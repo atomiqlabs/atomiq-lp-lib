@@ -1,4 +1,4 @@
-import {StorageObject} from "crosslightning-base";
+import {StorageObject} from "@atomiqlabs/base";
 import * as fs from "fs/promises";
 import {IIntermediaryStorage, StorageQueryParam} from "../storage/IIntermediaryStorage";
 import * as BN from "bn.js";

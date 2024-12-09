@@ -1,6 +1,6 @@
 import {FromBtcBaseConfig, FromBtcBaseSwapHandler} from "../FromBtcBaseSwapHandler";
 import {FromBtcTrustedSwap, FromBtcTrustedSwapState} from "./FromBtcTrustedSwap";
-import {BitcoinRpc, BtcBlock, BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData} from "crosslightning-base";
+import {BitcoinRpc, BtcBlock, BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData} from "@atomiqlabs/base";
 import {Express, Request, Response} from "express";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import * as BN from "bn.js";

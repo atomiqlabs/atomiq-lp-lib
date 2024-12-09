@@ -10,7 +10,7 @@ import {
     InitializeEvent,
     RefundEvent,
     SwapData
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {AuthenticatedLnd} from "lightning";
 import * as bitcoin from "bitcoinjs-lib";
 import {createHash} from "crypto";

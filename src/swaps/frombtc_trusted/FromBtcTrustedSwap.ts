@@ -1,4 +1,4 @@
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
 import * as BN from "bn.js";
 import {deserializeBN, serializeBN} from "../../utils/Utils";

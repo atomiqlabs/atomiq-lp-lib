@@ -1,7 +1,7 @@
 import * as BN from "bn.js";
 import * as bitcoin from "bitcoinjs-lib";
 import {createHash} from "crypto";
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../SwapHandler";
 import {deserializeBN, serializeBN} from "../../utils/Utils";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";

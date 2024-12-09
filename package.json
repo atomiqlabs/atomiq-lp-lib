@@ -1,7 +1,7 @@
 {
-  "name": "crosslightning-intermediary",
+  "name": "@atomiqlabs/lp-lib",
   "version": "10.3.11",
-  "description": "Main functionality implementation for intermediary node, easily extensible to any chain",
+  "description": "Main functionality implementation for atomiq LP node",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
   "scripts": {
@@ -22,12 +22,12 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
+    "@atomiqlabs/base": "7.2.0",
     "@atomiqlabs/bolt11": "1.5.1",
+    "@atomiqlabs/server-base": "1.0.4",
     "@bitcoinerlab/secp256k1": "1.0.5",
     "bitcoinjs-lib": "6.1.5",
     "bn.js": "5.2.1",
-    "crosslightning-base": "7.2.0",
-    "crosslightning-server-base": "1.0.3",
     "express": "4.18.2",
     "lightning": "10.2.1",
     "ln-service": "57.2.0",

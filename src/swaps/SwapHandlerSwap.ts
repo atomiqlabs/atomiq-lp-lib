@@ -1,4 +1,4 @@
-import {Lockable, StorageObject, SwapData} from "crosslightning-base";
+import {Lockable, StorageObject, SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "./SwapHandler";
 import {PluginManager} from "../plugins/PluginManager";
 import * as BN from "bn.js";

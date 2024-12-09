@@ -12,9 +12,10 @@ import {
     InitializeEvent,
     RefundEvent,
     SwapCommitStatus,
-    SwapData
-} from "crosslightning-base";
-import {BitcoinRpc, BtcBlock} from "crosslightning-base/dist";
+    SwapData,
+    BitcoinRpc, 
+    BtcBlock
+} from "@atomiqlabs/base";
 import {AuthenticatedLnd} from "lightning";
 import {expressHandlerWrapper, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";

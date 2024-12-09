@@ -1,4 +1,4 @@
-import {BitcoinRpc, SwapData} from "crosslightning-base";
+import {BitcoinRpc, SwapData} from "@atomiqlabs/base";
 import {
     FromBtcLnRequestType,
     FromBtcRequestType,
@@ -10,7 +10,7 @@ import {
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
 import {AuthenticatedLnd} from "lightning";
 import * as BN from "bn.js";
-import {Command} from "crosslightning-server-base";
+import {Command} from "@atomiqlabs/server-base";
 import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
 
 export type QuoteThrow = {

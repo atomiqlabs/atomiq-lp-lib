@@ -1,5 +1,5 @@
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import {RequestData, SwapBaseConfig, SwapHandler} from "./SwapHandler";
 import * as BN from "bn.js";
 import {IParamReader} from "../utils/paramcoders/IParamReader";

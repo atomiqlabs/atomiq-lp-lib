@@ -1,5 +1,5 @@
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import {FromBtcBaseSwapHandler} from "./FromBtcBaseSwapHandler";
 import * as BN from "bn.js";
 import * as lncli from "ln-service";

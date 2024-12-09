@@ -1,5 +1,5 @@
 import * as BN from "bn.js";
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
 import * as bolt11 from "@atomiqlabs/bolt11";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";

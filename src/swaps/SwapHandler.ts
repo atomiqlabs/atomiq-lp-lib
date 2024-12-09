@@ -8,7 +8,7 @@ import {
     SwapContract,
     SwapData,
     SwapEvent
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {AuthenticatedLnd} from "lightning";
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {PluginManager} from "../plugins/PluginManager";

@@ -1,4 +1,4 @@
-import {BitcoinRpc, SwapData} from "crosslightning-base";
+import {BitcoinRpc, SwapData} from "@atomiqlabs/base";
 import {
     IPlugin, isPluginQuote, isQuoteAmountTooHigh, isQuoteAmountTooLow, isQuoteSetFees,
     isQuoteThrow, isToBtcPluginQuote, PluginQuote,

@@ -12,7 +12,7 @@ import {
     InitializeEvent,
     RefundEvent,
     SwapData
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {AuthenticatedLnd} from "lightning";
 import {expressHandlerWrapper, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";

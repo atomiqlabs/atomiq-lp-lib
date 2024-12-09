@@ -7,7 +7,7 @@ import {
     InitializeEvent,
     RefundEvent,
     SwapData,
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {
     AuthenticatedLnd,
     cancelHodlInvoice,
