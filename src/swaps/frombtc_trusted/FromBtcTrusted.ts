@@ -453,7 +453,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             metadata.request = parsedBody;
 
             const refundAddressData = req.paramReader.getExistingParamsOrNull({
-                refundAddress: (val: string) => val==null &&
+                refundAddress: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     this.isValidBitcoinAddress(val) ? val : null
             });
@@ -671,7 +671,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                     val.length===64 &&
                     HEX_REGEX.test(val) ? val: null,
                 sequence: FieldTypeEnum.BN,
-                refundAddress: (val: string) => val==null &&
+                refundAddress: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     this.isValidBitcoinAddress(val) ? val : null
             });
