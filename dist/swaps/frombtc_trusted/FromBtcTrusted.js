@@ -50,7 +50,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             if (swap.refundAddress == null) {
                 if (swap.state !== FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE) {
                     yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE);
-                    yield this.storageManager.saveData(swap.getHash(), null, swap);
+                    yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                 }
                 return;
             }
@@ -206,19 +206,19 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 swap.vout = vout;
                 this.subscriptions.delete(swap.btcAddress);
                 yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED);
-                yield this.storageManager.saveData(swap.getHash(), null, swap);
+                yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
             }
             if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED) {
                 //Check if transaction still exists
                 if (tx == null || foundVout == null || tx.id !== swap.txId) {
                     yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CREATED);
-                    yield this.storageManager.saveData(swap.getHash(), null, swap);
+                    yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                     return;
                 }
                 //Check if it is confirmed
                 if (tx.confirmation_count > 0) {
                     yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED);
-                    yield this.storageManager.saveData(swap.getHash(), null, swap);
+                    yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                 }
                 else {
                     //Check if it pays high enough fee AND has confirmed ancestors
@@ -235,7 +235,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                         swap.txSize = parsedTx.virtualSize();
                         swap.txFee = fee;
                         yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED);
-                        yield this.storageManager.saveData(swap.getHash(), null, swap);
+                        yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                     }
                     else {
                         return;
@@ -299,7 +299,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     swap.scRawTx = rawTx;
                     if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED) {
                         yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.SENT);
-                        yield this.storageManager.saveData(swap.getHash(), null, swap);
+                        yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                     }
                     if (unlock != null)
                         unlock();
@@ -314,7 +314,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                         swap.txIds = { init: null };
                         swap.scRawTx = null;
                         yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED);
-                        yield this.storageManager.saveData(swap.getHash(), null, swap);
+                        yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                         break;
                     case "reverted":
                         //Cancel invoice
@@ -323,7 +323,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                         break;
                     case "success":
                         yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CONFIRMED);
-                        yield this.storageManager.saveData(swap.getHash(), null, swap);
+                        yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                         break;
                 }
             }
@@ -448,7 +448,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
-            yield this.storageManager.saveData(createdSwap.getHash(), null, createdSwap);
+            yield this.storageManager.saveData(createdSwap.getHash(), createdSwap.getSequence(), createdSwap);
             this.subscriptions.set(createdSwap.btcAddress, createdSwap);
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: " + createdSwap.btcAddress + " amount: " + amountBD.toString(10));
             yield responseStream.writeParamsAndEnd({
