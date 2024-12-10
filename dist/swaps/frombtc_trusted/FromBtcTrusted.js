@@ -435,15 +435,22 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Make sure we have MORE THAN ENOUGH to honor the swap request
             yield this.checkBalance(totalInToken.mul(new BN(4)), balancePrefetch, abortController.signal);
             metadata.times.balanceChecked = Date.now();
+            const { current_block_height } = yield (0, lightning_1.getHeight)({ lnd: this.LND });
+            const feeRate = yield this.config.feeEstimator.estimateFee();
+            const recommendedFee = Math.ceil(feeRate * this.config.recommendFeeMultiplier);
+            if (recommendedFee === 0)
+                throw {
+                    _httpStatus: 500,
+                    code: 21100,
+                    msg: "Cannot estimate bitcoin fee!"
+                };
+            metadata.times.feeEstimated = Date.now();
             const { address: receiveAddress } = yield (0, lightning_1.createChainAddress)({
                 lnd: this.LND,
                 format: "p2wpkh"
             });
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
-            const { current_block_height } = yield (0, lightning_1.getHeight)({ lnd: this.LND });
-            const feeRate = yield this.config.feeEstimator.estimateFee();
-            const recommendedFee = Math.ceil(feeRate * this.config.recommendFeeMultiplier);
             const createdSwap = new FromBtcTrustedSwap_1.FromBtcTrustedSwap(chainIdentifier, swapFee, swapFeeInToken, receiveAddress, amountBD, parsedBody.address, totalInToken, current_block_height, Date.now() + (this.config.swapAddressExpiry * 1000), recommendedFee, refundAddress);
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;

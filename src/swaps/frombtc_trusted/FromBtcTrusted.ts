@@ -496,16 +496,22 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             await this.checkBalance(totalInToken.mul(new BN(4)), balancePrefetch, abortController.signal)
             metadata.times.balanceChecked = Date.now();
 
+            const {current_block_height} = await getHeight({lnd: this.LND});
+            const feeRate = await this.config.feeEstimator.estimateFee();
+            const recommendedFee = Math.ceil(feeRate*this.config.recommendFeeMultiplier);
+            if(recommendedFee===0) throw {
+                _httpStatus: 500,
+                code: 21100,
+                msg: "Cannot estimate bitcoin fee!"
+            };
+            metadata.times.feeEstimated = Date.now();
+
             const {address: receiveAddress} = await createChainAddress({
                 lnd: this.LND,
                 format: "p2wpkh"
             });
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
-
-            const {current_block_height} = await getHeight({lnd: this.LND});
-            const feeRate = await this.config.feeEstimator.estimateFee();
-            const recommendedFee = Math.ceil(feeRate*this.config.recommendFeeMultiplier);
 
             const createdSwap = new FromBtcTrustedSwap(
                 chainIdentifier,
