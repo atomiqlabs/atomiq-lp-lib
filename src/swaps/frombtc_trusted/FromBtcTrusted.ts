@@ -315,9 +315,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 this.doubleSpendWatchdogSwaps.add(swap);
             }
         }
-        if(tx.confirmation_count > 0) {
+        if(tx.confirmation_count > 0 && this.doubleSpendWatchdogSwaps.delete(swap)) {
             this.swapLogger.debug(swap, "processPastSwap(): Removing confirmed swap transaction from double spend watchdog list: ", swap.txId);
-            this.doubleSpendWatchdogSwaps.delete(swap);
         }
 
         if(swap.state===FromBtcTrustedSwapState.BTC_CONFIRMED) {
