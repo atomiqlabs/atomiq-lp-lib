@@ -432,8 +432,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Check valid amount specified (min/max)
             const { amountBD, swapFee, swapFeeInToken, totalInToken } = yield this.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
             metadata.times.priceCalculated = Date.now();
-            //Check if we have enough funds to honor the request
-            yield this.checkBalance(totalInToken, balancePrefetch, abortController.signal);
+            //Make sure we have MORE THAN ENOUGH to honor the swap request
+            yield this.checkBalance(totalInToken.mul(new BN(4)), balancePrefetch, abortController.signal);
             metadata.times.balanceChecked = Date.now();
             const { address: receiveAddress } = yield (0, lightning_1.createChainAddress)({
                 lnd: this.LND,
