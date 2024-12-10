@@ -189,6 +189,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     if (sentSats.lt(this.config.min))
                         return;
                     if (sentSats.gt(this.config.max)) {
+                        swap.adjustedInput = sentSats;
                         swap.rawTx = tx.transaction;
                         swap.txId = tx.id;
                         swap.vout = vout;

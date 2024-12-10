@@ -232,6 +232,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 //If lower than minimum then ignore
                 if(sentSats.lt(this.config.min)) return;
                 if(sentSats.gt(this.config.max)) {
+                    swap.adjustedInput = sentSats;
                     swap.rawTx = tx.transaction;
                     swap.txId = tx.id;
                     swap.vout = vout;
