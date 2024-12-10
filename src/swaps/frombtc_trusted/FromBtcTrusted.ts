@@ -558,12 +558,14 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
         const getInvoiceStatus = expressHandlerWrapper(async (req, res) => {
             /**
              * paymentHash: string          payment hash of the invoice
+             * sequence: BN                 secret sequence for the swap,
              */
             const parsedBody = verifySchema(req.query, {
                 paymentHash: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     val.length===64 &&
                     HEX_REGEX.test(val) ? val: null,
+                sequence: FieldTypeEnum.BN,
             });
             if(parsedBody==null) throw {
                 code: 20100,
@@ -575,7 +577,11 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 _httpStatus: 200,
                 code: 10000,
                 msg: "Success, tx confirmed",
-                data: processedTxData
+                data: {
+                    adjustedAmount: processedTxData.adjustedAmount.toString(10),
+                    adjustedTotal: processedTxData.adjustedTotal.toString(10),
+                    txId: processedTxData.txId
+                }
             };
 
             const refundTxId = this.refundedSwaps.get(parsedBody.paymentHash);
@@ -598,7 +604,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 }
             };
 
-            const invoiceData: FromBtcTrustedSwap = await this.storageManager.getData(parsedBody.paymentHash, null);
+            const invoiceData: FromBtcTrustedSwap = await this.storageManager.getData(parsedBody.paymentHash, parsedBody.sequence);
             if (invoiceData==null) throw {
                 _httpStatus: 200,
                 code: 10001,

@@ -480,12 +480,14 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         const getInvoiceStatus = (0, Utils_1.expressHandlerWrapper)((req, res) => __awaiter(this, void 0, void 0, function* () {
             /**
              * paymentHash: string          payment hash of the invoice
+             * sequence: BN                 secret sequence for the swap,
              */
             const parsedBody = (0, SchemaVerifier_1.verifySchema)(req.query, {
                 paymentHash: (val) => val != null &&
                     typeof (val) === "string" &&
                     val.length === 64 &&
                     Utils_1.HEX_REGEX.test(val) ? val : null,
+                sequence: SchemaVerifier_1.FieldTypeEnum.BN,
             });
             if (parsedBody == null)
                 throw {
@@ -498,7 +500,11 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     _httpStatus: 200,
                     code: 10000,
                     msg: "Success, tx confirmed",
-                    data: processedTxData
+                    data: {
+                        adjustedAmount: processedTxData.adjustedAmount.toString(10),
+                        adjustedTotal: processedTxData.adjustedTotal.toString(10),
+                        txId: processedTxData.txId
+                    }
                 };
             const refundTxId = this.refundedSwaps.get(parsedBody.paymentHash);
             if (refundTxId != null)
@@ -520,7 +526,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                         txId: doubleSpendTxId
                     }
                 };
-            const invoiceData = yield this.storageManager.getData(parsedBody.paymentHash, null);
+            const invoiceData = yield this.storageManager.getData(parsedBody.paymentHash, parsedBody.sequence);
             if (invoiceData == null)
                 throw {
                     _httpStatus: 200,
