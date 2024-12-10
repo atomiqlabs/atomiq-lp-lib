@@ -267,7 +267,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 return;
             }
             else {
-                if (!this.doubleSpendWatchdogSwaps.has(swap)) {
+                if (tx.confirmation_count === 0 && !this.doubleSpendWatchdogSwaps.has(swap)) {
                     this.swapLogger.debug(swap, "processPastSwap(): Adding swap transaction to double spend watchdog list: ", swap.txId);
                     this.doubleSpendWatchdogSwaps.add(swap);
                 }
