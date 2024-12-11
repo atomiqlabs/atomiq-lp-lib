@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import * as BN from "bn.js";
 import { SwapData } from "@atomiqlabs/base";
 import { ToBtcBaseSwap } from "../ToBtcBaseSwap";
@@ -18,8 +17,6 @@ export declare class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtc
     constructor(chainIdentifier: string, pr: string, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN, signatureExpiry: BN);
     constructor(obj: any);
     serialize(): any;
-    getHash(): string;
-    getHashBuffer(): Buffer;
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;

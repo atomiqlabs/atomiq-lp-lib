@@ -60,14 +60,6 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
         return partialSerialized;
     }
 
-    getHash(): string {
-        return bolt11.decode(this.pr).tagsObject.payment_hash;
-    }
-
-    getHashBuffer(): Buffer {
-        return Buffer.from(bolt11.decode(this.pr).tagsObject.payment_hash, "hex");
-    }
-
     isInitiated(): boolean {
         return this.state!==ToBtcLnSwapState.SAVED;
     }

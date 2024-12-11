@@ -1,15 +1,13 @@
-/// <reference types="node" />
 import * as BN from "bn.js";
 import { Express } from "express";
 import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
-import { AuthenticatedLnd } from "lightning";
 import { FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState } from "./FromBtcLnTrustedSwap";
 import { FromBtcBaseConfig } from "../FromBtcBaseSwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { FromBtcLnBaseSwapHandler } from "../FromBtcLnBaseSwapHandler";
-import EventEmitter from "node:events";
+import { ILightningWallet } from "../../wallets/ILightningWallet";
 export type SwapForGasServerConfig = FromBtcBaseConfig & {
     minCltv: BN;
     invoiceTimeoutSeconds?: number;
@@ -24,10 +22,10 @@ export type FromBtcLnTrustedRequestType = {
  */
 export declare class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState> {
     readonly type: SwapHandlerType;
-    activeSubscriptions: Map<string, EventEmitter>;
+    activeSubscriptions: Map<string, AbortController>;
     processedTxIds: Map<string, string>;
     readonly config: SwapForGasServerConfig;
-    constructor(storageDirectory: IIntermediaryStorage<FromBtcLnTrustedSwap>, path: string, chains: MultichainData, lnd: AuthenticatedLnd, swapPricing: ISwapPrice, config: SwapForGasServerConfig);
+    constructor(storageDirectory: IIntermediaryStorage<FromBtcLnTrustedSwap>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: SwapForGasServerConfig);
     /**
      * Unsubscribe from the pending lightning network invoice
      *

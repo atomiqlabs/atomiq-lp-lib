@@ -1,7 +1,6 @@
 import { Express, Request } from "express";
 import { ISwapPrice } from "./ISwapPrice";
 import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, SwapEvent } from "@atomiqlabs/base";
-import { AuthenticatedLnd } from "lightning";
 import { SwapHandlerSwap } from "./SwapHandlerSwap";
 import { IIntermediaryStorage } from "../storage/IIntermediaryStorage";
 import * as BN from "bn.js";
@@ -70,7 +69,6 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
         [chainId: string]: Set<string>;
     };
     readonly swapPricing: ISwapPrice;
-    readonly LND: AuthenticatedLnd;
     abstract config: SwapBaseConfig;
     logger: {
         debug: (msg: string, ...args: any) => void;
@@ -84,7 +82,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
         warn: (swap: SwapHandlerSwap | SwapEvent<SwapData> | SwapData, msg: string, ...args: any) => void;
         error: (swap: SwapHandlerSwap | SwapEvent<SwapData> | SwapData, msg: string, ...args: any) => void;
     };
-    protected constructor(storageDirectory: IIntermediaryStorage<V>, path: string, chainsData: MultichainData, lnd: AuthenticatedLnd, swapPricing: ISwapPrice);
+    protected constructor(storageDirectory: IIntermediaryStorage<V>, path: string, chainsData: MultichainData, swapPricing: ISwapPrice);
     protected getDefaultChain(): ChainData;
     protected getChain(identifier: string): ChainData;
     protected abstract processPastSwaps(): Promise<void>;

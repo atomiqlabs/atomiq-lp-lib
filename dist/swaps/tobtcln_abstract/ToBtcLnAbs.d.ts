@@ -4,9 +4,9 @@ import { ToBtcLnSwapAbs, ToBtcLnSwapState } from "./ToBtcLnSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
 import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
-import { AuthenticatedLnd } from "lightning";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
+import { ILightningWallet, ParsedPaymentRequest } from "../../wallets/ILightningWallet";
 export type ToBtcLnConfig = ToBtcBaseConfig & {
     routingFeeMultiplier: BN;
     minSendCltv: BN;
@@ -16,21 +16,12 @@ export type ToBtcLnConfig = ToBtcBaseConfig & {
     minLnBaseFee?: BN;
     exactInExpiry?: number;
 };
-type LNRoutes = {
-    public_key: string;
-    fee_rate?: number;
-    cltv_delta?: number;
-    channel?: string;
-    base_fee_mtokens?: string;
-}[][];
 type ExactInAuthorization = {
     chainIdentifier: string;
     reqId: string;
     expiry: number;
     amount: BN;
-    destination: string;
-    cltvDelta: number;
-    routes: LNRoutes;
+    initialInvoice: ParsedPaymentRequest;
     quotedNetworkFeeInToken: BN;
     swapFeeInToken: BN;
     total: BN;
@@ -67,7 +58,7 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
     protected readonly LIGHTNING_LIQUIDITY_CACHE_TIMEOUT: number;
     activeSubscriptions: Set<string>;
     lightningLiquidityCache: {
-        liquidityMTokens: BN;
+        liquidity: BN;
         timestamp: number;
     };
     readonly type = SwapHandlerType.TO_BTCLN;
@@ -77,14 +68,8 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
     readonly exactInAuths: {
         [reqId: string]: ExactInAuthorization;
     };
-    constructor(storageDirectory: IIntermediaryStorage<ToBtcLnSwapAbs>, path: string, chainData: MultichainData, lnd: AuthenticatedLnd, swapPricing: ISwapPrice, config: ToBtcLnConfig);
-    /**
-     * Fetches the payment info, returns null if payment not found
-     *
-     * @param paymentHash
-     * @private
-     */
-    private getPayment;
+    readonly lightning: ILightningWallet;
+    constructor(storageDirectory: IIntermediaryStorage<ToBtcLnSwapAbs>, path: string, chainData: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: ToBtcLnConfig);
     /**
      * Cleans up exactIn authorization that are already past their expiry
      *
@@ -174,41 +159,6 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
      * @throws {DefinedRuntimeError} will throw an error if there isn't enough liquidity
      */
     private checkLiquidity;
-    /**
-     * Computes the route paying to the specified bolt11 invoice, estimating the fee, uses bLIP-39 blinded paths
-     *
-     * @param amountSats
-     * @param maxFee
-     * @param parsedRequest
-     * @param maxTimeoutBlockheight
-     * @param metadata
-     * @param maxUsableCLTV
-     * @private
-     */
-    private getRoutesInvoiceBLIP39;
-    /**
-     * Computes the route paying to the specified bolt11 invoice, estimating the fee
-     *
-     * @param amountSats
-     * @param maxFee
-     * @param parsedRequest
-     * @param maxTimeoutBlockheight
-     * @param metadata
-     * @param maxUsableCLTV
-     * @private
-     */
-    private getRoutesInvoice;
-    /**
-     * Sends a probe payment to the specified bolt11 invoice to check if it is reachable
-     *
-     * @param amountSats
-     * @param maxFee
-     * @param parsedRequest
-     * @param maxTimeoutBlockheight
-     * @param metadata
-     * @private
-     */
-    private probeInvoice;
     /**
      * Estimates the routing fee & confidence by either probing or routing (if probing fails), the fee is also adjusted
      *  according to routing fee multiplier, and subject to minimums set in config

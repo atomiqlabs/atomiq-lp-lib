@@ -43,12 +43,6 @@ class ToBtcLnSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         partialSerialized.secret = this.secret;
         return partialSerialized;
     }
-    getHash() {
-        return bolt11.decode(this.pr).tagsObject.payment_hash;
-    }
-    getHashBuffer() {
-        return Buffer.from(bolt11.decode(this.pr).tagsObject.payment_hash, "hex");
-    }
     isInitiated() {
         return this.state !== ToBtcLnSwapState.SAVED;
     }

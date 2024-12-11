@@ -11,9 +11,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBtcLnBaseSwapHandler = void 0;
 const FromBtcBaseSwapHandler_1 = require("./FromBtcBaseSwapHandler");
-const BN = require("bn.js");
-const lncli = require("ln-service");
 class FromBtcLnBaseSwapHandler extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
+    constructor(storageDirectory, path, chains, lightning, swapPricing) {
+        super(storageDirectory, path, chains, swapPricing);
+        this.lightning = lightning;
+    }
     /**
      * Checks if we have enough inbound liquidity to be able to receive an LN payment (without MPP)
      *
@@ -27,8 +29,8 @@ class FromBtcLnBaseSwapHandler extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapH
             const channelsResponse = yield channelsPrefetch;
             signal.throwIfAborted();
             let hasEnoughInboundLiquidity = false;
-            channelsResponse.channels.forEach(channel => {
-                if (new BN(channel.remote_balance).gte(amountBD))
+            channelsResponse.forEach(channel => {
+                if (channel.remoteBalance.gte(amountBD))
                     hasEnoughInboundLiquidity = true;
             });
             if (!hasEnoughInboundLiquidity) {
@@ -45,7 +47,7 @@ class FromBtcLnBaseSwapHandler extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapH
      * @param abortController
      */
     getChannelsPrefetch(abortController) {
-        return lncli.getChannels({ is_active: true, lnd: this.LND }).catch(e => {
+        return this.lightning.getChannels(true).catch(e => {
             this.logger.error("getChannelsPrefetch(): error", e);
             abortController.abort(e);
             return null;

@@ -28,7 +28,7 @@ var SwapHandlerType;
  * An abstract class defining a singular swap service
  */
 class SwapHandler {
-    constructor(storageDirectory, path, chainsData, lnd, swapPricing) {
+    constructor(storageDirectory, path, chainsData, swapPricing) {
         this.logger = {
             debug: (msg, ...args) => console.debug("SwapHandler(" + this.type + "): " + msg, ...args),
             info: (msg, ...args) => console.info("SwapHandler(" + this.type + "): " + msg, ...args),
@@ -46,7 +46,6 @@ class SwapHandler {
         if (this.chains.chains[this.chains.default] == null)
             throw new Error("Invalid default chain specified");
         this.path = path;
-        this.LND = lnd;
         this.swapPricing = swapPricing;
         this.allowedTokens = {};
         for (let chainId in chainsData.chains) {
