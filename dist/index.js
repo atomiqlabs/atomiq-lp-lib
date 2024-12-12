@@ -50,3 +50,8 @@ __exportStar(require("./utils/paramcoders/ParamEncoder"), exports);
 __exportStar(require("./utils/paramcoders/SchemaVerifier"), exports);
 __exportStar(require("./utils/paramcoders/server/ServerParamDecoder"), exports);
 __exportStar(require("./utils/paramcoders/server/ServerParamEncoder"), exports);
+__exportStar(require("./wallets/IBitcoinWallet"), exports);
+__exportStar(require("./wallets/ILightningWallet"), exports);
+__exportStar(require("./lnd/LNDClient"), exports);
+__exportStar(require("./lnd/LNDBitcoinWallet"), exports);
+__exportStar(require("./lnd/LNDLightningWallet"), exports);

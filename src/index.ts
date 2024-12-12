@@ -44,3 +44,10 @@ export * from "./utils/paramcoders/ParamEncoder";
 export * from "./utils/paramcoders/SchemaVerifier";
 export * from "./utils/paramcoders/server/ServerParamDecoder";
 export * from "./utils/paramcoders/server/ServerParamEncoder";
+
+export * from "./wallets/IBitcoinWallet";
+export * from "./wallets/ILightningWallet";
+
+export * from "./lnd/LNDClient";
+export * from "./lnd/LNDBitcoinWallet";
+export * from "./lnd/LNDLightningWallet";

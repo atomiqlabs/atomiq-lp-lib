@@ -27,7 +27,7 @@ class PluginManager {
     static unregisterPlugin(name) {
         return PluginManager.plugins.delete(name);
     }
-    static enable(chainsData, bitcoinRpc, lnd, swapPricing, tokens, directory) {
+    static enable(chainsData, bitcoinRpc, bitcoinWallet, lightningWallet, swapPricing, tokens, directory) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 fs.mkdirSync(directory);
@@ -39,7 +39,7 @@ class PluginManager {
                         fs.mkdirSync(directory + "/" + name);
                     }
                     catch (e) { }
-                    yield plugin.onEnable(chainsData, bitcoinRpc, lnd, swapPricing, tokens, directory + "/" + name);
+                    yield plugin.onEnable(chainsData, bitcoinRpc, bitcoinWallet, lightningWallet, swapPricing, tokens, directory + "/" + name);
                 }
                 catch (e) {
                     pluginLogger.error(plugin, "enable(): plugin enable error", e);

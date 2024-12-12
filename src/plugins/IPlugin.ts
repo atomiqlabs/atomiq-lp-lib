@@ -8,10 +8,11 @@ import {
     ToBtcRequestType
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
-import {AuthenticatedLnd} from "lightning";
 import * as BN from "bn.js";
 import {Command} from "@atomiqlabs/server-base";
 import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
+import {ILightningWallet} from "../wallets/ILightningWallet";
 
 export type QuoteThrow = {
     type: "throw",
@@ -84,7 +85,8 @@ export interface IPlugin {
         chainsData: MultichainData,
 
         bitcoinRpc: BitcoinRpc<any>,
-        lnd: AuthenticatedLnd,
+        bitcoinWallet: IBitcoinWallet,
+        lightningWallet: ILightningWallet,
 
         swapPricing: ISwapPrice,
         tokens: {
