@@ -10,15 +10,16 @@ import {
     ProbeAndRouteResponse
 } from "../wallets/ILightningWallet";
 import {
-    cancelHodlInvoice,
+    addPeer,
+    cancelHodlInvoice, closeChannel,
     createHodlInvoice, createInvoice,
     getChannelBalance,
     getChannels,
     getHeight,
     getInvoice,
-    getPayment,
+    getPayment, getPendingChannels,
     getRouteToDestination,
-    getWalletInfo,
+    getWalletInfo, openChannel,
     pay,
     probeForRoute,
     settleHodlInvoice,
@@ -33,6 +34,14 @@ import {handleLndError} from "../utils/Utils";
 import * as bolt11 from "@atomiqlabs/bolt11";
 import {TagsObject} from "@atomiqlabs/bolt11";
 import {LNDClient, LNDConfig} from "./LNDClient";
+import {
+    cmdNumberParser,
+    cmdStringParser,
+    Command,
+    createCommand,
+    fromDecimal,
+    toDecimal
+} from "@atomiqlabs/server-base";
 
 
 //Check for lightning nodes which don't properly handle probe requests
@@ -80,6 +89,196 @@ export class LNDLightningWallet implements ILightningWallet{
 
     init(): Promise<void> {
         return this.lndClient.init();
+    }
+
+    getStatus(): string {
+        return this.lndClient.status;
+    }
+
+    async getStatusInfo(): Promise<Record<string, string>> {
+        if(this.lndClient.lnd==null) return {};
+        const resp = await getWalletInfo({lnd: this.lndClient.lnd});
+        const clientRecords = await this.lndClient.getStatusInfo();
+        return {
+            ...clientRecords,
+            "Connected peers": resp.peers_count.toString(),
+            "Channels active": resp.active_channels_count.toString(),
+            "Channels pending": resp.pending_channels_count.toString()
+        };
+    }
+
+    getCommands(): Command<any>[] {
+        return [
+            createCommand(
+                "connectlightning",
+                "Connect to a lightning node peer",
+                {
+                    args: {
+                        node: {
+                            base: true,
+                            description: "Remote node identification as <pubkey>@<ip address>",
+                            parser: (data: string) => {
+                                if(data==null) throw new Error("Data cannot be null");
+                                const arr = data.split("@");
+                                if(arr.length!==2) throw new Error("Invalid format, should be: <pubkey>@<ip address>");
+                                return {
+                                    pubkey: arr[0],
+                                    address: arr[1]
+                                };
+                            }
+                        }
+                    },
+                    parser: async (args, sendLine) => {
+                        if(this.lndClient.lnd==null) throw new Error("LND node not ready yet! Monitor the status with the 'status' command");
+                        sendLine("Connecting to remote peer...");
+                        await addPeer({
+                            lnd: this.lndClient.lnd,
+                            public_key: args.node.pubkey,
+                            socket: args.node.address
+                        });
+                        return "Connection to the lightning peer established! Public key: "+args.node.pubkey;
+                    }
+                }
+            ),
+            createCommand(
+                "openchannel",
+                "Opens up a lightning network payment channel",
+                {
+                    args: {
+                        amount: {
+                            base: true,
+                            description: "Amount of BTC to use inside a lightning",
+                            parser: cmdNumberParser(true, 0)
+                        },
+                        node: {
+                            base: true,
+                            description: "Remote node identification as <pubkey>@<ip address>",
+                            parser: (data: string) => {
+                                if(data==null) throw new Error("Data cannot be null");
+                                const arr = data.split("@");
+                                if(arr.length!==2) throw new Error("Invalid format, should be: <pubkey>@<ip address>");
+                                return {
+                                    pubkey: arr[0],
+                                    address: arr[1]
+                                };
+                            }
+                        },
+                        feeRate: {
+                            base: false,
+                            description: "Fee rate for the opening transaction (sats/vB)",
+                            parser: cmdNumberParser(false, 1, null, true)
+                        }
+                    },
+                    parser: async (args, sendLine) => {
+                        if(this.lndClient.lnd==null) throw new Error("LND node not ready yet! Monitor the status with the 'status' command");
+                        const amtBN = args.amount==null ? null : fromDecimal(args.amount.toFixed(8), 8);
+                        if(amtBN==null) throw new Error("Amount cannot be parsed");
+                        const resp = await openChannel({
+                            lnd: this.lndClient.lnd,
+                            local_tokens: amtBN.toNumber(),
+                            min_confirmations: 0,
+                            partner_public_key: args.node.pubkey,
+                            partner_socket: args.node.address,
+                            fee_rate: 1000,
+                            base_fee_mtokens: "1000",
+                            chain_fee_tokens_per_vbyte: args.feeRate
+                        });
+                        return "Lightning channel funded, wait for TX confirmations! txId: "+resp.transaction_id;
+                    }
+                }
+            ),
+            createCommand(
+                "closechannel",
+                "Attempts to cooperatively close a lightning network channel",
+                {
+                    args: {
+                        channelId: {
+                            base: true,
+                            description: "Channel ID to close cooperatively",
+                            parser: cmdStringParser()
+                        },
+                        feeRate: {
+                            base: false,
+                            description: "Fee rate for the closing transaction (sats/vB)",
+                            parser: cmdNumberParser(false, 1, null, true)
+                        }
+                    },
+                    parser: async (args, sendLine) => {
+                        if(this.lndClient.lnd==null) throw new Error("LND node not ready yet! Monitor the status with the 'status' command");
+                        const resp = await closeChannel({
+                            lnd: this.lndClient.lnd,
+                            is_force_close: false,
+                            id: args.channelId,
+                            tokens_per_vbyte: args.feeRate
+                        });
+                        return "Lightning channel closed, txId: "+resp.transaction_id;
+                    }
+                }
+            ),
+            createCommand(
+                "forceclosechannel",
+                "Force closes a lightning network channel",
+                {
+                    args: {
+                        channelId: {
+                            base: true,
+                            description: "Channel ID to force close",
+                            parser: cmdStringParser()
+                        }
+                    },
+                    parser: async (args, sendLine) => {
+                        if(this.lndClient.lnd==null) throw new Error("LND node not ready yet! Monitor the status with the 'status' command");
+                        const resp = await closeChannel({
+                            lnd: this.lndClient.lnd,
+                            is_force_close: true,
+                            id: args.channelId
+                        });
+                        return "Lightning channel closed, txId: "+resp.transaction_id;
+                    }
+                }
+            ),
+            createCommand(
+                "listchannels",
+                "Lists existing lightning channels",
+                {
+                    args: {},
+                    parser: async (args, sendLine) => {
+                        if(this.lndClient.lnd==null) throw new Error("LND node not ready yet! Monitor the status with the 'status' command");
+                        const {channels} = await getChannels({
+                            lnd: this.lndClient.lnd
+                        });
+                        const reply: string[] = [];
+                        reply.push("Opened channels:");
+                        for(let channel of channels) {
+                            reply.push(" - "+channel.id);
+                            reply.push("    Peer: "+channel.partner_public_key);
+                            reply.push("    State: "+(channel.is_closing ? "closing" : channel.is_opening ? "opening" : channel.is_active ? "active" : "inactive"));
+                            reply.push("    Balance: "+toDecimal(new BN(channel.local_balance), 8)+"/"+toDecimal(new BN(channel.capacity), 8)+" ("+(channel.local_balance/channel.capacity*100).toFixed(2)+"%)");
+                            reply.push("    Unsettled balance: "+toDecimal(new BN(channel.unsettled_balance), 8));
+                        }
+                        const {pending_channels} = await getPendingChannels({
+                            lnd: this.lndClient.lnd
+                        });
+                        if(pending_channels.length>0) {
+                            reply.push("Pending channels:");
+                            for(let channel of pending_channels) {
+                                reply.push(" - "+channel.transaction_id+":"+channel.transaction_vout);
+                                reply.push("    Peer: "+channel.partner_public_key);
+                                reply.push("    State: "+(channel.is_closing ? "closing" : channel.is_opening ? "opening" : channel.is_active ? "active" : "inactive"));
+                                reply.push("    Balance: "+toDecimal(new BN(channel.local_balance), 8)+"/"+toDecimal(new BN(channel.capacity), 8)+" ("+(channel.local_balance/channel.capacity*100).toFixed(2)+"%)");
+                                if(channel.is_opening) reply.push("    Funding txId: "+channel.transaction_id);
+                                if(channel.is_closing) {
+                                    reply.push("    Is timelocked: "+channel.is_timelocked);
+                                    if(channel.is_timelocked) reply.push("    Blocks till claimable: "+channel.timelock_blocks);
+                                    reply.push("    Close txId: "+channel.close_transaction_id);
+                                }
+                            }
+                        }
+                        return reply.join("\n");
+                    }
+                }
+            )
+        ]
     }
 
     async getInvoice(paymentHash: string): Promise<LightningNetworkInvoice | null> {

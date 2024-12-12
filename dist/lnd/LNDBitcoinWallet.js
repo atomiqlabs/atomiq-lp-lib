@@ -83,6 +83,15 @@ class LNDBitcoinWallet {
     init() {
         return this.lndClient.init();
     }
+    getStatus() {
+        return this.lndClient.status;
+    }
+    getStatusInfo() {
+        return this.lndClient.getStatusInfo();
+    }
+    getCommands() {
+        return [];
+    }
     toOutputScript(_address) {
         return bitcoinjs_lib_1.address.toOutputScript(_address, this.config.network);
     }
@@ -202,6 +211,22 @@ class LNDBitcoinWallet {
                 };
             }
             return this.cachedUtxos.utxos;
+        });
+    }
+    getBalance() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const resUtxos = yield (0, lightning_1.getUtxos)({ lnd: this.lndClient.lnd });
+            let confirmed = 0;
+            let unconfirmed = 0;
+            resUtxos.utxos.forEach(utxo => {
+                if (utxo.confirmation_count > 0) {
+                    confirmed += utxo.tokens;
+                }
+                else {
+                    unconfirmed += utxo.tokens;
+                }
+            });
+            return { confirmed, unconfirmed };
         });
     }
     sendRawTransaction(tx) {

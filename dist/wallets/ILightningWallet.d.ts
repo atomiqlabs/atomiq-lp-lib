@@ -1,4 +1,5 @@
 import * as BN from "bn.js";
+import { Command } from "@atomiqlabs/server-base";
 export type IncomingLightningNetworkPayment = {
     createdAt: number;
     confirmedAt: number;
@@ -94,6 +95,9 @@ export type ProbeAndRouteResponse = {
 export declare function routesMatch(routesA: LNRoutes, routesB: LNRoutes): boolean;
 export interface ILightningWallet {
     init(): Promise<void>;
+    getStatus(): string;
+    getStatusInfo(): Promise<Record<string, string>>;
+    getCommands(): Command<any>[];
     createInvoice(init: InvoiceInit): Promise<LightningNetworkInvoice>;
     createHodlInvoice(init: HodlInvoiceInit): Promise<LightningNetworkInvoice>;
     getInvoice(paymentHash: string): Promise<LightningNetworkInvoice | null>;

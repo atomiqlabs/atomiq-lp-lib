@@ -18,11 +18,23 @@ const crypto_1 = require("crypto");
 const promises_1 = require("fs/promises");
 class LNDClient {
     constructor(config) {
+        this.status = "offline";
         if (config.CERT == null && config.CERT_FILE == null)
             throw new Error("Certificate for LND not provided, provide either CERT or CERT_FILE config!");
         if (config.MACAROON == null && config.MACAROON_FILE == null)
             throw new Error("Macaroon for LND not provided, provide either MACAROON or MACAROON_FILE config!");
         this.config = config;
+    }
+    getStatusInfo() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.lnd == null)
+                return {};
+            const resp = yield (0, lightning_1.getWalletInfo)({ lnd: this.lnd });
+            return {
+                "Synced to chain": "" + resp.is_synced_to_chain,
+                "Blockheight": resp.current_block_height.toString()
+            };
+        });
     }
     getUnauthenticatedLndGrpc() {
         let cert = this.config.CERT;
@@ -196,8 +208,11 @@ class LNDClient {
                 return false;
             }
             const walletStatus = yield this.getLNDWalletStatus(lnd);
-            if (walletStatus === "active" || walletStatus === "ready")
+            if (walletStatus === "active" || walletStatus === "ready") {
+                this.status = "syncing";
                 return true;
+            }
+            this.status = walletStatus;
             if (walletStatus === "waiting" || walletStatus === "starting" || walletStatus === "offline")
                 return false;
             if (walletStatus === "absent") {
@@ -238,6 +253,7 @@ class LNDClient {
                 if (!lndReady)
                     yield new Promise(resolve => setTimeout(resolve, 30 * 1000));
             }
+            this.status = "ready";
         });
     }
 }

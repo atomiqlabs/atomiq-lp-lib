@@ -11,8 +11,10 @@ export type LNDConfig = {
 };
 export declare class LNDClient {
     lnd: AuthenticatedLnd;
+    status: string;
     private readonly config;
     constructor(config: LNDConfig);
+    getStatusInfo(): Promise<Record<string, string>>;
     private getUnauthenticatedLndGrpc;
     private getAuthenticatedLndGrpc;
     /**

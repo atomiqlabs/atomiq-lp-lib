@@ -1,10 +1,14 @@
 import { HodlInvoiceInit, ILightningWallet, InvoiceInit, LightningBalanceResponse, LightningNetworkChannel, LightningNetworkInvoice, LightningPaymentInit, OutgoingLightningNetworkPayment, ParsedPaymentRequest, ProbeAndRouteInit, ProbeAndRouteResponse } from "../wallets/ILightningWallet";
 import { LNDClient, LNDConfig } from "./LNDClient";
+import { Command } from "@atomiqlabs/server-base";
 export declare class LNDLightningWallet implements ILightningWallet {
     private readonly lndClient;
     constructor(config: LNDConfig);
     constructor(client: LNDClient);
     init(): Promise<void>;
+    getStatus(): string;
+    getStatusInfo(): Promise<Record<string, string>>;
+    getCommands(): Command<any>[];
     getInvoice(paymentHash: string): Promise<LightningNetworkInvoice | null>;
     cancelHodlInvoice(paymentHash: string): Promise<void>;
     settleHodlInvoice(secret: string): Promise<void>;

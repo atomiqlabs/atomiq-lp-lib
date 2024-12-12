@@ -6,6 +6,7 @@ import { BtcTx } from "@atomiqlabs/base";
 import { Network, Psbt } from "bitcoinjs-lib";
 import { IBtcFeeEstimator } from "../fees/IBtcFeeEstimator";
 import * as bitcoin from "bitcoinjs-lib";
+import { Command } from "@atomiqlabs/server-base";
 export type LNDBitcoinWalletConfig = {
     network?: Network;
     feeEstimator?: IBtcFeeEstimator;
@@ -40,6 +41,9 @@ export declare class LNDBitcoinWallet implements IBitcoinWallet {
     constructor(lndConfig: LNDConfig, config?: LNDBitcoinWalletConfig);
     constructor(client: LNDClient, config?: LNDBitcoinWalletConfig);
     init(): Promise<void>;
+    getStatus(): string;
+    getStatusInfo(): Promise<Record<string, string>>;
+    getCommands(): Command<any>[];
     toOutputScript(_address: string): Buffer;
     getBlockheight(): Promise<number>;
     getFeeRate(): Promise<number>;
@@ -50,6 +54,10 @@ export declare class LNDBitcoinWallet implements IBitcoinWallet {
     getWalletTransaction(txId: string): Promise<BtcTx | null>;
     subscribeToWalletTransactions(callback: (tx: BtcTx) => void, abortSignal?: AbortSignal): void;
     getUtxos(useCached?: boolean): Promise<BitcoinUtxo[]>;
+    getBalance(): Promise<{
+        confirmed: number;
+        unconfirmed: number;
+    }>;
     sendRawTransaction(tx: string): Promise<void>;
     signPsbt(psbt: Psbt): Promise<SignPsbtResponse>;
     /**

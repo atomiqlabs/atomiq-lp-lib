@@ -26,12 +26,22 @@ export type LNDConfig = {
 export class LNDClient {
 
     lnd: AuthenticatedLnd;
+    status: string = "offline";
     private readonly config: LNDConfig;
 
     constructor(config: LNDConfig) {
         if (config.CERT == null && config.CERT_FILE == null) throw new Error("Certificate for LND not provided, provide either CERT or CERT_FILE config!");
         if (config.MACAROON == null && config.MACAROON_FILE == null) throw new Error("Macaroon for LND not provided, provide either MACAROON or MACAROON_FILE config!");
         this.config = config;
+    }
+
+    async getStatusInfo(): Promise<Record<string, string>> {
+        if(this.lnd==null) return {};
+        const resp = await getWalletInfo({lnd: this.lnd});
+        return {
+            "Synced to chain": ""+resp.is_synced_to_chain,
+            "Blockheight": resp.current_block_height.toString()
+        };
     }
 
     private getUnauthenticatedLndGrpc(): UnauthenticatedLnd {
@@ -202,7 +212,11 @@ export class LNDClient {
         }
         const walletStatus = await this.getLNDWalletStatus(lnd);
 
-        if (walletStatus === "active" || walletStatus === "ready") return true;
+        if (walletStatus === "active" || walletStatus === "ready") {
+            this.status = "syncing";
+            return true;
+        }
+        this.status = walletStatus;
         if (walletStatus === "waiting" || walletStatus === "starting" || walletStatus === "offline") return false;
         if (walletStatus === "absent") {
             //New wallet has to be created based on the provided mnemonic file
@@ -238,5 +252,6 @@ export class LNDClient {
             lndReady = await this.isLNDSynced();
             if(!lndReady) await new Promise(resolve => setTimeout(resolve, 30*1000));
         }
+        this.status = "ready";
     }
 }

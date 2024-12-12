@@ -18,6 +18,7 @@ import {CoinselectAddressTypes, CoinselectTxInput, CoinselectTxOutput, utils} fr
 import {coinSelect} from "../utils/coinselect2";
 import * as bitcoin from "bitcoinjs-lib";
 import {handleLndError} from "../utils/Utils";
+import {Command} from "@atomiqlabs/server-base";
 
 export type LNDBitcoinWalletConfig = {
     network?: Network,
@@ -105,6 +106,18 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
 
     init(): Promise<void> {
         return this.lndClient.init();
+    }
+
+    getStatus(): string {
+        return this.lndClient.status;
+    }
+
+    getStatusInfo(): Promise<Record<string, string>> {
+        return this.lndClient.getStatusInfo();
+    }
+
+    getCommands(): Command<any>[] {
+        return [];
     }
 
     toOutputScript(_address: string): Buffer {
@@ -225,6 +238,22 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
             };
         }
         return this.cachedUtxos.utxos;
+    }
+
+    async getBalance(): Promise<{ confirmed: number; unconfirmed: number }> {
+        const resUtxos = await getUtxos({lnd: this.lndClient.lnd});
+
+        let confirmed = 0;
+        let unconfirmed = 0;
+        resUtxos.utxos.forEach(utxo => {
+            if(utxo.confirmation_count>0) {
+                confirmed+=utxo.tokens;
+            } else {
+                unconfirmed+=utxo.tokens;
+            }
+        });
+
+        return {confirmed, unconfirmed}
     }
 
     async sendRawTransaction(tx: string): Promise<void> {
