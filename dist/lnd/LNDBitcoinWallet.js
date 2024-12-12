@@ -283,14 +283,19 @@ class LNDBitcoinWallet {
                     value: targetAmount,
                     script: this.toOutputScript(targetAddress)
                 }], satsPerVbyte, this.CHANGE_ADDRESS_TYPE);
-            if (obj.inputs == null || obj.outputs == null)
+            if (obj.inputs == null || obj.outputs == null) {
+                console.debug("LNDBitcoinWallet: getChainFee(): Cannot run coinselection algorithm, not enough funds?");
                 return null;
+            }
             const leavesUtxos = utxoPool.filter(val => obj.inputs.includes(val));
             if (obj.outputs.length > 1)
                 leavesUtxos.push(obj.outputs[1]);
             const leavesEconomicValue = utils_1.utils.utxoEconomicValue(leavesUtxos, satsPerVbyte);
-            if (leavesEconomicValue < (yield this.getRequiredReserve(estimate)))
+            const requiredReserve = yield this.getRequiredReserve(estimate);
+            if (leavesEconomicValue < requiredReserve) {
+                console.debug("LNDBitcoinWallet: getChainFee(): Doesn't leave enough for reserve, required reserve: " + requiredReserve + " leavesValue: " + leavesEconomicValue);
                 return null;
+            }
             console.info("getChainFee(): fee estimated," +
                 " target: " + targetAddress +
                 " amount: " + targetAmount.toString(10) +
@@ -408,7 +413,8 @@ class LNDBitcoinWallet {
                 return null;
             const psbt = yield this.getPsbt(res, nonce);
             const psbtResp = yield this.signPsbt(psbt);
-            this.checkPsbtFee(psbtResp.psbt, psbtResp.tx, maxAllowedFeeRate, res.satsPerVbyte);
+            if (maxAllowedFeeRate != null)
+                this.checkPsbtFee(psbtResp.psbt, psbtResp.tx, maxAllowedFeeRate, res.satsPerVbyte);
             return psbtResp;
         });
     }

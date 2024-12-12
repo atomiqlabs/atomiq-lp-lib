@@ -342,7 +342,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 swap.address,
                 swap.amount.toNumber(),
                 satsPerVbyte,
-                swap.data.getEscrowNonce()
+                swap.data.getEscrowNonce(),
+                swap.satsPerVbyte.toNumber()
             );
             if(signResult==null) throw {
                 code: 90002,

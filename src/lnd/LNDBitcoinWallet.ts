@@ -314,7 +314,10 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
             script: this.toOutputScript(targetAddress)
         }], satsPerVbyte, this.CHANGE_ADDRESS_TYPE);
 
-        if(obj.inputs==null || obj.outputs==null) return null;
+        if(obj.inputs==null || obj.outputs==null) {
+            console.debug("LNDBitcoinWallet: getChainFee(): Cannot run coinselection algorithm, not enough funds?");
+            return null;
+        }
 
         const leavesUtxos: {
             value: number,
@@ -325,7 +328,11 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
         if(obj.outputs.length>1) leavesUtxos.push(obj.outputs[1]);
         const leavesEconomicValue = utils.utxoEconomicValue(leavesUtxos, satsPerVbyte);
 
-        if(leavesEconomicValue < await this.getRequiredReserve(estimate)) return null;
+        const requiredReserve = await this.getRequiredReserve(estimate);
+        if(leavesEconomicValue < requiredReserve) {
+            console.debug("LNDBitcoinWallet: getChainFee(): Doesn't leave enough for reserve, required reserve: "+requiredReserve+" leavesValue: "+leavesEconomicValue);
+            return null;
+        }
 
         console.info("getChainFee(): fee estimated,"+
             " target: "+targetAddress+
@@ -458,7 +465,7 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
         if(res==null) return null;
         const psbt = await this.getPsbt(res, nonce);
         const psbtResp = await this.signPsbt(psbt);
-        this.checkPsbtFee(psbtResp.psbt, psbtResp.tx, maxAllowedFeeRate, res.satsPerVbyte);
+        if(maxAllowedFeeRate!=null) this.checkPsbtFee(psbtResp.psbt, psbtResp.tx, maxAllowedFeeRate, res.satsPerVbyte);
         return psbtResp;
     }
 

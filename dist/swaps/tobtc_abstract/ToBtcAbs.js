@@ -284,7 +284,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             this.checkCalculatedTxFee(swap.satsPerVbyte, new BN(satsPerVbyte));
             if (swap.metadata != null)
                 swap.metadata.times.payChainFee = Date.now();
-            const signResult = yield this.bitcoin.getSignedTransaction(swap.address, swap.amount.toNumber(), satsPerVbyte, swap.data.getEscrowNonce());
+            const signResult = yield this.bitcoin.getSignedTransaction(swap.address, swap.amount.toNumber(), satsPerVbyte, swap.data.getEscrowNonce(), swap.satsPerVbyte.toNumber());
             if (signResult == null)
                 throw {
                     code: 90002,
