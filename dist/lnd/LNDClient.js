@@ -192,7 +192,7 @@ class LNDClient {
                 lnd = this.getUnauthenticatedLndGrpc();
             }
             catch (e) {
-                console.error("LNDLightningWallet: tryConnect(): Error: ", e);
+                console.error("LNDClient: tryConnect(): Error: ", e);
                 return false;
             }
             const walletStatus = yield this.getLNDWalletStatus(lnd);
@@ -212,11 +212,29 @@ class LNDClient {
             }
         });
     }
+    isLNDSynced() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const resp = yield (0, lightning_1.getWalletInfo)({
+                lnd: this.lnd
+            });
+            console.log("LNDClient: isLNDSynced(): LND blockheight: " + resp.current_block_height + " is_synced: " + resp.is_synced_to_chain);
+            return resp.is_synced_to_chain;
+        });
+    }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
             let lndReady = false;
+            console.log("LNDClient: init(): Waiting for LND node connection...");
             while (!lndReady) {
                 lndReady = yield this.tryConnect();
+                if (!lndReady)
+                    yield new Promise(resolve => setTimeout(resolve, 30 * 1000));
+            }
+            this.lnd = this.getAuthenticatedLndGrpc();
+            lndReady = false;
+            console.log("LNDClient: init(): Waiting for LND node synchronization...");
+            while (!lndReady) {
+                lndReady = yield this.isLNDSynced();
                 if (!lndReady)
                     yield new Promise(resolve => setTimeout(resolve, 30 * 1000));
             }

@@ -1,6 +1,6 @@
 import {
     AuthenticatedLnd,
-    authenticatedLndGrpc,
+    authenticatedLndGrpc, getWalletInfo,
     getWalletStatus,
     UnauthenticatedLnd,
     unauthenticatedLndGrpc,
@@ -25,7 +25,7 @@ export type LNDConfig = {
 
 export class LNDClient {
 
-    readonly lnd: AuthenticatedLnd;
+    lnd: AuthenticatedLnd;
     private readonly config: LNDConfig;
 
     constructor(config: LNDConfig) {
@@ -197,7 +197,7 @@ export class LNDClient {
         try {
             lnd = this.getUnauthenticatedLndGrpc();
         } catch (e) {
-            console.error("LNDLightningWallet: tryConnect(): Error: ", e);
+            console.error("LNDClient: tryConnect(): Error: ", e);
             return false;
         }
         const walletStatus = await this.getLNDWalletStatus(lnd);
@@ -216,11 +216,27 @@ export class LNDClient {
         }
     }
 
+    private async isLNDSynced() {
+        const resp = await getWalletInfo({
+            lnd: this.lnd
+        });
+        console.log("LNDClient: isLNDSynced(): LND blockheight: "+resp.current_block_height+" is_synced: "+resp.is_synced_to_chain);
+        return resp.is_synced_to_chain;
+    }
+
     async init(): Promise<void> {
         let lndReady: boolean = false;
+        console.log("LNDClient: init(): Waiting for LND node connection...");
         while (!lndReady) {
             lndReady = await this.tryConnect();
             if (!lndReady) await new Promise(resolve => setTimeout(resolve, 30 * 1000));
+        }
+        this.lnd = this.getAuthenticatedLndGrpc();
+        lndReady = false;
+        console.log("LNDClient: init(): Waiting for LND node synchronization...");
+        while(!lndReady) {
+            lndReady = await this.isLNDSynced();
+            if(!lndReady) await new Promise(resolve => setTimeout(resolve, 30*1000));
         }
     }
 }

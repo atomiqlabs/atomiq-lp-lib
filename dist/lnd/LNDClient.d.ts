@@ -10,7 +10,7 @@ export type LNDConfig = {
     PORT: number;
 };
 export declare class LNDClient {
-    readonly lnd: AuthenticatedLnd;
+    lnd: AuthenticatedLnd;
     private readonly config;
     constructor(config: LNDConfig);
     private getUnauthenticatedLndGrpc;
@@ -28,5 +28,6 @@ export declare class LNDClient {
     private unlockWallet;
     private createWallet;
     private tryConnect;
+    private isLNDSynced;
     init(): Promise<void>;
 }
