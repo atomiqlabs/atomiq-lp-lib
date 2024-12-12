@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LNDBitcoinWallet = void 0;
 const LNDClient_1 = require("./LNDClient");
-const bn_js_1 = require("bn.js");
+const BN = require("bn.js");
 const bitcoinjs_lib_1 = require("bitcoinjs-lib");
 const PluginManager_1 = require("../plugins/PluginManager");
 const lightning_1 = require("lightning");
@@ -346,12 +346,12 @@ class LNDBitcoinWallet {
             //Apply nonce
             if (nonce != null) {
                 const nonceBuffer = Buffer.from(nonce.toArray("be", 8));
-                const locktimeBN = new bn_js_1.default(nonceBuffer.slice(0, 5), "be");
+                const locktimeBN = new BN(nonceBuffer.slice(0, 5), "be");
                 let locktime = locktimeBN.toNumber() + 500000000;
                 if (locktime > (Date.now() / 1000 - 24 * 60 * 60))
                     throw new Error("Invalid escrow nonce!");
                 psbt.setLocktime(locktime);
-                const sequenceBN = new bn_js_1.default(nonceBuffer.slice(5, 8), "be");
+                const sequenceBN = new BN(nonceBuffer.slice(5, 8), "be");
                 sequence = 0xFE000000 + sequenceBN.toNumber();
             }
             psbt.addInputs(coinselectResult.inputs.map(input => {

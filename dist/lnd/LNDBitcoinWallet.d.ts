@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { BitcoinUtxo, IBitcoinWallet, SignPsbtResponse } from "../wallets/IBitcoinWallet";
 import { LNDClient, LNDConfig } from "./LNDClient";
-import BN from "bn.js";
+import * as BN from "bn.js";
 import { BtcTx } from "@atomiqlabs/base";
 import { Network, Psbt } from "bitcoinjs-lib";
 import { IBtcFeeEstimator } from "../fees/IBtcFeeEstimator";
