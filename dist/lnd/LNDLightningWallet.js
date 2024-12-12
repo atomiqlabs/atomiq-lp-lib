@@ -13,7 +13,6 @@ exports.LNDLightningWallet = void 0;
 const lightning_1 = require("lightning");
 const ln_service_1 = require("ln-service");
 const BN = require("bn.js");
-const types_1 = require("bitcoinjs-lib/src/types");
 const Utils_1 = require("../utils/Utils");
 const bolt11 = require("@atomiqlabs/bolt11");
 const LNDClient_1 = require("./LNDClient");
@@ -378,7 +377,7 @@ class LNDLightningWallet {
                 };
             }
             catch (e) {
-                if (types_1.Array.isArray(e) && e[0] === 404 && e[1] === "SentPaymentNotFound")
+                if (Array.isArray(e) && e[0] === 404 && e[1] === "SentPaymentNotFound")
                     return null;
                 throw e;
             }

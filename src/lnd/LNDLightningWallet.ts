@@ -29,7 +29,6 @@ import {
 } from "lightning";
 import {parsePaymentRequest} from "ln-service";
 import * as BN from "bn.js";
-import {Array} from "bitcoinjs-lib/src/types";
 import {handleLndError} from "../utils/Utils";
 import * as bolt11 from "@atomiqlabs/bolt11";
 import {TagsObject} from "@atomiqlabs/bolt11";
