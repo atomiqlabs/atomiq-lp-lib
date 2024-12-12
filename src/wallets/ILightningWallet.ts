@@ -90,8 +90,8 @@ export type ParsedPaymentRequest = {
 
 export type LightningPaymentInit = {
     request: string,
-    maxFeeMtokens: BN,
-    maxTimeoutHeight: number
+    maxFeeMtokens?: BN,
+    maxTimeoutHeight?: number
 };
 
 export type LightningBalanceResponse = {
