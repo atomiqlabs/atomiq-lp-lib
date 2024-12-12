@@ -34,6 +34,8 @@ function isSnowflake(routes) {
     return is_snowflake;
 }
 function fromLndRoutes(routes) {
+    if (routes == null)
+        return null;
     return routes.map(arr => arr.map(route => {
         return {
             baseFeeMtokens: new BN(route.base_fee_mtokens),

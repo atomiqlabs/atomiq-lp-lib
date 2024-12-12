@@ -62,6 +62,7 @@ function isSnowflake(routes: LNRoutes | null) {
 }
 
 function fromLndRoutes(routes: {base_fee_mtokens: string, channel: string, cltv_delta: number, fee_rate: number, public_key: string}[][]): LNRoutes {
+    if(routes==null) return null;
     return routes.map(arr => arr.map(route => {
         return {
             baseFeeMtokens: new BN(route.base_fee_mtokens),
