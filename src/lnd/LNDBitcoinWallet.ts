@@ -194,7 +194,7 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
             const parsedTx = lndTxToBtcTx(tx);
             if(callback!=null) callback(parsedTx);
         });
-        abortSignal.addEventListener("abort", () => {
+        if(abortSignal!=null) abortSignal.addEventListener("abort", () => {
             res.removeAllListeners();
         });
     }

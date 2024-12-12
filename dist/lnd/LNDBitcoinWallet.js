@@ -173,9 +173,10 @@ class LNDBitcoinWallet {
             if (callback != null)
                 callback(parsedTx);
         });
-        abortSignal.addEventListener("abort", () => {
-            res.removeAllListeners();
-        });
+        if (abortSignal != null)
+            abortSignal.addEventListener("abort", () => {
+                res.removeAllListeners();
+            });
     }
     getUtxos(useCached = false) {
         return __awaiter(this, void 0, void 0, function* () {
