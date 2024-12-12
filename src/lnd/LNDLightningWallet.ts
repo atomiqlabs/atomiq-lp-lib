@@ -91,6 +91,10 @@ export class LNDLightningWallet implements ILightningWallet{
         return this.lndClient.init();
     }
 
+    isReady(): boolean {
+        return this.lndClient.isReady();
+    }
+
     getStatus(): string {
         return this.lndClient.status;
     }

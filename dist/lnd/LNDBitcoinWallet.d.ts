@@ -41,6 +41,7 @@ export declare class LNDBitcoinWallet implements IBitcoinWallet {
     constructor(lndConfig: LNDConfig, config?: LNDBitcoinWalletConfig);
     constructor(client: LNDClient, config?: LNDBitcoinWalletConfig);
     init(): Promise<void>;
+    isReady(): boolean;
     getStatus(): string;
     getStatusInfo(): Promise<Record<string, string>>;
     getCommands(): Command<any>[];

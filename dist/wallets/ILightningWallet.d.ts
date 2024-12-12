@@ -95,6 +95,7 @@ export type ProbeAndRouteResponse = {
 export declare function routesMatch(routesA: LNRoutes, routesB: LNRoutes): boolean;
 export interface ILightningWallet {
     init(): Promise<void>;
+    isReady(): boolean;
     getStatus(): string;
     getStatusInfo(): Promise<Record<string, string>>;
     getCommands(): Command<any>[];

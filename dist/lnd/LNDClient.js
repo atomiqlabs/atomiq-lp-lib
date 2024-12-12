@@ -25,6 +25,9 @@ class LNDClient {
             throw new Error("Macaroon for LND not provided, provide either MACAROON or MACAROON_FILE config!");
         this.config = config;
     }
+    isReady() {
+        return this.status === "ready";
+    }
     getStatusInfo() {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.lnd == null)

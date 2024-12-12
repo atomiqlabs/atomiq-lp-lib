@@ -83,6 +83,9 @@ class LNDBitcoinWallet {
     init() {
         return this.lndClient.init();
     }
+    isReady() {
+        return this.lndClient.isReady();
+    }
     getStatus() {
         return this.lndClient.status;
     }

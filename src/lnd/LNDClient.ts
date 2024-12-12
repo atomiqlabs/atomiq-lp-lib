@@ -35,6 +35,10 @@ export class LNDClient {
         this.config = config;
     }
 
+    isReady(): boolean {
+        return this.status==="ready";
+    }
+
     async getStatusInfo(): Promise<Record<string, string>> {
         if(this.lnd==null) return {};
         const resp = await getWalletInfo({lnd: this.lnd});

@@ -14,6 +14,7 @@ export declare class LNDClient {
     status: string;
     private readonly config;
     constructor(config: LNDConfig);
+    isReady(): boolean;
     getStatusInfo(): Promise<Record<string, string>>;
     private getUnauthenticatedLndGrpc;
     private getAuthenticatedLndGrpc;

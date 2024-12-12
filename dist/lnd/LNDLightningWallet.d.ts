@@ -6,6 +6,7 @@ export declare class LNDLightningWallet implements ILightningWallet {
     constructor(config: LNDConfig);
     constructor(client: LNDClient);
     init(): Promise<void>;
+    isReady(): boolean;
     getStatus(): string;
     getStatusInfo(): Promise<Record<string, string>>;
     getCommands(): Command<any>[];

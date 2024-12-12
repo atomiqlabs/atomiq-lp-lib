@@ -150,6 +150,7 @@ export interface ILightningWallet {
 
     init(): Promise<void>;
 
+    isReady(): boolean;
     getStatus(): string;
     getStatusInfo(): Promise<Record<string, string>>;
     getCommands(): Command<any>[];

@@ -108,6 +108,10 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
         return this.lndClient.init();
     }
 
+    isReady(): boolean {
+        return this.lndClient.isReady();
+    }
+
     getStatus(): string {
         return this.lndClient.status;
     }
