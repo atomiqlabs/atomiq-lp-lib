@@ -1,5 +1,4 @@
 import * as BN from "bn.js";
-import * as lncli from "ln-service";
 import {Express, Request, Response} from "express";
 import {FromBtcSwapAbs, FromBtcSwapState} from "./FromBtcSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
@@ -11,8 +10,6 @@ import {
     RefundEvent,
     SwapData
 } from "@atomiqlabs/base";
-import {AuthenticatedLnd} from "lightning";
-import * as bitcoin from "bitcoinjs-lib";
 import {createHash} from "crypto";
 import {expressHandlerWrapper} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
@@ -22,9 +19,9 @@ import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDeco
 import {IParamReader} from "../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEncoder";
 import {FromBtcBaseConfig, FromBtcBaseSwapHandler} from "../FromBtcBaseSwapHandler";
+import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 
 export type FromBtcConfig = FromBtcBaseConfig & {
-    bitcoinNetwork: bitcoin.networks.Network
     confirmations: number,
     swapCsvDelta: number
 };
@@ -46,18 +43,22 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
     readonly config: FromBtcConfig & {swapTsCsvDelta: BN};
 
+    readonly bitcoin: IBitcoinWallet;
+
     constructor(
         storageDirectory: IIntermediaryStorage<FromBtcSwapAbs>,
         path: string,
         chains: MultichainData,
-        lnd: AuthenticatedLnd,
+        bitcoin: IBitcoinWallet,
         swapPricing: ISwapPrice,
         config: FromBtcConfig
     ) {
-        super(storageDirectory, path, chains, lnd, swapPricing);
-        const anyConfig = config as any;
-        anyConfig.swapTsCsvDelta = new BN(config.swapCsvDelta).mul(config.bitcoinBlocktime.div(config.safetyFactor));
-        this.config = anyConfig;
+        super(storageDirectory, path, chains, swapPricing);
+        this.bitcoin = bitcoin;
+        this.config = {
+            ...config,
+            swapTsCsvDelta: new BN(config.swapCsvDelta).mul(config.bitcoinBlocktime.div(config.safetyFactor))
+        };
     }
 
     /**
@@ -65,10 +66,9 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      *
      * @param address
      * @param amount
-     * @param bitcoinNetwork
      */
-    private getTxoHash(address: string, amount: BN, bitcoinNetwork: bitcoin.networks.Network): Buffer {
-        const parsedOutputScript = bitcoin.address.toOutputScript(address, bitcoinNetwork);
+    private getTxoHash(address: string, amount: BN): Buffer {
+        const parsedOutputScript = this.bitcoin.toOutputScript(address);
 
         return createHash("sha256").update(Buffer.concat([
             Buffer.from(amount.toArray("le", 8)),
@@ -84,7 +84,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * @param amount
      */
     private getHash(chainIdentifier: string, address: string, amount: BN): Buffer {
-        const parsedOutputScript = bitcoin.address.toOutputScript(address, this.config.bitcoinNetwork);
+        const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const {swapContract} = this.getChain(chainIdentifier);
         return swapContract.getHashForOnchain(parsedOutputScript, amount, new BN(0));
     }
@@ -383,10 +383,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             metadata.times.balanceChecked = Date.now();
 
             //Create swap receive bitcoin address
-            const {address: receiveAddress} = await lncli.createChainAddress({
-                lnd: this.LND,
-                format: "p2wpkh"
-            });
+            const receiveAddress = await this.bitcoin.getAddress();
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
 
@@ -424,7 +421,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 totalSecurityDeposit,
                 totalClaimerBounty
             );
-            data.setTxoHash(this.getTxoHash(receiveAddress, amountBD, this.config.bitcoinNetwork).toString("hex"));
+            data.setTxoHash(this.getTxoHash(receiveAddress, amountBD).toString("hex"));
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
 

@@ -60,7 +60,7 @@ function inputBytes (input: {
     }
     return {
         length: TX_INPUT_BASE + (input.script?.length || 0) + ((input.witness?.length || 0)/4),
-        isWitness: input.witness!=null
+        isWitness: (input.type!=null && input.type!=="p2pkh") || input.witness!=null
     };
 }
 
@@ -103,13 +103,13 @@ function transactionBytes (
         script?: Buffer,
         type?: CoinselectAddressTypes
     }[],
-    changeType: CoinselectAddressTypes
+    changeType?: CoinselectAddressTypes
 ): number {
     let size = TX_EMPTY_SIZE;
     let isSegwit = false;
-    if(changeType!=="p2pkh") {
+    if(changeType!=null && changeType!=="p2pkh") {
         size += WITNESS_OVERHEAD;
-        let isSegwit = true;
+        isSegwit = true;
     }
     for(let input of inputs) {
         const {length, isWitness} = inputBytes(input);
@@ -171,6 +171,20 @@ function finalize(
   }
 }
 
+function utxoEconomicValue(utxos: {
+    value: number,
+    script?: Buffer,
+    witness?: Buffer,
+    type?: CoinselectAddressTypes
+}[], feeRate: number): number {
+    let accumulator = 0;
+    utxos.forEach(utxo => {
+        let economicValue: number = utxo.value - (feeRate*inputBytes(utxo).length);
+        if(economicValue > 0) accumulator += economicValue;
+    });
+    return accumulator;
+}
+
 export const utils = {
   dustThreshold: dustThreshold,
   finalize: finalize,
@@ -179,5 +193,6 @@ export const utils = {
   sumOrNaN: sumOrNaN,
   sumForgiving: sumForgiving,
   transactionBytes: transactionBytes,
-  uintOrNaN: uintOrNaN
+  uintOrNaN: uintOrNaN,
+  utxoEconomicValue
 };

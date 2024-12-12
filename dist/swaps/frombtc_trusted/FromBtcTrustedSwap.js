@@ -49,7 +49,7 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.refundAddress = objOrChainIdentifier.refundAddress;
             this.doubleSpent = objOrChainIdentifier.doubleSpent;
             this.scRawTx = objOrChainIdentifier.scRawTx;
-            this.rawTx = objOrChainIdentifier.rawTx;
+            this.btcTx = objOrChainIdentifier.btcTx;
             this.txFee = objOrChainIdentifier.txFee;
             this.txSize = objOrChainIdentifier.txSize;
             this.txId = objOrChainIdentifier.txId;
@@ -73,7 +73,7 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.refundAddress = this.refundAddress;
         partialSerialized.doubleSpent = this.doubleSpent;
         partialSerialized.scRawTx = this.scRawTx;
-        partialSerialized.rawTx = this.rawTx;
+        partialSerialized.btcTx = this.btcTx;
         partialSerialized.txFee = this.txFee;
         partialSerialized.txSize = this.txSize;
         partialSerialized.txId = this.txId;

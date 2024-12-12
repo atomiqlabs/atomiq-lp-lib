@@ -32,7 +32,7 @@ function inputBytes(input) {
     }
     return {
         length: TX_INPUT_BASE + (((_a = input.script) === null || _a === void 0 ? void 0 : _a.length) || 0) + ((((_b = input.witness) === null || _b === void 0 ? void 0 : _b.length) || 0) / 4),
-        isWitness: input.witness != null
+        isWitness: (input.type != null && input.type !== "p2pkh") || input.witness != null
     };
 }
 const OUTPUT_BYTES = {
@@ -58,9 +58,9 @@ function dustThreshold(output) {
 function transactionBytes(inputs, outputs, changeType) {
     let size = TX_EMPTY_SIZE;
     let isSegwit = false;
-    if (changeType !== "p2pkh") {
+    if (changeType != null && changeType !== "p2pkh") {
         size += WITNESS_OVERHEAD;
-        let isSegwit = true;
+        isSegwit = true;
     }
     for (let input of inputs) {
         const { length, isWitness } = inputBytes(input);
@@ -109,6 +109,15 @@ function finalize(inputs, outputs, feeRate, changeType) {
         fee: fee
     };
 }
+function utxoEconomicValue(utxos, feeRate) {
+    let accumulator = 0;
+    utxos.forEach(utxo => {
+        let economicValue = utxo.value - (feeRate * inputBytes(utxo).length);
+        if (economicValue > 0)
+            accumulator += economicValue;
+    });
+    return accumulator;
+}
 exports.utils = {
     dustThreshold: dustThreshold,
     finalize: finalize,
@@ -117,5 +126,6 @@ exports.utils = {
     sumOrNaN: sumOrNaN,
     sumForgiving: sumForgiving,
     transactionBytes: transactionBytes,
-    uintOrNaN: uintOrNaN
+    uintOrNaN: uintOrNaN,
+    utxoEconomicValue
 };

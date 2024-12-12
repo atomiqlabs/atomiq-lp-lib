@@ -38,7 +38,7 @@ declare function transactionBytes(inputs: {
 }[], outputs: {
     script?: Buffer;
     type?: CoinselectAddressTypes;
-}[], changeType: CoinselectAddressTypes): number;
+}[], changeType?: CoinselectAddressTypes): number;
 declare function uintOrNaN(v: number): number;
 declare function sumForgiving(range: {
     value: number;
@@ -51,6 +51,12 @@ declare function finalize(inputs: CoinselectTxInput[], outputs: CoinselectTxOutp
     outputs?: CoinselectTxOutput[];
     fee: number;
 };
+declare function utxoEconomicValue(utxos: {
+    value: number;
+    script?: Buffer;
+    witness?: Buffer;
+    type?: CoinselectAddressTypes;
+}[], feeRate: number): number;
 export declare const utils: {
     dustThreshold: typeof dustThreshold;
     finalize: typeof finalize;
@@ -60,5 +66,6 @@ export declare const utils: {
     sumForgiving: typeof sumForgiving;
     transactionBytes: typeof transactionBytes;
     uintOrNaN: typeof uintOrNaN;
+    utxoEconomicValue: typeof utxoEconomicValue;
 };
 export {};

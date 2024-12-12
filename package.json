@@ -22,7 +22,7 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/base": "7.2.0",
+    "@atomiqlabs/base": "7.2.1",
     "@atomiqlabs/bolt11": "1.5.1",
     "@atomiqlabs/server-base": "1.0.4",
     "@bitcoinerlab/secp256k1": "1.0.5",

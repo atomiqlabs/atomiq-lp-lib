@@ -4,12 +4,10 @@ import { FromBtcSwapAbs, FromBtcSwapState } from "./FromBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
 import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
-import { AuthenticatedLnd } from "lightning";
-import * as bitcoin from "bitcoinjs-lib";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { FromBtcBaseConfig, FromBtcBaseSwapHandler } from "../FromBtcBaseSwapHandler";
+import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
 export type FromBtcConfig = FromBtcBaseConfig & {
-    bitcoinNetwork: bitcoin.networks.Network;
     confirmations: number;
     swapCsvDelta: number;
 };
@@ -28,13 +26,13 @@ export declare class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, F
     readonly config: FromBtcConfig & {
         swapTsCsvDelta: BN;
     };
-    constructor(storageDirectory: IIntermediaryStorage<FromBtcSwapAbs>, path: string, chains: MultichainData, lnd: AuthenticatedLnd, swapPricing: ISwapPrice, config: FromBtcConfig);
+    readonly bitcoin: IBitcoinWallet;
+    constructor(storageDirectory: IIntermediaryStorage<FromBtcSwapAbs>, path: string, chains: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, config: FromBtcConfig);
     /**
      * Returns the TXO hash of the specific address and amount - sha256(u64le(amount) + outputScript(address))
      *
      * @param address
      * @param amount
-     * @param bitcoinNetwork
      */
     private getTxoHash;
     /**

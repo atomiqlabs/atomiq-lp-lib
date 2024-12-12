@@ -1,4 +1,4 @@
-import {SwapData} from "@atomiqlabs/base";
+import {BtcTx, SwapData} from "@atomiqlabs/base";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
 import * as BN from "bn.js";
 import {deserializeBN, serializeBN} from "../../utils/Utils";
@@ -38,7 +38,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
     doubleSpent: boolean;
     scRawTx: string;
 
-    rawTx: string;
+    btcTx: BtcTx;
     txFee: number;
     txSize: number;
     txId: string;
@@ -103,7 +103,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
             this.refundAddress = objOrChainIdentifier.refundAddress;
             this.doubleSpent = objOrChainIdentifier.doubleSpent;
             this.scRawTx = objOrChainIdentifier.scRawTx;
-            this.rawTx = objOrChainIdentifier.rawTx;
+            this.btcTx = objOrChainIdentifier.btcTx;
             this.txFee = objOrChainIdentifier.txFee;
             this.txSize = objOrChainIdentifier.txSize;
             this.txId = objOrChainIdentifier.txId;
@@ -128,7 +128,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         partialSerialized.refundAddress = this.refundAddress;
         partialSerialized.doubleSpent = this.doubleSpent;
         partialSerialized.scRawTx = this.scRawTx;
-        partialSerialized.rawTx = this.rawTx;
+        partialSerialized.btcTx = this.btcTx;
         partialSerialized.txFee = this.txFee;
         partialSerialized.txSize = this.txSize;
         partialSerialized.txId = this.txId;

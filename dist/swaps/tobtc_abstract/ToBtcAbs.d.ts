@@ -1,37 +1,22 @@
 import { Express } from "express";
 import * as BN from "bn.js";
-import * as bitcoin from "bitcoinjs-lib";
 import { ToBtcSwapAbs, ToBtcSwapState } from "./ToBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
 import { BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
-import { AuthenticatedLnd } from "lightning";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
-import { IBtcFeeEstimator } from "../../fees/IBtcFeeEstimator";
-import { CoinselectTxInput, CoinselectTxOutput } from "../../utils/coinselect2/utils";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { PromiseQueue } from "promise-queue-ts";
-type SpendableUtxo = {
-    address: string;
-    address_format: string;
-    confirmation_count: number;
-    output_script: string;
-    tokens: number;
-    transaction_id: string;
-    transaction_vout: number;
-};
+import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
 export type ToBtcConfig = ToBtcBaseConfig & {
     sendSafetyFactor: BN;
-    bitcoinNetwork: bitcoin.networks.Network;
     minChainCltv: BN;
-    networkFeeMultiplierPPM: BN;
+    networkFeeMultiplier: number;
     minConfirmations: number;
     maxConfirmations: number;
     maxConfTarget: number;
     minConfTarget: number;
     txCheckInterval: number;
-    feeEstimator?: IBtcFeeEstimator;
-    onchainReservedPerChannel?: number;
 };
 export type ToBtcRequestType = {
     address: string;
@@ -47,33 +32,15 @@ export type ToBtcRequestType = {
  * Handler for to BTC swaps, utilizing PTLCs (proof-time locked contracts) using btc relay (on-chain bitcoin SPV)
  */
 export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState> {
-    protected readonly CONFIRMATIONS_REQUIRED = 1;
-    protected readonly ADDRESS_FORMAT_MAP: {
-        p2wpkh: string;
-        np2wpkh: string;
-        p2tr: string;
-    };
-    protected readonly LND_CHANGE_OUTPUT_TYPE = "p2tr";
-    protected readonly UTXO_CACHE_TIMEOUT: number;
-    protected readonly CHANNEL_COUNT_CACHE_TIMEOUT: number;
     readonly type = SwapHandlerType.TO_BTC;
     activeSubscriptions: {
         [txId: string]: ToBtcSwapAbs;
     };
-    cachedUtxos: {
-        utxos: (CoinselectTxInput & {
-            confirmations: number;
-        })[];
-        timestamp: number;
-    };
-    cachedChannelCount: {
-        count: number;
-        timestamp: number;
-    };
     bitcoinRpc: BitcoinRpc<BtcBlock>;
+    bitcoin: IBitcoinWallet;
     sendBtcQueue: PromiseQueue;
     readonly config: ToBtcConfig;
-    constructor(storageDirectory: IIntermediaryStorage<ToBtcSwapAbs>, path: string, chainData: MultichainData, lnd: AuthenticatedLnd, swapPricing: ISwapPrice, bitcoinRpc: BitcoinRpc<BtcBlock>, config: ToBtcConfig);
+    constructor(storageDirectory: IIntermediaryStorage<ToBtcSwapAbs>, path: string, chainData: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, bitcoinRpc: BitcoinRpc<BtcBlock>, config: ToBtcConfig);
     /**
      * Returns the payment hash of the swap, takes swap nonce into account. Payment hash is chain-specific.
      *
@@ -81,61 +48,13 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param address
      * @param nonce
      * @param amount
-     * @param bitcoinNetwork
      */
     private getHash;
-    /**
-     * Returns spendable UTXOs, these are either confirmed UTXOs, or unconfirmed ones that are either whitelisted,
-     *  or created by our transactions (and therefore only we could doublespend)
-     *
-     * @private
-     */
-    protected getSpendableUtxos(): Promise<SpendableUtxo[]>;
-    /**
-     * Returns utxo pool to be used by the coinselection algorithm
-     *
-     * @private
-     */
-    protected getUtxoPool(useCached?: boolean): Promise<(CoinselectTxInput & {
-        confirmations: number;
-    })[]>;
-    /**
-     * Checks whether a coinselect result leaves enough funds to cover potential lightning anchor transaction fees
-     *
-     * @param utxoPool
-     * @param obj
-     * @param satsPerVbyte
-     * @param useCached Whether to use a cached channel count
-     * @param initialOutputLength
-     * @private
-     * @returns true if alright, false if the coinselection doesn't leave enough funds for anchor fees
-     */
-    protected isLeavingEnoughForLightningAnchors(utxoPool: CoinselectTxInput[], obj: {
-        inputs?: CoinselectTxInput[];
-        outputs?: CoinselectTxOutput[];
-    }, satsPerVbyte: BN, useCached?: boolean, initialOutputLength?: number): Promise<boolean>;
-    /**
-     * Gets the change address from the underlying LND instance
-     *
-     * @private
-     */
-    protected getChangeAddress(): Promise<string>;
-    /**
-     * Computes bitcoin on-chain network fee, takes channel reserve & network fee multiplier into consideration
-     *
-     * @param targetAddress Bitcoin address to send the funds to
-     * @param targetAmount Amount of funds to send to the address
-     * @param estimate Whether the chain fee should be just estimated and therefore cached utxo set could be used
-     * @param multiplierPPM Multiplier for the sats/vB returned from the fee estimator in PPM (parts per million)
-     * @private
-     * @returns Fee estimate & inputs/outputs to use when constructing transaction, or null in case of not enough funds
-     */
-    private getChainFee;
     /**
      * Tries to claim the swap after our transaction was confirmed
      *
      * @param tx
-     * @param payment
+     * @param swap
      * @param vout
      */
     private tryClaimSwap;
@@ -173,44 +92,6 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @throws DefinedRuntimeError will throw an error in case the actual fee is higher than quoted fee
      */
     protected checkCalculatedTxFee(quotedSatsPerVbyte: BN, actualSatsPerVbyte: BN): void;
-    /**
-     * Runs sanity check on the calculated fee for the transaction
-     *
-     * @param psbt
-     * @param tx
-     * @param maxAllowedSatsPerVbyte
-     * @param actualSatsPerVbyte
-     * @private
-     * @throws {Error} Will throw an error if the fee sanity check doesn't pass
-     */
-    protected checkPsbtFee(psbt: bitcoin.Psbt, tx: bitcoin.Transaction, maxAllowedSatsPerVbyte: BN, actualSatsPerVbyte: BN): BN;
-    /**
-     * Create PSBT for swap payout from coinselection result
-     *
-     * @param address
-     * @param amount
-     * @param escrowNonce
-     * @param coinselectResult
-     * @private
-     */
-    private getPsbt;
-    /**
-     * Signs provided PSBT and also returns a raw signed transaction
-     *
-     * @param psbt
-     * @private
-     */
-    protected signPsbt(psbt: bitcoin.Psbt): Promise<{
-        psbt: bitcoin.Psbt;
-        rawTx: string;
-    }>;
-    /**
-     * Sends raw bitcoin transaction
-     *
-     * @param rawTx
-     * @private
-     */
-    protected sendRawTransaction(rawTx: string): Promise<void>;
     /**
      * Sends a bitcoin transaction to payout BTC for a swap
      *
@@ -287,4 +168,3 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
     init(): Promise<void>;
     getInfoData(): any;
 }
-export {};
