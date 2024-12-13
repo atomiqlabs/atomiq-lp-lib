@@ -324,7 +324,7 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
             script?: Buffer,
             witness?: Buffer,
             type?: CoinselectAddressTypes
-        }[] = utxoPool.filter(val => obj.inputs.includes(val));
+        }[] = utxoPool.filter(val => !obj.inputs.includes(val));
         if(obj.outputs.length>1) leavesUtxos.push(obj.outputs[1]);
         const leavesEconomicValue = utils.utxoEconomicValue(leavesUtxos, satsPerVbyte);
 
@@ -341,7 +341,8 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
             " sats/vB: "+satsPerVbyte+
             " inputs: "+obj.inputs.length+
             " outputs: "+obj.outputs.length+
-            " multiplier: "+(multiplier ?? 1));
+            " multiplier: "+(multiplier ?? 1)+"" +
+            " leaveValue: "+leavesEconomicValue);
 
         return {
             networkFee: obj.fee,

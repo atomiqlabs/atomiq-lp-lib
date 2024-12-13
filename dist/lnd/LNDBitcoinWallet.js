@@ -287,7 +287,7 @@ class LNDBitcoinWallet {
                 console.debug("LNDBitcoinWallet: getChainFee(): Cannot run coinselection algorithm, not enough funds?");
                 return null;
             }
-            const leavesUtxos = utxoPool.filter(val => obj.inputs.includes(val));
+            const leavesUtxos = utxoPool.filter(val => !obj.inputs.includes(val));
             if (obj.outputs.length > 1)
                 leavesUtxos.push(obj.outputs[1]);
             const leavesEconomicValue = utils_1.utils.utxoEconomicValue(leavesUtxos, satsPerVbyte);
@@ -303,7 +303,8 @@ class LNDBitcoinWallet {
                 " sats/vB: " + satsPerVbyte +
                 " inputs: " + obj.inputs.length +
                 " outputs: " + obj.outputs.length +
-                " multiplier: " + (multiplier !== null && multiplier !== void 0 ? multiplier : 1));
+                " multiplier: " + (multiplier !== null && multiplier !== void 0 ? multiplier : 1) + "" +
+                " leaveValue: " + leavesEconomicValue);
             return {
                 networkFee: obj.fee,
                 satsPerVbyte,
