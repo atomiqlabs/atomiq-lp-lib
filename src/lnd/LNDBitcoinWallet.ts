@@ -185,11 +185,7 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
             });
             return lndTxToBtcTx(resp);
         } catch (e) {
-            console.debug("isArray: ", Array.isArray(e));
-            console.debug("e[0]: ", e[0]);
-            console.debug("e[1]: ", e[1]);
-            console.debug("e[2].code: ", e[2].code);
-            if(Array.isArray(e) && e[0]===503 && e[1]==="UnexpectedGetChainTransactionError" && e[2].code===2) return null;
+            if(Array.isArray(e) && e[0]===503 && e[1]==="UnexpectedGetChainTransactionError" && e[2].err.code===2) return null;
             handleLndError(e);
         }
         return null;
