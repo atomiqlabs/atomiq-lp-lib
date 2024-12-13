@@ -38,7 +38,6 @@ __exportStar(require("./swaps/SwapHandlerSwap"), exports);
 __exportStar(require("./plugins/PluginManager"), exports);
 __exportStar(require("./plugins/IPlugin"), exports);
 __exportStar(require("./fees/IBtcFeeEstimator"), exports);
-__exportStar(require("./fees/OneDollarFeeEstimator"), exports);
 __exportStar(require("./utils/paramcoders/IParamReader"), exports);
 __exportStar(require("./utils/paramcoders/IParamWriter"), exports);
 __exportStar(require("./utils/paramcoders/LegacyParamEncoder"), exports);

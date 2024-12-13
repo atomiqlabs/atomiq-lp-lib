@@ -30,7 +30,6 @@ export * from "./plugins/PluginManager";
 export * from "./plugins/IPlugin";
 
 export * from "./fees/IBtcFeeEstimator";
-export * from "./fees/OneDollarFeeEstimator";
 
 export * from "./utils/paramcoders/IParamReader";
 export * from "./utils/paramcoders/IParamWriter";
