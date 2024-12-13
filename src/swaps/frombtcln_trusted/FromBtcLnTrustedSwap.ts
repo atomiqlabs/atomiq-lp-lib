@@ -1,8 +1,8 @@
 import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {createHash} from "crypto";
-import * as bolt11 from "@atomiqlabs/bolt11";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
+import {deserializeBN, serializeBN} from "../../utils/Utils";
 
 export enum FromBtcLnTrustedSwapState {
     REFUNDED = -2,
@@ -26,6 +26,7 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
     constructor(
         chainIdentifier: string,
         pr: string,
+        inputMtokens: BN,
         swapFee: BN,
         swapFeeInToken: BN,
         output: BN,
@@ -34,9 +35,9 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
     );
     constructor(obj: any);
 
-    constructor(chainIdOrObj: string | any, pr?: string, swapFee?: BN, swapFeeInToken?: BN, output?: BN, secret?: string, dstAddress?: string) {
+    constructor(chainIdOrObj: string | any, pr?: string, inputMtokens?: BN, swapFee?: BN, swapFeeInToken?: BN, output?: BN, secret?: string, dstAddress?: string) {
         if(typeof(chainIdOrObj)==="string") {
-            super(chainIdOrObj, swapFee, swapFeeInToken);
+            super(chainIdOrObj, inputMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
             this.state = FromBtcLnTrustedSwapState.CREATED;
             this.pr = pr;
             this.output = output;
@@ -45,7 +46,7 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
         } else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
-            this.output = new BN(chainIdOrObj.output);
+            this.output = deserializeBN(chainIdOrObj.output);
             this.secret = chainIdOrObj.secret;
             this.dstAddress = chainIdOrObj.dstAddress;
             this.scRawTx = chainIdOrObj.scRawTx;
@@ -64,15 +65,11 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
     serialize(): any {
         const partialSerialized = super.serialize();
         partialSerialized.pr = this.pr;
-        partialSerialized.output = this.output.toString(10);
+        partialSerialized.output = serializeBN(this.output);
         partialSerialized.secret = this.secret;
         partialSerialized.dstAddress = this.dstAddress;
         partialSerialized.scRawTx = this.scRawTx;
         return partialSerialized;
-    }
-
-    getTotalInputAmount(): BN {
-        return new BN(bolt11.decode(this.pr).millisatoshis).add(new BN(999)).div(new BN(1000));
     }
 
     isFailed(): boolean {

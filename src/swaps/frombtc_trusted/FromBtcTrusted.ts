@@ -184,8 +184,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 return;
             }
             const sentSats = new BN(foundVout.value);
-            if(sentSats.eq(swap.inputSats)) {
-                swap.adjustedInput = swap.inputSats;
+            if(sentSats.eq(swap.amount)) {
+                swap.adjustedInput = swap.amount;
                 swap.adjustedOutput = swap.outputTokens;
             } else {
                 //If lower than minimum then ignore
@@ -201,7 +201,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 }
                 //Adjust the amount
                 swap.adjustedInput = sentSats;
-                swap.adjustedOutput = swap.outputTokens.mul(sentSats).div(swap.inputSats);
+                swap.adjustedOutput = swap.outputTokens.mul(sentSats).div(swap.amount);
             }
             swap.btcTx = tx;
             swap.txId = tx.txid;

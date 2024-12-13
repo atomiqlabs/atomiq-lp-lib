@@ -20,10 +20,9 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
     constructor(chainIdOrObj, address, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken, satsPerVbyte, nonce, preferedConfirmationTarget, signatureExpiry) {
         var _a;
         if (typeof (chainIdOrObj) === "string") {
-            super(chainIdOrObj, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
+            super(chainIdOrObj, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
             this.state = ToBtcSwapState.SAVED;
             this.address = address;
-            this.amount = amount;
             this.satsPerVbyte = satsPerVbyte;
             this.nonce = nonce;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
@@ -32,7 +31,6 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.amount = new BN(chainIdOrObj.amount);
             this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
             this.nonce = new BN(chainIdOrObj.nonce);
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
@@ -62,9 +60,6 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
     }
     isSuccess() {
         return this.state === ToBtcSwapState.CLAIMED;
-    }
-    getOutputAmount() {
-        return this.amount;
     }
 }
 exports.ToBtcSwapAbs = ToBtcSwapAbs;

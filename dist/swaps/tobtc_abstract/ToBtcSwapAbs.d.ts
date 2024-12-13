@@ -13,7 +13,6 @@ export declare enum ToBtcSwapState {
 }
 export declare class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
     readonly address: string;
-    readonly amount: BN;
     readonly satsPerVbyte: BN;
     readonly nonce: BN;
     readonly preferedConfirmationTarget: number;
@@ -25,5 +24,4 @@ export declare class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBa
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;
-    getOutputAmount(): BN;
 }

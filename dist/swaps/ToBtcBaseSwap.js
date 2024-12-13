@@ -5,15 +5,17 @@ const SwapHandlerSwap_1 = require("./SwapHandlerSwap");
 const BN = require("bn.js");
 const Utils_1 = require("../utils/Utils");
 class ToBtcBaseSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
-    constructor(obj, swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken) {
-        if (typeof (obj) === "string" && BN.isBN(swapFee) && BN.isBN(swapFeeInToken) && BN.isBN(quotedNetworkFee) && BN.isBN(quotedNetworkFeeInToken)) {
+    constructor(obj, amount, swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken) {
+        if (typeof (obj) === "string" && BN.isBN(amount) && BN.isBN(swapFee) && BN.isBN(swapFeeInToken) && BN.isBN(quotedNetworkFee) && BN.isBN(quotedNetworkFeeInToken)) {
             super(obj, swapFee, swapFeeInToken);
+            this.amount = amount;
             this.quotedNetworkFee = quotedNetworkFee;
             this.quotedNetworkFeeInToken = quotedNetworkFeeInToken;
             return;
         }
         else {
             super(obj);
+            this.amount = (0, Utils_1.deserializeBN)(obj.amount);
             this.quotedNetworkFee = (0, Utils_1.deserializeBN)(obj.quotedNetworkFee);
             this.quotedNetworkFeeInToken = (0, Utils_1.deserializeBN)(obj.quotedNetworkFeeInToken);
             this.realNetworkFee = (0, Utils_1.deserializeBN)(obj.realNetworkFee);
@@ -22,6 +24,7 @@ class ToBtcBaseSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     }
     serialize() {
         const obj = super.serialize();
+        obj.amount = (0, Utils_1.serializeBN)(this.amount);
         obj.quotedNetworkFee = (0, Utils_1.serializeBN)(this.quotedNetworkFee);
         obj.quotedNetworkFeeInToken = (0, Utils_1.serializeBN)(this.quotedNetworkFeeInToken);
         obj.realNetworkFee = (0, Utils_1.serializeBN)(this.realNetworkFee);
@@ -56,6 +59,9 @@ class ToBtcBaseSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
      */
     getRealNetworkFee() {
         return { inInputToken: this.realNetworkFeeInToken, inOutputToken: this.realNetworkFee };
+    }
+    getOutputAmount() {
+        return this.amount;
     }
 }
 exports.ToBtcBaseSwap = ToBtcBaseSwap;

@@ -773,6 +773,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             const createdSwap = new ToBtcLnSwapAbs(
                 parsedAuth.chainIdentifier,
                 parsedBody.pr,
+                parsedPR.mtokens,
                 parsedAuth.swapFee,
                 parsedAuth.swapFeeInToken,
                 parsedAuth.quotedNetworkFee,
@@ -985,7 +986,16 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             metadata.times.swapSigned = Date.now();
 
             //Create swap
-            const createdSwap = new ToBtcLnSwapAbs(chainIdentifier, parsedBody.pr, swapFee, swapFeeInToken, networkFeeData.networkFee, networkFeeInToken, new BN(sigData.timeout));
+            const createdSwap = new ToBtcLnSwapAbs(
+                chainIdentifier,
+                parsedBody.pr,
+                parsedPR.mtokens,
+                swapFee,
+                swapFeeInToken,
+                networkFeeData.networkFee,
+                networkFeeInToken,
+                new BN(sigData.timeout)
+            );
             createdSwap.data = payObject;
             createdSwap.metadata = metadata;
 
@@ -1114,6 +1124,13 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
     async init() {
         await this.storageManager.loadData(ToBtcLnSwapAbs);
+        //Check if all swaps contain a valid amount
+        for(let swap of await this.storageManager.query([])) {
+            if(swap.amount==null) {
+                const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
+                swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+            }
+        }
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }

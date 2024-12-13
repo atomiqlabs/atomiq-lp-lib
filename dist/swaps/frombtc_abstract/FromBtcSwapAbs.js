@@ -1,9 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBtcSwapAbs = exports.FromBtcSwapState = void 0;
-const BN = require("bn.js");
-const bitcoin = require("bitcoinjs-lib");
-const crypto_1 = require("crypto");
 const SwapHandler_1 = require("../SwapHandler");
 const Utils_1 = require("../../utils/Utils");
 const FromBtcBaseSwap_1 = require("../FromBtcBaseSwap");
@@ -18,15 +15,13 @@ var FromBtcSwapState;
 class FromBtcSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     constructor(prOrObj, address, amount, swapFee, swapFeeInToken) {
         if (typeof (prOrObj) === "string") {
-            super(prOrObj, swapFee, swapFeeInToken);
+            super(prOrObj, amount, swapFee, swapFeeInToken);
             this.state = FromBtcSwapState.CREATED;
             this.address = address;
-            this.amount = amount;
         }
         else {
             super(prOrObj);
             this.address = prOrObj.address;
-            this.amount = new BN(prOrObj.amount);
             this.authorizationExpiry = (0, Utils_1.deserializeBN)(prOrObj.authorizationExpiry);
             this.txId = prOrObj.txId;
         }
@@ -35,17 +30,12 @@ class FromBtcSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     serialize() {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
-        partialSerialized.amount = this.amount.toString(10);
         partialSerialized.authorizationExpiry = (0, Utils_1.serializeBN)(this.authorizationExpiry);
         partialSerialized.txId = this.txId;
         return partialSerialized;
     }
-    getTxoHash(bitcoinNetwork) {
-        const parsedOutputScript = bitcoin.address.toOutputScript(this.address, bitcoinNetwork);
-        return (0, crypto_1.createHash)("sha256").update(Buffer.concat([
-            Buffer.from(this.amount.toArray("le", 8)),
-            parsedOutputScript
-        ])).digest();
+    getTxoHash() {
+        return Buffer.from(this.data.getTxoHash(), "hex");
     }
     isInitiated() {
         return this.state !== FromBtcSwapState.CREATED;

@@ -16,12 +16,11 @@ export declare class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends
     readonly dstAddress: string;
     readonly secret: string;
     scRawTx: string;
-    constructor(chainIdentifier: string, pr: string, swapFee: BN, swapFeeInToken: BN, output: BN, secret: string, dstAddress: string);
+    constructor(chainIdentifier: string, pr: string, inputMtokens: BN, swapFee: BN, swapFeeInToken: BN, output: BN, secret: string, dstAddress: string);
     constructor(obj: any);
     getHash(): string;
     getSequence(): BN;
     serialize(): any;
-    getTotalInputAmount(): BN;
     isFailed(): boolean;
     isInitiated(): boolean;
     isSuccess(): boolean;

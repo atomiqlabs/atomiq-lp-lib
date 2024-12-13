@@ -1,6 +1,5 @@
 /// <reference types="node" />
 import * as BN from "bn.js";
-import * as bitcoin from "bitcoinjs-lib";
 import { SwapData } from "@atomiqlabs/base";
 import { FromBtcBaseSwap } from "../FromBtcBaseSwap";
 export declare enum FromBtcSwapState {
@@ -12,13 +11,12 @@ export declare enum FromBtcSwapState {
 }
 export declare class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcSwapState> {
     readonly address: string;
-    readonly amount: BN;
     authorizationExpiry: BN;
     txId: string;
     constructor(chainIdentifier: string, address: string, amount: BN, swapFee: BN, swapFeeInToken: BN);
     constructor(obj: any);
     serialize(): any;
-    getTxoHash(bitcoinNetwork: bitcoin.networks.Network): Buffer;
+    getTxoHash(): Buffer;
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;

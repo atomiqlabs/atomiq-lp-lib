@@ -16,7 +16,6 @@ export declare enum FromBtcTrustedSwapState {
 export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcTrustedSwapState> {
     readonly sequence: BN;
     readonly btcAddress: string;
-    readonly inputSats: BN;
     readonly dstAddress: string;
     readonly outputTokens: BN;
     readonly createdHeight: number;

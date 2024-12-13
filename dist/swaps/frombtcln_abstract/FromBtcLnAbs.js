@@ -576,7 +576,7 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
             abortController.signal.throwIfAborted();
             metadata.times.invoiceCreated = Date.now();
             metadata.invoiceResponse = Object.assign({}, hodlInvoice);
-            const createdSwap = new FromBtcLnSwapAbs_1.FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, swapFee, swapFeeInToken);
+            const createdSwap = new FromBtcLnSwapAbs_1.FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, hodlInvoice.mtokens, swapFee, swapFeeInToken);
             //Pre-compute the security deposit
             const expiryTimeout = this.config.minCltv.mul(this.config.bitcoinBlocktime.div(this.config.safetyFactor)).sub(this.config.gracePeriod);
             const totalSecurityDeposit = yield this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSDPromise, securityDepositPricePrefetchPromise, abortController.signal, metadata);
@@ -695,6 +695,13 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
     init() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.storageManager.loadData(FromBtcLnSwapAbs_1.FromBtcLnSwapAbs);
+            //Check if all swaps contain a valid amount
+            for (let swap of yield this.storageManager.query([])) {
+                if (swap.amount == null) {
+                    const parsedPR = yield this.lightning.parsePaymentRequest(swap.pr);
+                    swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+                }
+            }
             this.subscribeToEvents();
             yield PluginManager_1.PluginManager.serviceInitialize(this);
         });

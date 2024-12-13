@@ -378,7 +378,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
             metadata.times.invoiceCreated = Date.now();
             metadata.invoiceResponse = Object.assign({}, hodlInvoice);
             console.log("[From BTC-LN: REST.CreateInvoice] hodl invoice created: ", hodlInvoice);
-            const createdSwap = new FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwap(chainIdentifier, hodlInvoice.request, swapFee, swapFeeInToken, totalInToken, secret.toString("hex"), parsedBody.address);
+            const createdSwap = new FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwap(chainIdentifier, hodlInvoice.request, hodlInvoice.mtokens, swapFee, swapFeeInToken, totalInToken, secret.toString("hex"), parsedBody.address);
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
@@ -470,6 +470,13 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
     init() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.storageManager.loadData(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwap);
+            //Check if all swaps contain a valid amount
+            for (let swap of yield this.storageManager.query([])) {
+                if (swap.amount == null) {
+                    const parsedPR = yield this.lightning.parsePaymentRequest(swap.pr);
+                    swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+                }
+            }
             yield PluginManager_1.PluginManager.serviceInitialize(this);
         });
     }

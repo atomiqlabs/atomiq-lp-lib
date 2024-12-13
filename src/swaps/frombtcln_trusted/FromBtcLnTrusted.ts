@@ -435,6 +435,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             const createdSwap = new FromBtcLnTrustedSwap(
                 chainIdentifier,
                 hodlInvoice.request,
+                hodlInvoice.mtokens,
                 swapFee,
                 swapFeeInToken,
                 totalInToken,
@@ -542,6 +543,13 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
     async init() {
         await this.storageManager.loadData(FromBtcLnTrustedSwap);
+        //Check if all swaps contain a valid amount
+        for(let swap of await this.storageManager.query([])) {
+            if(swap.amount==null) {
+                const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
+                swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+            }
+        }
         await PluginManager.serviceInitialize(this);
     }
 

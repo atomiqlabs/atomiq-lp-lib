@@ -1,15 +1,12 @@
-import {Express, Request, Response} from "express";
+import {Express, Request} from "express";
 import {ISwapPrice} from "./ISwapPrice";
 import {
-    AbstractSigner,
     ChainType,
     ClaimEvent,
     InitializeEvent, RefundEvent,
-    SwapContract,
     SwapData,
     SwapEvent
 } from "@atomiqlabs/base";
-import {AuthenticatedLnd} from "lightning";
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {PluginManager} from "../plugins/PluginManager";
 import {IIntermediaryStorage} from "../storage/IIntermediaryStorage";

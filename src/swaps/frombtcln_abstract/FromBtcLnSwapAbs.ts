@@ -1,7 +1,6 @@
 import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
-import * as bolt11 from "@atomiqlabs/bolt11";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
 
 export enum FromBtcLnSwapState {
@@ -26,12 +25,12 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
 
     secret: string;
 
-    constructor(chainIdentifier: string, pr: string, swapFee: BN, swapFeeInToken: BN);
+    constructor(chainIdentifier: string, pr: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN);
     constructor(obj: any);
 
-    constructor(chainIdOrObj: string | any, pr?: string, swapFee?: BN, swapFeeInToken?: BN) {
+    constructor(chainIdOrObj: string | any, pr?: string, amountMtokens?: BN, swapFee?: BN, swapFeeInToken?: BN) {
         if(typeof(chainIdOrObj)==="string") {
-            super(chainIdOrObj, swapFee, swapFeeInToken);
+            super(chainIdOrObj, amountMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
             this.state = FromBtcLnSwapState.CREATED;
             this.pr = pr;
         } else {
@@ -73,10 +72,6 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
 
     isSuccess(): boolean {
         return this.state===FromBtcLnSwapState.SETTLED;
-    }
-
-    getTotalInputAmount(): BN {
-        return new BN(bolt11.decode(this.pr).millisatoshis).add(new BN(999)).div(new BN(1000));
     }
 
 }

@@ -14,9 +14,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const bitcoin = require("bitcoinjs-lib");
-const tinySecpk256Interface = require("@bitcoinerlab/secp256k1");
-bitcoin.initEccLib(tinySecpk256Interface);
 __exportStar(require("./info/InfoHandler"), exports);
 __exportStar(require("./prices/CoinGeckoSwapPrice"), exports);
 __exportStar(require("./prices/BinanceSwapPrice"), exports);
@@ -52,6 +49,3 @@ __exportStar(require("./utils/paramcoders/server/ServerParamDecoder"), exports);
 __exportStar(require("./utils/paramcoders/server/ServerParamEncoder"), exports);
 __exportStar(require("./wallets/IBitcoinWallet"), exports);
 __exportStar(require("./wallets/ILightningWallet"), exports);
-__exportStar(require("./lnd/LNDClient"), exports);
-__exportStar(require("./lnd/LNDBitcoinWallet"), exports);
-__exportStar(require("./lnd/LNDLightningWallet"), exports);

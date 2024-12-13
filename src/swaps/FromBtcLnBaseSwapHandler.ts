@@ -2,7 +2,6 @@ import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {SwapData} from "@atomiqlabs/base";
 import {FromBtcBaseSwapHandler} from "./FromBtcBaseSwapHandler";
 import * as BN from "bn.js";
-import * as lncli from "ln-service";
 import {ILightningWallet, LightningNetworkChannel} from "../wallets/ILightningWallet";
 import {IIntermediaryStorage} from "../storage/IIntermediaryStorage";
 import {MultichainData} from "./SwapHandler";

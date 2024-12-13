@@ -6,22 +6,26 @@ import {deserializeBN, serializeBN} from "../utils/Utils";
 
 export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> extends SwapHandlerSwap<T, S> {
 
+    amount: BN;
+
     quotedNetworkFee: BN;
     readonly quotedNetworkFeeInToken: BN;
     realNetworkFee: BN;
     realNetworkFeeInToken: BN;
 
-    protected constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
+    protected constructor(chainIdentifier: string, amount: BN, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
     protected constructor(obj: any);
 
-    protected constructor(obj?: any | string, swapFee?: BN, swapFeeInToken?: BN, quotedNetworkFee?: BN, quotedNetworkFeeInToken?: BN) {
-        if(typeof(obj)==="string" && BN.isBN(swapFee) && BN.isBN(swapFeeInToken) && BN.isBN(quotedNetworkFee) && BN.isBN(quotedNetworkFeeInToken)) {
+    protected constructor(obj?: any | string, amount?: BN, swapFee?: BN, swapFeeInToken?: BN, quotedNetworkFee?: BN, quotedNetworkFeeInToken?: BN) {
+        if(typeof(obj)==="string" && BN.isBN(amount) && BN.isBN(swapFee) && BN.isBN(swapFeeInToken) && BN.isBN(quotedNetworkFee) && BN.isBN(quotedNetworkFeeInToken)) {
             super(obj, swapFee, swapFeeInToken);
+            this.amount = amount;
             this.quotedNetworkFee = quotedNetworkFee;
             this.quotedNetworkFeeInToken = quotedNetworkFeeInToken;
             return;
         } else {
             super(obj);
+            this.amount = deserializeBN(obj.amount);
             this.quotedNetworkFee = deserializeBN(obj.quotedNetworkFee);
             this.quotedNetworkFeeInToken = deserializeBN(obj.quotedNetworkFeeInToken);
             this.realNetworkFee = deserializeBN(obj.realNetworkFee);
@@ -31,6 +35,7 @@ export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> exte
 
     serialize(): any {
         const obj = super.serialize();
+        obj.amount = serializeBN(this.amount);
         obj.quotedNetworkFee = serializeBN(this.quotedNetworkFee);
         obj.quotedNetworkFeeInToken = serializeBN(this.quotedNetworkFeeInToken);
         obj.realNetworkFee = serializeBN(this.realNetworkFee);
@@ -71,6 +76,10 @@ export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> exte
      */
     getRealNetworkFee(): { inInputToken: BN; inOutputToken: BN } {
         return {inInputToken: this.realNetworkFeeInToken, inOutputToken: this.realNetworkFee};
+    }
+
+    getOutputAmount(): BN {
+        return this.amount;
     }
 
 }

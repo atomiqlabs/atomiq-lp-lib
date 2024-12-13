@@ -22,7 +22,6 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
 
     readonly sequence: BN;
     readonly btcAddress: string;
-    readonly inputSats: BN;
 
     readonly dstAddress: string;
     readonly outputTokens: BN;
@@ -76,12 +75,11 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         refundAddress?: string
     ) {
         if(typeof(objOrChainIdentifier)==="string") {
-            super(objOrChainIdentifier, swapFee, swapFeeInToken);
+            super(objOrChainIdentifier, inputSats, swapFee, swapFeeInToken);
             this.state = FromBtcTrustedSwapState.CREATED;
             this.doubleSpent = false;
             this.sequence = new BN(randomBytes(8));
             this.btcAddress = btcAddress;
-            this.inputSats = inputSats;
             this.dstAddress = dstAddress;
             this.outputTokens = outputTokens;
             this.createdHeight = createdHeight;
@@ -92,7 +90,6 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
             super(objOrChainIdentifier);
             this.btcAddress = objOrChainIdentifier.btcAddress;
             this.sequence = deserializeBN(objOrChainIdentifier.sequence);
-            this.inputSats = deserializeBN(objOrChainIdentifier.inputSats);
             this.dstAddress = objOrChainIdentifier.dstAddress;
             this.outputTokens = deserializeBN(objOrChainIdentifier.outputTokens);
             this.adjustedInput = deserializeBN(objOrChainIdentifier.adjustedInput);
@@ -117,7 +114,6 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         const partialSerialized = super.serialize();
         partialSerialized.btcAddress = this.btcAddress;
         partialSerialized.sequence = serializeBN(this.sequence);
-        partialSerialized.inputSats = serializeBN(this.inputSats);
         partialSerialized.dstAddress = this.dstAddress;
         partialSerialized.outputTokens = serializeBN(this.outputTokens);
         partialSerialized.adjustedInput = serializeBN(this.adjustedInput);
@@ -151,7 +147,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
     }
 
     getTotalInputAmount(): BN {
-        return this.adjustedInput || this.inputSats;
+        return this.adjustedInput || this.amount;
     }
 
     isFailed(): boolean {

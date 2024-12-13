@@ -18,7 +18,6 @@ export enum ToBtcSwapState {
 export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
 
     readonly address: string;
-    readonly amount: BN;
     readonly satsPerVbyte: BN;
     readonly nonce: BN;
     readonly preferedConfirmationTarget: number;
@@ -55,10 +54,9 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         signatureExpiry?: BN
     ) {
         if(typeof(chainIdOrObj)==="string") {
-            super(chainIdOrObj, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
+            super(chainIdOrObj, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
             this.state = ToBtcSwapState.SAVED;
             this.address = address;
-            this.amount = amount;
             this.satsPerVbyte = satsPerVbyte;
             this.nonce = nonce;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
@@ -66,7 +64,6 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         } else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.amount = new BN(chainIdOrObj.amount);
             this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
             this.nonce = new BN(chainIdOrObj.nonce);
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
@@ -103,10 +100,6 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
 
     isSuccess(): boolean {
         return this.state===ToBtcSwapState.CLAIMED;
-    }
-
-    getOutputAmount(): BN {
-        return this.amount;
     }
 
 }

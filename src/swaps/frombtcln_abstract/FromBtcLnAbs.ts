@@ -677,7 +677,13 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             metadata.times.invoiceCreated = Date.now();
             metadata.invoiceResponse = {...hodlInvoice};
 
-            const createdSwap = new FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, swapFee, swapFeeInToken);
+            const createdSwap = new FromBtcLnSwapAbs(
+                chainIdentifier,
+                hodlInvoice.request,
+                hodlInvoice.mtokens,
+                swapFee,
+                swapFeeInToken
+            );
 
             //Pre-compute the security deposit
             const expiryTimeout = this.config.minCltv.mul(this.config.bitcoinBlocktime.div(this.config.safetyFactor)).sub(this.config.gracePeriod);
@@ -833,6 +839,13 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
 
     async init() {
         await this.storageManager.loadData(FromBtcLnSwapAbs);
+        //Check if all swaps contain a valid amount
+        for(let swap of await this.storageManager.query([])) {
+            if(swap.amount==null) {
+                const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
+                swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+            }
+        }
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }
