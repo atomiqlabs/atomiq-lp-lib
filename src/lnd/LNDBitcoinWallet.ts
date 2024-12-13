@@ -177,7 +177,6 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
         return resChainTxns.transactions.map(lndTxToBtcTx);
     }
 
-    //TODO: Test if this try-catch approach works for transaction that are not found
     async getWalletTransaction(txId: string): Promise<BtcTx | null> {
         try {
             const resp = await getChainTransaction({
@@ -186,6 +185,7 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
             });
             return lndTxToBtcTx(resp);
         } catch (e) {
+            if(Array.isArray(e) && e[0]===503 && e[1]==="UnexpectedGetChainTransactionError" && e[2].code===2) return null;
             handleLndError(e);
         }
         return null;
