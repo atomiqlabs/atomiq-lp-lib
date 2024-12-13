@@ -107,11 +107,13 @@ class LNDBitcoinWallet {
     getFeeRate() {
         return __awaiter(this, void 0, void 0, function* () {
             let feeRate;
-            if (this.config.feeEstimator != null)
+            if (this.config.feeEstimator != null) {
                 feeRate = yield this.config.feeEstimator.estimateFee();
-            if (feeRate == null || feeRate === 0)
+            }
+            else {
                 feeRate = yield (0, lightning_1.getChainFeeRate)({ lnd: this.lndClient.lnd })
                     .then(val => val.tokens_per_vbyte);
+            }
             if (feeRate == null || feeRate === 0)
                 throw new Error("Unable to estimate chain fee!");
             return feeRate;

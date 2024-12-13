@@ -135,9 +135,12 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
 
     async getFeeRate(): Promise<number> {
         let feeRate: number;
-        if(this.config.feeEstimator!=null) feeRate = await this.config.feeEstimator.estimateFee();
-        if(feeRate==null || feeRate===0) feeRate = await getChainFeeRate({lnd: this.lndClient.lnd})
-            .then(val => val.tokens_per_vbyte);
+        if(this.config.feeEstimator!=null) {
+            feeRate = await this.config.feeEstimator.estimateFee();
+        } else {
+            feeRate = await getChainFeeRate({lnd: this.lndClient.lnd})
+                .then(val => val.tokens_per_vbyte)
+        }
         if(feeRate==null || feeRate===0) throw new Error("Unable to estimate chain fee!");
         return feeRate;
     }

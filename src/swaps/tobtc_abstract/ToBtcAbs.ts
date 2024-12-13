@@ -313,8 +313,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             code: 90003,
             msg: "Fee changed too much!",
             data: {
-                quotedFee: actualSatsPerVbyte.toString(10),
-                actualFee: quotedSatsPerVbyte.toString(10)
+                quotedFee: quotedSatsPerVbyte.toString(10),
+                actualFee: actualSatsPerVbyte.toString(10)
             }
         };
     }
