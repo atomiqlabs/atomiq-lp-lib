@@ -111,7 +111,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const burnTxId = resp.txId;
             swap.burnTxId = burnTxId;
             //Send the original TX + our burn TX as a package
-            const sendTxns = [swap.btcTx.hex, resp.raw];
+            const sendTxns = [swap.btcTx.raw, resp.raw];
             //TODO: We should handle this in a better way
             try {
                 yield this.bitcoinRpc.sendRawPackage(sendTxns);

@@ -21,11 +21,15 @@ const bitcoin = require("bitcoinjs-lib");
 const Utils_1 = require("../utils/Utils");
 function lndTxToBtcTx(tx) {
     const btcTx = bitcoinjs_lib_1.Transaction.fromHex(tx.transaction);
+    btcTx.ins.forEach(vin => {
+        vin.witness = [];
+    });
     return {
         blockhash: tx.block_id,
         confirmations: tx.confirmation_count,
         txid: tx.id,
-        hex: tx.transaction,
+        hex: btcTx.toHex(),
+        raw: tx.transaction,
         vsize: btcTx.virtualSize(),
         outs: btcTx.outs.map((output, index) => {
             return {
