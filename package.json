@@ -23,7 +23,7 @@
   "license": "ISC",
   "dependencies": {
     "@atomiqlabs/base": "7.2.2",
-    "@atomiqlabs/server-base": "1.0.4",
+    "@atomiqlabs/server-base": "1.0.5",
     "bitcoinjs-lib": "6.1.5",
     "bn.js": "5.2.1",
     "express": "4.21.1",
