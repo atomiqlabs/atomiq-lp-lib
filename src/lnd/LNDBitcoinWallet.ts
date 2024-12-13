@@ -449,9 +449,12 @@ export class LNDBitcoinWallet implements IBitcoinWallet {
         const txFee = psbt.getFee();
 
         //Sanity check on sats/vB
-        const maxAllowedFee = tx.virtualSize() +
-            //Considering the extra output was not added, because was detrminetal
-            (utils.outputBytes({type: this.CHANGE_ADDRESS_TYPE}) * maxAllowedSatsPerVbyte) +
+        const maxAllowedFee =
+            (
+                tx.virtualSize() +
+                //Considering the extra output was not added, because was detrminetal
+                utils.outputBytes({type: this.CHANGE_ADDRESS_TYPE})
+            ) * maxAllowedSatsPerVbyte +
             //Possibility that extra output was not added due to it being lower than dust
             utils.dustThreshold({type: this.CHANGE_ADDRESS_TYPE});
 

@@ -395,9 +395,9 @@ class LNDBitcoinWallet {
     checkPsbtFee(psbt, tx, maxAllowedSatsPerVbyte, actualSatsPerVbyte) {
         const txFee = psbt.getFee();
         //Sanity check on sats/vB
-        const maxAllowedFee = tx.virtualSize() +
+        const maxAllowedFee = (tx.virtualSize() +
             //Considering the extra output was not added, because was detrminetal
-            (utils_1.utils.outputBytes({ type: this.CHANGE_ADDRESS_TYPE }) * maxAllowedSatsPerVbyte) +
+            utils_1.utils.outputBytes({ type: this.CHANGE_ADDRESS_TYPE })) * maxAllowedSatsPerVbyte +
             //Possibility that extra output was not added due to it being lower than dust
             utils_1.utils.dustThreshold({ type: this.CHANGE_ADDRESS_TYPE });
         if (txFee > maxAllowedFee)
