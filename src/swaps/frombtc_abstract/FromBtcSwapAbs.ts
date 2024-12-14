@@ -1,8 +1,6 @@
 import * as BN from "bn.js";
-import {createHash} from "crypto";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../SwapHandler";
-import {deserializeBN, serializeBN} from "../../utils/Utils";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
 
 export enum FromBtcSwapState {
@@ -16,7 +14,6 @@ export enum FromBtcSwapState {
 export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcSwapState> {
 
     readonly address: string;
-    authorizationExpiry: BN;
     txId: string;
 
     constructor(chainIdentifier: string, address: string, amount: BN, swapFee: BN, swapFeeInToken: BN);
@@ -30,7 +27,6 @@ export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSw
         } else {
             super(prOrObj);
             this.address = prOrObj.address;
-            this.authorizationExpiry = deserializeBN(prOrObj.authorizationExpiry);
             this.txId = prOrObj.txId;
         }
         this.type = SwapHandlerType.FROM_BTC;
@@ -39,7 +35,6 @@ export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSw
     serialize(): any {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
-        partialSerialized.authorizationExpiry = serializeBN(this.authorizationExpiry);
         partialSerialized.txId = this.txId;
         return partialSerialized;
     }

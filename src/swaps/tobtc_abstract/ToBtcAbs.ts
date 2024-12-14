@@ -129,10 +129,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     protected async processPastSwap(swap: ToBtcSwapAbs) {
         const {swapContract, signer} = this.getChain(swap.chainIdentifier);
 
-        const timestamp = new BN(Math.floor(Date.now()/1000)).sub(new BN(this.config.maxSkew));
-
-        if(swap.state===ToBtcSwapState.SAVED && swap.signatureExpiry!=null) {
-            const isSignatureExpired = swap.signatureExpiry.lt(timestamp);
+        if(swap.state===ToBtcSwapState.SAVED) {
+            const isSignatureExpired = swapContract.isInitAuthorizationExpired(swap.data, swap);
             if(isSignatureExpired) {
                 const isCommitted = await swapContract.isCommited(swap.data);
                 if(!isCommitted) {
@@ -148,8 +146,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         }
 
         if(swap.state===ToBtcSwapState.NON_PAYABLE || swap.state===ToBtcSwapState.SAVED) {
-            const isSwapExpired = swap.data.getExpiry().lt(timestamp);
-            if(isSwapExpired) {
+            if(swapContract.isExpired(signer.getAddress(), swap.data)) {
                 this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE|SAVED): swap expired, cancelling, address: "+swap.address);
                 await this.removeSwapData(swap, ToBtcSwapState.CANCELED);
                 return;
@@ -572,7 +569,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @throws {DefinedRuntimeError} will throw an error if the swap is expired
      */
     protected checkExpired(swap: ToBtcSwapAbs) {
-        const isExpired = swap.data.getExpiry().lt(new BN(Math.floor(Date.now()/1000)).sub(new BN(this.config.maxSkew)));
+        const {swapContract, signer} = this.getChain(swap.chainIdentifier);
+        const isExpired = swapContract.isExpired(signer.getAddress(), swap.data);
         if(isExpired) throw {
             _httpStatus: 200,
             code: 20010,
@@ -728,11 +726,14 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 networkFeeInToken,
                 networkFeeData.satsPerVbyte,
                 parsedBody.nonce,
-                parsedBody.confirmationTarget,
-                new BN(sigData.timeout)
+                parsedBody.confirmationTarget
             );
             createdSwap.data = payObject;
             createdSwap.metadata = metadata;
+            createdSwap.prefix = sigData.prefix;
+            createdSwap.timeout = sigData.timeout;
+            createdSwap.signature = sigData.signature
+            createdSwap.feeRate = sigData.feeRate;
 
             await PluginManager.swapCreate(createdSwap);
             await this.storageManager.saveData(paymentHash, sequence, createdSwap);
@@ -788,8 +789,6 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 msg: "Payment not found"
             };
 
-            const {swapContract, signer} = this.getChain(payment.chainIdentifier);
-
             this.checkExpired(payment);
 
             if (payment.state === ToBtcSwapState.COMMITED) throw {
@@ -806,6 +805,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     txId: payment.txId
                 }
             };
+
+            const {swapContract, signer} = this.getChain(payment.chainIdentifier);
 
             if (payment.state === ToBtcSwapState.NON_PAYABLE) {
                 const isCommited = await swapContract.isCommited(payment.data);

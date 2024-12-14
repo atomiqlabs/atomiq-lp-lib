@@ -27,8 +27,15 @@ export interface IBitcoinWallet {
     getCommands(): Command<any>[];
     toOutputScript(address: string): Buffer;
     getAddressType(): "p2wpkh" | "p2sh-p2wpkh" | "p2tr";
+    /**
+     * Returns an unused address suitable for receiving
+     */
     getAddress(): Promise<string>;
-    getChangeAddress(): Promise<string>;
+    /**
+     * Adds previously returned address (with getAddress call), to the pool of unused addresses
+     * @param address
+     */
+    addUnusedAddress(address: string): Promise<void>;
     getUtxos(): Promise<BitcoinUtxo[]>;
     getBalance(): Promise<{
         confirmed: number;

@@ -32,7 +32,6 @@ export type SwapBaseConfig = {
     feePPM: BN;
     max: BN;
     min: BN;
-    maxSkew: number;
     safetyFactor: BN;
     swapCheckInterval: number;
 };

@@ -83,9 +83,8 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     processPastSwap(swap) {
         return __awaiter(this, void 0, void 0, function* () {
             const { swapContract, signer } = this.getChain(swap.chainIdentifier);
-            const timestamp = new BN(Math.floor(Date.now() / 1000)).sub(new BN(this.config.maxSkew));
-            if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.SAVED && swap.signatureExpiry != null) {
-                const isSignatureExpired = swap.signatureExpiry.lt(timestamp);
+            if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.SAVED) {
+                const isSignatureExpired = swapContract.isInitAuthorizationExpired(swap.data, swap);
                 if (isSignatureExpired) {
                     const isCommitted = yield swapContract.isCommited(swap.data);
                     if (!isCommitted) {
@@ -101,8 +100,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 }
             }
             if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.NON_PAYABLE || swap.state === ToBtcSwapAbs_1.ToBtcSwapState.SAVED) {
-                const isSwapExpired = swap.data.getExpiry().lt(timestamp);
-                if (isSwapExpired) {
+                if (swapContract.isExpired(signer.getAddress(), swap.data)) {
                     this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE|SAVED): swap expired, cancelling, address: " + swap.address);
                     yield this.removeSwapData(swap, ToBtcSwapAbs_1.ToBtcSwapState.CANCELED);
                     return;
@@ -504,7 +502,8 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the swap is expired
      */
     checkExpired(swap) {
-        const isExpired = swap.data.getExpiry().lt(new BN(Math.floor(Date.now() / 1000)).sub(new BN(this.config.maxSkew)));
+        const { swapContract, signer } = this.getChain(swap.chainIdentifier);
+        const isExpired = swapContract.isExpired(signer.getAddress(), swap.data);
         if (isExpired)
             throw {
                 _httpStatus: 200,
@@ -613,9 +612,13 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             metadata.times.swapCreated = Date.now();
             const sigData = yield this.getToBtcSignatureData(chainIdentifier, payObject, req, abortController.signal, signDataPrefetchPromise);
             metadata.times.swapSigned = Date.now();
-            const createdSwap = new ToBtcSwapAbs_1.ToBtcSwapAbs(chainIdentifier, parsedBody.address, amountBD, swapFee, swapFeeInToken, networkFeeData.networkFee, networkFeeInToken, networkFeeData.satsPerVbyte, parsedBody.nonce, parsedBody.confirmationTarget, new BN(sigData.timeout));
+            const createdSwap = new ToBtcSwapAbs_1.ToBtcSwapAbs(chainIdentifier, parsedBody.address, amountBD, swapFee, swapFeeInToken, networkFeeData.networkFee, networkFeeInToken, networkFeeData.satsPerVbyte, parsedBody.nonce, parsedBody.confirmationTarget);
             createdSwap.data = payObject;
             createdSwap.metadata = metadata;
+            createdSwap.prefix = sigData.prefix;
+            createdSwap.timeout = sigData.timeout;
+            createdSwap.signature = sigData.signature;
+            createdSwap.feeRate = sigData.feeRate;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
             yield this.storageManager.saveData(paymentHash, sequence, createdSwap);
             this.swapLogger.info(createdSwap, "REST: /payInvoice: created swap address: " + createdSwap.address + " amount: " + amountBD.toString(10));
@@ -663,7 +666,6 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     code: 20007,
                     msg: "Payment not found"
                 };
-            const { swapContract, signer } = this.getChain(payment.chainIdentifier);
             this.checkExpired(payment);
             if (payment.state === ToBtcSwapAbs_1.ToBtcSwapState.COMMITED)
                 throw {
@@ -680,6 +682,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                         txId: payment.txId
                     }
                 };
+            const { swapContract, signer } = this.getChain(payment.chainIdentifier);
             if (payment.state === ToBtcSwapAbs_1.ToBtcSwapState.NON_PAYABLE) {
                 const isCommited = yield swapContract.isCommited(payment.data);
                 if (!isCommited)

@@ -97,15 +97,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * @returns true if the swap should be refunded, false if nothing should be done
      */
     protected async processPastSwap(swap: FromBtcSwapAbs): Promise<boolean> {
-        //Current time, minus maximum chain time skew
-        const currentTime = new BN(Math.floor(Date.now()/1000)-this.config.maxSkew);
-
-        const {swapContract} = this.getChain(swap.chainIdentifier);
+        const {swapContract, signer} = this.getChain(swap.chainIdentifier);
 
         //Once authorization expires in CREATED state, the user can no more commit it on-chain
         if(swap.state===FromBtcSwapState.CREATED) {
-            const isExpired = swap.authorizationExpiry.lt(currentTime);
-            if(!isExpired) return false;
+            if(!await swapContract.isInitAuthorizationExpired(swap.data, swap)) return false;
 
             const isCommited = await swapContract.isCommited(swap.data);
             if(isCommited) {
@@ -116,15 +112,14 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             }
 
             this.swapLogger.info(swap, "processPastSwap(state=CREATED): removing past swap due to authorization expiry, address: "+swap.address);
+            await this.bitcoin.addUnusedAddress(swap.address);
             await this.removeSwapData(swap, FromBtcSwapState.CANCELED);
             return false;
         }
 
-        const expiryTime = swap.data.getExpiry();
         //Check if commited swap expired by now
         if(swap.state===FromBtcSwapState.COMMITED) {
-            const isExpired = expiryTime.lt(currentTime);
-            if(!isExpired) return false;
+            if(!swapContract.isExpired(signer.getAddress(), swap.data)) return false;
 
             const isCommited = await swapContract.isCommited(swap.data);
             if(isCommited) {
@@ -233,6 +228,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         savedSwap.txIds.refund = (event as any).meta?.txId;
 
         this.swapLogger.info(event, "SC: RefundEvent: swap refunded, address: "+savedSwap.address);
+        await this.bitcoin.addUnusedAddress(savedSwap.address);
         await this.removeSwapData(savedSwap, FromBtcSwapState.REFUNDED);
     }
 
@@ -432,7 +428,10 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const createdSwap: FromBtcSwapAbs = new FromBtcSwapAbs(chainIdentifier, receiveAddress, amountBD, swapFee, swapFeeInToken);
             createdSwap.data = data;
             createdSwap.metadata = metadata;
-            createdSwap.authorizationExpiry = new BN(sigData.timeout);
+            createdSwap.prefix = sigData.prefix;
+            createdSwap.timeout = sigData.timeout;
+            createdSwap.signature = sigData.signature;
+            createdSwap.feeRate = sigData.feeRate;
 
             await PluginManager.swapCreate(createdSwap);
             await this.storageManager.saveData(createdSwap.data.getHash(), createdSwap.data.getSequence(), createdSwap);

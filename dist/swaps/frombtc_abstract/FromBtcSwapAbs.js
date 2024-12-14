@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBtcSwapAbs = exports.FromBtcSwapState = void 0;
 const SwapHandler_1 = require("../SwapHandler");
-const Utils_1 = require("../../utils/Utils");
 const FromBtcBaseSwap_1 = require("../FromBtcBaseSwap");
 var FromBtcSwapState;
 (function (FromBtcSwapState) {
@@ -22,7 +21,6 @@ class FromBtcSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         else {
             super(prOrObj);
             this.address = prOrObj.address;
-            this.authorizationExpiry = (0, Utils_1.deserializeBN)(prOrObj.authorizationExpiry);
             this.txId = prOrObj.txId;
         }
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC;
@@ -30,7 +28,6 @@ class FromBtcSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     serialize() {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
-        partialSerialized.authorizationExpiry = (0, Utils_1.serializeBN)(this.authorizationExpiry);
         partialSerialized.txId = this.txId;
         return partialSerialized;
     }

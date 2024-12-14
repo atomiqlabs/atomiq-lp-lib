@@ -65,7 +65,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
     }
 
     protected async processPastSwap(swap: FromBtcLnSwapAbs): Promise<"REFUND" | "SETTLE" | "CANCEL" | null> {
-        const {swapContract} = this.getChain(swap.chainIdentifier);
+        const {swapContract, signer} = this.getChain(swap.chainIdentifier);
         if(swap.state===FromBtcLnSwapState.CREATED) {
             //Check if already paid
             const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
@@ -100,8 +100,6 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         }
 
         if(swap.state===FromBtcLnSwapState.RECEIVED) {
-            const parsedPR = this.lightning.parsePaymentRequest(swap.pr);
-
             const isAuthorizationExpired = await swapContract.isInitAuthorizationExpired(swap.data, swap);
             if(isAuthorizationExpired) {
                 const isCommited = await swapContract.isCommited(swap.data);
@@ -119,11 +117,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         }
 
         if(swap.state===FromBtcLnSwapState.RECEIVED || swap.state===FromBtcLnSwapState.COMMITED) {
-            const expiryTime = swap.data.getExpiry();
-            const currentTime = new BN(Math.floor(Date.now()/1000)-this.config.maxSkew);
-
-            const isExpired = expiryTime!=null && expiryTime.lt(currentTime);
-            if(!isExpired) return null;
+            if(!swapContract.isExpired(signer.getAddress(), swap.data)) return null;
 
             const isCommited = await swapContract.isCommited(swap.data);
             if(isCommited) {

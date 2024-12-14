@@ -18,10 +18,6 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
     readonly pr: string;
 
     nonce: number;
-    prefix: string;
-    timeout: string;
-    signature: string;
-    feeRate: string;
 
     secret: string;
 
@@ -38,10 +34,6 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
             this.pr = chainIdOrObj.pr;
             this.secret = chainIdOrObj.secret;
             this.nonce = chainIdOrObj.nonce;
-            this.prefix = chainIdOrObj.prefix;
-            this.timeout = chainIdOrObj.timeout;
-            this.signature = chainIdOrObj.signature;
-            this.feeRate = chainIdOrObj.feeRate;
         }
         this.type = SwapHandlerType.FROM_BTCLN;
     }
@@ -51,10 +43,6 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         partialSerialized.pr = this.pr;
         partialSerialized.secret = this.secret;
         partialSerialized.nonce = this.nonce;
-        partialSerialized.prefix = this.prefix;
-        partialSerialized.timeout = this.timeout;
-        partialSerialized.signature = this.signature;
-        partialSerialized.feeRate = this.feeRate;
         return partialSerialized;
     }
 

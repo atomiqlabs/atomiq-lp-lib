@@ -26,7 +26,7 @@ import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 export type FromBtcTrustedConfig = FromBtcBaseConfig & {
     doubleSpendCheckInterval: number,
     swapAddressExpiry: number,
-    recommendFeeMultiplier?: number,
+    recommendFeeMultiplier?: number
 }
 
 export type FromBtcTrustedRequestType = {
@@ -178,6 +178,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 //Check expiry
                 if(swap.expiresAt<Date.now()) {
                     this.subscriptions.delete(outputScript);
+                    await this.bitcoin.addUnusedAddress(swap.btcAddress);
                     await this.removeSwapData(swap, FromBtcTrustedSwapState.EXPIRED);
                     return;
                 }

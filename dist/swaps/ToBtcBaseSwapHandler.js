@@ -226,7 +226,7 @@ class ToBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
             const { swapContract, signer } = this.getChain(chainIdentifier);
             const sigData = yield swapContract.getInitSignature(signer, swapObject, this.config.authorizationTimeout, prefetchedSignData, feeRate);
             abortSignal.throwIfAborted();
-            return sigData;
+            return Object.assign(Object.assign({}, sigData), { feeRate });
         });
     }
 }

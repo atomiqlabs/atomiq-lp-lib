@@ -135,6 +135,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     //Check expiry
                     if (swap.expiresAt < Date.now()) {
                         this.subscriptions.delete(outputScript);
+                        yield this.bitcoin.addUnusedAddress(swap.btcAddress);
                         yield this.removeSwapData(swap, FromBtcTrustedSwap_1.FromBtcTrustedSwapState.EXPIRED);
                         return;
                     }

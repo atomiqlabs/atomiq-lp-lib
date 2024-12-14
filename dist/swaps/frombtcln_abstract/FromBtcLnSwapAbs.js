@@ -26,10 +26,6 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.pr = chainIdOrObj.pr;
             this.secret = chainIdOrObj.secret;
             this.nonce = chainIdOrObj.nonce;
-            this.prefix = chainIdOrObj.prefix;
-            this.timeout = chainIdOrObj.timeout;
-            this.signature = chainIdOrObj.signature;
-            this.feeRate = chainIdOrObj.feeRate;
         }
         this.type = __1.SwapHandlerType.FROM_BTCLN;
     }
@@ -38,10 +34,6 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.pr = this.pr;
         partialSerialized.secret = this.secret;
         partialSerialized.nonce = this.nonce;
-        partialSerialized.prefix = this.prefix;
-        partialSerialized.timeout = this.timeout;
-        partialSerialized.signature = this.signature;
-        partialSerialized.feeRate = this.feeRate;
         return partialSerialized;
     }
     getSequence() {

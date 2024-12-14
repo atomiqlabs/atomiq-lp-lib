@@ -11,7 +11,6 @@ export declare enum FromBtcSwapState {
 }
 export declare class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcSwapState> {
     readonly address: string;
-    authorizationExpiry: BN;
     txId: string;
     constructor(chainIdentifier: string, address: string, amount: BN, swapFee: BN, swapFeeInToken: BN);
     constructor(obj: any);

@@ -20,6 +20,10 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
     };
     readonly swapFee: BN;
     readonly swapFeeInToken: BN;
+    prefix: string;
+    timeout: string;
+    signature: string;
+    feeRate: string;
     protected constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN);
     protected constructor(obj: any);
     serialize(): any;

@@ -21,7 +21,6 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
     readonly satsPerVbyte: BN;
     readonly nonce: BN;
     readonly preferedConfirmationTarget: number;
-    readonly signatureExpiry: BN;
 
     txId: string;
 
@@ -35,8 +34,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         networkFeeInToken: BN,
         satsPerVbyte: BN,
         nonce: BN,
-        preferedConfirmationTarget: number,
-        signatureExpiry: BN
+        preferedConfirmationTarget: number
     );
     constructor(obj: any);
 
@@ -50,8 +48,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         networkFeeInToken?: BN,
         satsPerVbyte?: BN,
         nonce?: BN,
-        preferedConfirmationTarget?: number,
-        signatureExpiry?: BN
+        preferedConfirmationTarget?: number
     ) {
         if(typeof(chainIdOrObj)==="string") {
             super(chainIdOrObj, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
@@ -60,14 +57,12 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
             this.satsPerVbyte = satsPerVbyte;
             this.nonce = nonce;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
-            this.signatureExpiry = signatureExpiry;
         } else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
             this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
             this.nonce = new BN(chainIdOrObj.nonce);
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
-            this.signatureExpiry = deserializeBN(chainIdOrObj.signatureExpiry);
 
             this.txId = chainIdOrObj.txId;
 
@@ -84,8 +79,6 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         partialSerialized.satsPerVbyte = this.satsPerVbyte.toString(10);
         partialSerialized.nonce = this.nonce.toString(10);
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
-        partialSerialized.signatureExpiry = serializeBN(this.signatureExpiry);
-
         partialSerialized.txId = this.txId;
         return partialSerialized;
     }

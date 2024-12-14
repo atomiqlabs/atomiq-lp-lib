@@ -17,7 +17,6 @@ export enum ToBtcLnSwapState {
 export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcLnSwapState> {
 
     readonly pr: string;
-    readonly signatureExpiry: BN;
 
     secret: string;
 
@@ -29,20 +28,17 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
         swapFeeInToken: BN,
         quotedNetworkFee: BN,
         quotedNetworkFeeInToken: BN,
-        signatureExpiry: BN
     );
     constructor(obj: any);
 
-    constructor(chainIdOrObj: string | any, pr?: string, amount?: BN, swapFee?: BN, swapFeeInToken?: BN, quotedNetworkFee?: BN, quotedNetworkFeeInToken?: BN, signatureExpiry?: BN) {
+    constructor(chainIdOrObj: string | any, pr?: string, amount?: BN, swapFee?: BN, swapFeeInToken?: BN, quotedNetworkFee?: BN, quotedNetworkFeeInToken?: BN) {
         if(typeof(chainIdOrObj)==="string") {
             super(chainIdOrObj, amount.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken);
             this.state = ToBtcLnSwapState.SAVED;
             this.pr = pr;
-            this.signatureExpiry = signatureExpiry;
         } else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
-            this.signatureExpiry = deserializeBN(chainIdOrObj.signatureExpiry);
             this.secret = chainIdOrObj.secret;
 
             //Compatibility with older versions
@@ -55,7 +51,6 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
     serialize(): any {
         const partialSerialized = super.serialize();
         partialSerialized.pr = this.pr;
-        partialSerialized.signatureExpiry = serializeBN(this.signatureExpiry);
         partialSerialized.secret = this.secret;
         return partialSerialized;
     }
