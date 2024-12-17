@@ -47,7 +47,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
 
     readonly refundedSwaps: Map<string, string> = new Map();
     readonly doubleSpentSwaps: Map<string, string> = new Map();
-    readonly processedTxIds: Map<string, { txId: string, adjustedAmount: BN, adjustedTotal: BN }> = new Map();
+    readonly processedTxIds: Map<string, { scTxId: string, txId: string, adjustedAmount: BN, adjustedTotal: BN }> = new Map();
 
     constructor(
         storageDirectory: IIntermediaryStorage<FromBtcTrustedSwap>,
@@ -333,7 +333,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
 
         if(swap.state===FromBtcTrustedSwapState.CONFIRMED) {
             this.processedTxIds.set(swap.getHash(), {
-                txId: swap.txIds.init,
+                txId: swap.txId,
+                scTxId: swap.txIds.init,
                 adjustedAmount: swap.adjustedInput,
                 adjustedTotal: swap.adjustedOutput
             });
@@ -551,7 +552,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 data: {
                     adjustedAmount: processedTxData.adjustedAmount.toString(10),
                     adjustedTotal: processedTxData.adjustedTotal.toString(10),
-                    txId: processedTxData.txId
+                    txId: processedTxData.txId,
+                    scTxId: processedTxData.scTxId
                 }
             };
 
@@ -594,7 +596,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 msg: "Bitcoin received, payment processing",
                 data: {
                     adjustedAmount: invoiceData.adjustedInput.toString(10),
-                    adjustedTotal: invoiceData.adjustedOutput.toString(10)
+                    adjustedTotal: invoiceData.adjustedOutput.toString(10),
+                    txId: invoiceData.txId
                 }
             };
 
@@ -604,7 +607,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 msg: "Bitcoin accepted, payment processing",
                 data: {
                     adjustedAmount: invoiceData.adjustedInput.toString(10),
-                    adjustedTotal: invoiceData.adjustedOutput.toString(10)
+                    adjustedTotal: invoiceData.adjustedOutput.toString(10),
+                    txId: invoiceData.txId
                 }
             };
 
@@ -615,7 +619,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 data: {
                     adjustedAmount: invoiceData.adjustedInput.toString(10),
                     adjustedTotal: invoiceData.adjustedOutput.toString(10),
-                    txId: invoiceData.txIds.init
+                    txId: invoiceData.txId,
+                    scTxId: invoiceData.txIds.init
                 }
             };
 
@@ -626,13 +631,14 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 data: {
                     adjustedAmount: invoiceData.adjustedInput.toString(10),
                     adjustedTotal: invoiceData.adjustedOutput.toString(10),
-                    txId: invoiceData.txIds.init
+                    txId: invoiceData.txId,
+                    scTxId: invoiceData.txIds.init
                 }
             };
 
             if (invoiceData.state === FromBtcTrustedSwapState.REFUNDABLE) throw {
                 _httpStatus: 200,
-                code: 10015,
+                code: 10016,
                 msg: "Refundable",
                 data: {
                     adjustedAmount: invoiceData.adjustedInput.toString(10)

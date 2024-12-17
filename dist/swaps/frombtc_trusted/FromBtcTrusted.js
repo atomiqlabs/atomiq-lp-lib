@@ -291,7 +291,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             }
             if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CONFIRMED) {
                 this.processedTxIds.set(swap.getHash(), {
-                    txId: swap.txIds.init,
+                    txId: swap.txId,
+                    scTxId: swap.txIds.init,
                     adjustedAmount: swap.adjustedInput,
                     adjustedTotal: swap.adjustedOutput
                 });
@@ -477,7 +478,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     data: {
                         adjustedAmount: processedTxData.adjustedAmount.toString(10),
                         adjustedTotal: processedTxData.adjustedTotal.toString(10),
-                        txId: processedTxData.txId
+                        txId: processedTxData.txId,
+                        scTxId: processedTxData.scTxId
                     }
                 };
             const refundTxId = this.refundedSwaps.get(parsedBody.paymentHash);
@@ -520,7 +522,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     msg: "Bitcoin received, payment processing",
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
-                        adjustedTotal: invoiceData.adjustedOutput.toString(10)
+                        adjustedTotal: invoiceData.adjustedOutput.toString(10),
+                        txId: invoiceData.txId
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED)
@@ -530,7 +533,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     msg: "Bitcoin accepted, payment processing",
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
-                        adjustedTotal: invoiceData.adjustedOutput.toString(10)
+                        adjustedTotal: invoiceData.adjustedOutput.toString(10),
+                        txId: invoiceData.txId
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.SENT)
@@ -541,7 +545,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
                         adjustedTotal: invoiceData.adjustedOutput.toString(10),
-                        txId: invoiceData.txIds.init
+                        txId: invoiceData.txId,
+                        scTxId: invoiceData.txIds.init
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CONFIRMED || invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.FINISHED)
@@ -552,13 +557,14 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
                         adjustedTotal: invoiceData.adjustedOutput.toString(10),
-                        txId: invoiceData.txIds.init
+                        txId: invoiceData.txId,
+                        scTxId: invoiceData.txIds.init
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE)
                 throw {
                     _httpStatus: 200,
-                    code: 10015,
+                    code: 10016,
                     msg: "Refundable",
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10)

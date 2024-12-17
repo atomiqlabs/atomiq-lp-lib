@@ -27,6 +27,7 @@ export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTruste
     readonly refundedSwaps: Map<string, string>;
     readonly doubleSpentSwaps: Map<string, string>;
     readonly processedTxIds: Map<string, {
+        scTxId: string;
         txId: string;
         adjustedAmount: BN;
         adjustedTotal: BN;
