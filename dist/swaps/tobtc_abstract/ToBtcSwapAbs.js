@@ -42,7 +42,6 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
     serialize() {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
-        partialSerialized.amount = this.amount.toString(10);
         partialSerialized.satsPerVbyte = this.satsPerVbyte.toString(10);
         partialSerialized.nonce = this.nonce.toString(10);
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
