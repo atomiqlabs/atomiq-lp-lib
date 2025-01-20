@@ -1,4 +1,4 @@
-import {StorageObject} from "crosslightning-base";
+import {StorageObject} from "@atomiqlabs/base";
 import * as BN from "bn.js";
 
 export type StorageQueryParam = {

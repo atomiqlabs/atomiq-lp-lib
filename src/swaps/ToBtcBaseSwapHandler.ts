@@ -1,6 +1,6 @@
 import {RequestData, SwapBaseConfig, SwapHandler} from "./SwapHandler";
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import * as BN from "bn.js";
 import {ServerParamEncoder} from "../utils/paramcoders/server/ServerParamEncoder";
 import {IParamReader} from "../utils/paramcoders/IParamReader";
@@ -280,7 +280,8 @@ export abstract class ToBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData, S
     ): Promise<{
         prefix: string,
         timeout: string,
-        signature: string
+        signature: string,
+        feeRate: string
     }> {
         const prefetchedSignData = signDataPrefetchPromise!=null ? await signDataPrefetchPromise : null;
         if(prefetchedSignData!=null) this.logger.debug("getToBtcSignatureData(): pre-fetched signature data: ", prefetchedSignData);
@@ -303,7 +304,10 @@ export abstract class ToBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData, S
         );
         abortSignal.throwIfAborted();
 
-        return sigData;
+        return {
+            ...sigData,
+            feeRate
+        };
     }
 
 }

@@ -1,4 +1,4 @@
-import {BitcoinRpc, SwapData} from "crosslightning-base";
+import {BitcoinRpc, SwapData} from "@atomiqlabs/base";
 import {
     FromBtcLnRequestType,
     FromBtcRequestType,
@@ -8,9 +8,11 @@ import {
     ToBtcRequestType
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
-import {AuthenticatedLnd} from "lightning";
 import * as BN from "bn.js";
-import {Command} from "crosslightning-server-base";
+import {Command} from "@atomiqlabs/server-base";
+import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
+import {ILightningWallet} from "../wallets/ILightningWallet";
 
 export type QuoteThrow = {
     type: "throw",
@@ -83,7 +85,8 @@ export interface IPlugin {
         chainsData: MultichainData,
 
         bitcoinRpc: BitcoinRpc<any>,
-        lnd: AuthenticatedLnd,
+        bitcoinWallet: IBitcoinWallet,
+        lightningWallet: ILightningWallet,
 
         swapPricing: ISwapPrice,
         tokens: {
@@ -109,7 +112,7 @@ export interface IPlugin {
     onSwapRemove?(swap: SwapHandlerSwap): Promise<void>;
 
     onHandlePreFromBtcQuote?(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType>,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
         requestedAmount: {input: boolean, amount: BN},
         chainIdentifier: string,
         token: string,
@@ -117,7 +120,7 @@ export interface IPlugin {
         fees: {baseFeeInBtc: BN, feePPM: BN}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostFromBtcQuote?(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType>,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
         requestedAmount: {input: boolean, amount: BN},
         chainIdentifier: string,
         token: string,

@@ -1,5 +1,5 @@
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import {RequestData, SwapBaseConfig, SwapHandler} from "./SwapHandler";
 import * as BN from "bn.js";
 import {IParamReader} from "../utils/paramcoders/IParamReader";
@@ -12,6 +12,7 @@ import {
     isQuoteSetFees
 } from "../plugins/IPlugin";
 import {Request} from "express";
+import {FromBtcLnTrustedRequestType} from "./frombtcln_trusted/FromBtcLnTrusted";
 
 const secondsInYear = new BN(365*24*60*60);
 
@@ -129,7 +130,7 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     protected async preCheckAmounts(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType>,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
         requestedAmount: {input: boolean, amount: BN},
         useToken: string
     ): Promise<{baseFee: BN, feePPM: BN}> {
@@ -169,7 +170,7 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     protected async checkFromBtcAmount(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType>,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
         requestedAmount: {input: boolean, amount: BN},
         fees: {baseFee: BN, feePPM: BN},
         useToken: string,
@@ -344,7 +345,8 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
     ): Promise<{
         prefix: string,
         timeout: string,
-        signature: string
+        signature: string,
+        feeRate: string
     }> {
         const {swapContract, signer} = this.getChain(chainIdentifier);
 
@@ -368,7 +370,10 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
         );
         abortSignal.throwIfAborted();
 
-        return sigData;
+        return {
+            ...sigData,
+            feeRate
+        };
     }
 
 }

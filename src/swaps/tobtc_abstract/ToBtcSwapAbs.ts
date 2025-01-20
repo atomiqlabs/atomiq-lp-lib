@@ -1,5 +1,5 @@
 import * as BN from "bn.js";
-import {SwapData} from "crosslightning-base";
+import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
 import {ToBtcBaseSwap} from "../ToBtcBaseSwap";
 import {deserializeBN, serializeBN} from "../../utils/Utils";
@@ -18,11 +18,9 @@ export enum ToBtcSwapState {
 export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
 
     readonly address: string;
-    readonly amount: BN;
     readonly satsPerVbyte: BN;
     readonly nonce: BN;
     readonly preferedConfirmationTarget: number;
-    readonly signatureExpiry: BN;
 
     txId: string;
 
@@ -36,8 +34,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         networkFeeInToken: BN,
         satsPerVbyte: BN,
         nonce: BN,
-        preferedConfirmationTarget: number,
-        signatureExpiry: BN
+        preferedConfirmationTarget: number
     );
     constructor(obj: any);
 
@@ -51,26 +48,21 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         networkFeeInToken?: BN,
         satsPerVbyte?: BN,
         nonce?: BN,
-        preferedConfirmationTarget?: number,
-        signatureExpiry?: BN
+        preferedConfirmationTarget?: number
     ) {
         if(typeof(chainIdOrObj)==="string") {
-            super(chainIdOrObj, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
+            super(chainIdOrObj, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
             this.state = ToBtcSwapState.SAVED;
             this.address = address;
-            this.amount = amount;
             this.satsPerVbyte = satsPerVbyte;
             this.nonce = nonce;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
-            this.signatureExpiry = signatureExpiry;
         } else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.amount = new BN(chainIdOrObj.amount);
             this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
             this.nonce = new BN(chainIdOrObj.nonce);
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
-            this.signatureExpiry = deserializeBN(chainIdOrObj.signatureExpiry);
 
             this.txId = chainIdOrObj.txId;
 
@@ -83,12 +75,9 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
     serialize(): any {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
-        partialSerialized.amount = this.amount.toString(10);
         partialSerialized.satsPerVbyte = this.satsPerVbyte.toString(10);
         partialSerialized.nonce = this.nonce.toString(10);
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
-        partialSerialized.signatureExpiry = serializeBN(this.signatureExpiry);
-
         partialSerialized.txId = this.txId;
         return partialSerialized;
     }
@@ -103,10 +92,6 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
 
     isSuccess(): boolean {
         return this.state===ToBtcSwapState.CLAIMED;
-    }
-
-    getOutputAmount(): BN {
-        return this.amount;
     }
 
 }

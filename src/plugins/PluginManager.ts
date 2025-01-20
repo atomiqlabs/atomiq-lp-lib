@@ -1,4 +1,4 @@
-import {BitcoinRpc, SwapData} from "crosslightning-base";
+import {BitcoinRpc, SwapData} from "@atomiqlabs/base";
 import {
     IPlugin, isPluginQuote, isQuoteAmountTooHigh, isQuoteAmountTooLow, isQuoteSetFees,
     isQuoteThrow, isToBtcPluginQuote, PluginQuote,
@@ -16,10 +16,12 @@ import {
     ToBtcRequestType
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
-import {AuthenticatedLnd} from "lightning";
 import * as BN from "bn.js";
 import * as fs from "fs";
 import {getLogger} from "../utils/Utils";
+import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
+import {ILightningWallet} from "../wallets/ILightningWallet";
 
 export type FailSwapResponse = {
     type: "fail",
@@ -66,7 +68,8 @@ export class PluginManager {
         chainsData: MultichainData,
 
         bitcoinRpc: BitcoinRpc<any>,
-        lnd: AuthenticatedLnd,
+        bitcoinWallet: IBitcoinWallet,
+        lightningWallet: ILightningWallet,
 
         swapPricing: ISwapPrice,
         tokens: {
@@ -91,7 +94,8 @@ export class PluginManager {
                 await plugin.onEnable(
                     chainsData,
                     bitcoinRpc,
-                    lnd,
+                    bitcoinWallet,
+                    lightningWallet,
                     swapPricing,
                     tokens,
                     directory+"/"+name
@@ -163,7 +167,7 @@ export class PluginManager {
     }
 
     static async onHandlePostFromBtcQuote(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType>,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
         requestedAmount: {input: boolean, amount: BN},
         chainIdentifier: string,
         token: string,
@@ -194,7 +198,7 @@ export class PluginManager {
     }
 
     static async onHandlePreFromBtcQuote(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType>,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
         requestedAmount: {input: boolean, amount: BN},
         chainIdentifier: string,
         token: string,
