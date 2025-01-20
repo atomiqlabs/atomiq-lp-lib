@@ -287,7 +287,7 @@ class FromBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
             this.logger.debug("getFromBtcSignatureData(): using fee rate from client: ", feeRate);
             const sigData = yield swapContract.getInitSignature(signer, swapObject, this.config.authorizationTimeout, prefetchedSignData, feeRate);
             abortSignal.throwIfAborted();
-            return sigData;
+            return Object.assign(Object.assign({}, sigData), { feeRate });
         });
     }
 }

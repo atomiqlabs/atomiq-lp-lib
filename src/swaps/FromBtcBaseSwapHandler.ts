@@ -345,7 +345,8 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
     ): Promise<{
         prefix: string,
         timeout: string,
-        signature: string
+        signature: string,
+        feeRate: string
     }> {
         const {swapContract, signer} = this.getChain(chainIdentifier);
 
@@ -369,7 +370,10 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
         );
         abortSignal.throwIfAborted();
 
-        return sigData;
+        return {
+            ...sigData,
+            feeRate
+        };
     }
 
 }

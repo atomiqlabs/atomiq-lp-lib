@@ -23,6 +23,10 @@ class SwapHandlerSwap extends base_1.Lockable {
             this.state = obj.state;
             this.swapFee = (0, Utils_1.deserializeBN)(obj.swapFee);
             this.swapFeeInToken = (0, Utils_1.deserializeBN)(obj.swapFeeInToken);
+            this.prefix = obj.prefix;
+            this.timeout = obj.timeout;
+            this.signature = obj.signature;
+            this.feeRate = obj.feeRate;
         }
     }
     serialize() {
@@ -33,7 +37,11 @@ class SwapHandlerSwap extends base_1.Lockable {
             metadata: this.metadata,
             txIds: this.txIds,
             swapFee: (0, Utils_1.serializeBN)(this.swapFee),
-            swapFeeInToken: (0, Utils_1.serializeBN)(this.swapFeeInToken)
+            swapFeeInToken: (0, Utils_1.serializeBN)(this.swapFeeInToken),
+            prefix: this.prefix,
+            timeout: this.timeout,
+            signature: this.signature,
+            feeRate: this.feeRate
         };
     }
     /**

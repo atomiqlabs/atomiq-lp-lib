@@ -14,19 +14,15 @@ const FromBtcBaseSwapHandler_1 = require("../FromBtcBaseSwapHandler");
 const FromBtcTrustedSwap_1 = require("./FromBtcTrustedSwap");
 const SwapHandler_1 = require("../SwapHandler");
 const BN = require("bn.js");
-const lightning_1 = require("lightning");
 const PluginManager_1 = require("../../plugins/PluginManager");
-const bitcoin = require("bitcoinjs-lib");
-const bitcoinjs_lib_1 = require("bitcoinjs-lib");
-const utils_1 = require("../../utils/coinselect2/utils");
 const Utils_1 = require("../../utils/Utils");
 const SchemaVerifier_1 = require("../../utils/paramcoders/SchemaVerifier");
 const ServerParamDecoder_1 = require("../../utils/paramcoders/server/ServerParamDecoder");
 class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
-    constructor(storageDirectory, path, chains, lnd, swapPricing, bitcoinRpc, config) {
+    constructor(storageDirectory, path, chains, bitcoin, swapPricing, bitcoinRpc, config) {
         var _a;
         var _b;
-        super(storageDirectory, path, chains, lnd, swapPricing);
+        super(storageDirectory, path, chains, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_TRUSTED;
         this.subscriptions = new Map();
         this.doubleSpendWatchdogSwaps = new Set();
@@ -35,14 +31,15 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         this.processedTxIds = new Map();
         this.config = config;
         (_a = (_b = this.config).recommendFeeMultiplier) !== null && _a !== void 0 ? _a : (_b.recommendFeeMultiplier = 1.25);
+        this.bitcoin = bitcoin;
         this.bitcoinRpc = bitcoinRpc;
         for (let chainId in chains.chains) {
             this.allowedTokens[chainId] = new Set([chains.chains[chainId].swapContract.getNativeCurrencyAddress()]);
         }
     }
     getAllAncestors(tx) {
-        return Promise.all(tx.inputs.map(input => this.bitcoinRpc.getTransaction(input.transaction_id).then(tx => {
-            return { tx, vout: input.transaction_vout };
+        return Promise.all(tx.ins.map(input => this.bitcoinRpc.getTransaction(input.txid).then(tx => {
+            return { tx, vout: input.vout };
         })));
     }
     refundSwap(swap) {
@@ -57,45 +54,28 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             let unlock = swap.lock(30 * 1000);
             if (unlock == null)
                 return;
-            const feeRate = yield this.config.feeEstimator.estimateFee();
-            const initialTx = bitcoinjs_lib_1.Transaction.fromHex(swap.rawTx);
-            const ourOutput = initialTx.outs[swap.vout];
-            //Construct PSBT
-            const refundOutputScript = bitcoinjs_lib_1.address.toOutputScript(swap.refundAddress, this.config.bitcoinNetwork);
-            const txBytes = utils_1.utils.transactionBytes([{ type: "p2wpkh" }], [{ script: refundOutputScript }], "p2wpkh");
-            const txFee = txBytes * feeRate;
-            const adjustedOutput = ourOutput.value - txFee;
-            if (adjustedOutput < 546) {
+            const feeRate = yield this.bitcoin.getFeeRate();
+            const ourOutput = swap.btcTx.outs[swap.vout];
+            const resp = yield this.bitcoin.drainAll(swap.refundAddress, [{
+                    type: this.bitcoin.getAddressType(),
+                    confirmations: swap.btcTx.confirmations,
+                    outputScript: Buffer.from(ourOutput.scriptPubKey.hex, "hex"),
+                    value: ourOutput.value,
+                    txId: swap.btcTx.txid,
+                    vout: swap.vout
+                }], feeRate);
+            if (resp == null) {
                 this.swapLogger.error(swap, "refundSwap(): cannot refund swap because of dust limit, txId: " + swap.txId);
                 unlock();
                 return;
             }
-            //Construct PSBT
-            const _psbt = new bitcoinjs_lib_1.Psbt({ network: this.config.bitcoinNetwork });
-            _psbt.addInput({
-                hash: initialTx.getHash(),
-                index: swap.vout,
-                witnessUtxo: ourOutput,
-                sighashType: 0x01,
-                sequence: 0xfffffffd
-            });
-            _psbt.addOutput({
-                script: refundOutputScript,
-                value: adjustedOutput
-            });
-            //Sign
-            const { psbt, transaction } = yield (0, lightning_1.signPsbt)({
-                lnd: this.LND,
-                psbt: _psbt.toHex()
-            });
             if (swap.metadata != null)
                 swap.metadata.times.refundSignPSBT = Date.now();
-            this.swapLogger.debug(swap, "refundSwap(): signed raw transaction: " + transaction);
-            const signedTx = bitcoinjs_lib_1.Transaction.fromHex(transaction);
-            const refundTxId = signedTx.getId();
+            this.swapLogger.debug(swap, "refundSwap(): signed raw transaction: " + resp.raw);
+            const refundTxId = resp.txId;
             swap.refundTxId = refundTxId;
             //Send the refund TX
-            yield (0, lightning_1.broadcastChainTransaction)({ transaction, lnd: this.LND });
+            yield this.bitcoin.sendRawTransaction(resp.raw);
             this.swapLogger.debug(swap, "refundSwap(): sent refund transaction: " + refundTxId);
             this.refundedSwaps.set(swap.getHash(), refundTxId);
             yield this.removeSwapData(swap, FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDED);
@@ -104,8 +84,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     }
     burn(swap) {
         return __awaiter(this, void 0, void 0, function* () {
-            const initialTx = bitcoinjs_lib_1.Transaction.fromHex(swap.rawTx);
-            const ourOutput = initialTx.outs[swap.vout];
+            const ourOutput = swap.btcTx.outs[swap.vout];
             //Check if we can even increase the feeRate by burning
             const txSize = 110;
             const burnTxFeeRate = Math.floor(ourOutput.value / txSize);
@@ -118,31 +97,21 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 return;
             }
             //Construct PSBT
-            const _psbt = new bitcoinjs_lib_1.Psbt({ network: this.config.bitcoinNetwork });
-            _psbt.addInput({
-                hash: initialTx.getHash(),
-                index: swap.vout,
-                witnessUtxo: ourOutput,
-                sighashType: 0x01,
-                sequence: 0xfffffffd
-            });
-            _psbt.addOutput({
-                script: Buffer.concat([Buffer.from([0x6a, 20]), Buffer.from("BURN, BABY, BURN! AQ", "ascii")]),
-                value: 0
-            });
-            //Sign
-            const { psbt, transaction } = yield (0, lightning_1.signPsbt)({
-                lnd: this.LND,
-                psbt: _psbt.toHex()
-            });
+            const resp = yield this.bitcoin.burnAll([{
+                    type: this.bitcoin.getAddressType(),
+                    confirmations: swap.btcTx.confirmations,
+                    outputScript: Buffer.from(ourOutput.scriptPubKey.hex, "hex"),
+                    value: ourOutput.value,
+                    txId: swap.btcTx.txid,
+                    vout: swap.vout
+                }]);
             if (swap.metadata != null)
                 swap.metadata.times.burnSignPSBT = Date.now();
-            this.swapLogger.debug(swap, "burn(): signed raw transaction: " + transaction);
-            const signedTx = bitcoinjs_lib_1.Transaction.fromHex(transaction);
-            const burnTxId = signedTx.getId();
+            this.swapLogger.debug(swap, "burn(): signed raw transaction: " + resp.raw);
+            const burnTxId = resp.txId;
             swap.burnTxId = burnTxId;
             //Send the original TX + our burn TX as a package
-            const sendTxns = [swap.rawTx, transaction];
+            const sendTxns = [swap.btcTx.raw, resp.raw];
             //TODO: We should handle this in a better way
             try {
                 yield this.bitcoinRpc.sendRawPackage(sendTxns);
@@ -155,33 +124,26 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             yield this.removeSwapData(swap, FromBtcTrustedSwap_1.FromBtcTrustedSwapState.DOUBLE_SPENT);
         });
     }
-    processPastSwap(swap, tx) {
+    processPastSwap(swap, tx, vout) {
         return __awaiter(this, void 0, void 0, function* () {
-            let parsedTx = null;
-            let foundVout = null;
-            let vout = -1;
-            if (tx != null) {
-                parsedTx = bitcoinjs_lib_1.Transaction.fromHex(tx.transaction);
-                const requiredOutputScript = bitcoinjs_lib_1.address.toOutputScript(swap.btcAddress, this.config.bitcoinNetwork);
-                vout = parsedTx.outs.findIndex(vout => vout.script.equals(requiredOutputScript));
-                if (vout !== -1)
-                    foundVout = parsedTx.outs[vout];
-            }
+            const foundVout = tx.outs[vout];
             const { swapContract, signer } = this.getChain(swap.chainIdentifier);
+            const outputScript = this.bitcoin.toOutputScript(swap.btcAddress).toString("hex");
             if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CREATED) {
-                this.subscriptions.set(swap.btcAddress, swap);
+                this.subscriptions.set(outputScript, swap);
                 if (foundVout == null) {
                     //Check expiry
                     if (swap.expiresAt < Date.now()) {
-                        this.subscriptions.delete(swap.btcAddress);
+                        this.subscriptions.delete(outputScript);
+                        yield this.bitcoin.addUnusedAddress(swap.btcAddress);
                         yield this.removeSwapData(swap, FromBtcTrustedSwap_1.FromBtcTrustedSwapState.EXPIRED);
                         return;
                     }
                     return;
                 }
                 const sentSats = new BN(foundVout.value);
-                if (sentSats.eq(swap.inputSats)) {
-                    swap.adjustedInput = swap.inputSats;
+                if (sentSats.eq(swap.amount)) {
+                    swap.adjustedInput = swap.amount;
                     swap.adjustedOutput = swap.outputTokens;
                 }
                 else {
@@ -190,33 +152,33 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                         return;
                     if (sentSats.gt(this.config.max)) {
                         swap.adjustedInput = sentSats;
-                        swap.rawTx = tx.transaction;
-                        swap.txId = tx.id;
+                        swap.btcTx = tx;
+                        swap.txId = tx.txid;
                         swap.vout = vout;
-                        this.subscriptions.delete(swap.btcAddress);
+                        this.subscriptions.delete(outputScript);
                         yield this.refundSwap(swap);
                         return;
                     }
                     //Adjust the amount
                     swap.adjustedInput = sentSats;
-                    swap.adjustedOutput = swap.outputTokens.mul(sentSats).div(swap.inputSats);
+                    swap.adjustedOutput = swap.outputTokens.mul(sentSats).div(swap.amount);
                 }
-                swap.rawTx = tx.transaction;
-                swap.txId = tx.id;
+                swap.btcTx = tx;
+                swap.txId = tx.txid;
                 swap.vout = vout;
-                this.subscriptions.delete(swap.btcAddress);
+                this.subscriptions.delete(outputScript);
                 yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED);
                 yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
             }
             if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED) {
                 //Check if transaction still exists
-                if (tx == null || foundVout == null || tx.id !== swap.txId) {
+                if (tx == null || foundVout == null || tx.txid !== swap.txId) {
                     yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CREATED);
                     yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                     return;
                 }
                 //Check if it is confirmed
-                if (tx.confirmation_count > 0) {
+                if (tx.confirmations > 0) {
                     yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED);
                     yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
                 }
@@ -225,14 +187,14 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     const ancestors = yield this.getAllAncestors(tx);
                     const allAncestorsConfirmed = ancestors.reduce((prev, curr) => prev && curr.tx.confirmations > 0, true);
                     const totalInput = ancestors.reduce((prev, curr) => prev + curr.tx.outs[curr.vout].value, 0);
-                    const totalOutput = parsedTx.outs.reduce((prev, curr) => prev + curr.value, 0);
+                    const totalOutput = tx.outs.reduce((prev, curr) => prev + curr.value, 0);
                     const fee = totalInput - totalOutput;
-                    const feePerVbyte = Math.ceil(fee / parsedTx.virtualSize());
+                    const feePerVbyte = Math.ceil(fee / tx.vsize);
                     if (allAncestorsConfirmed &&
-                        (feePerVbyte >= swap.recommendedFee || feePerVbyte >= (yield this.config.feeEstimator.estimateFee()))) {
+                        (feePerVbyte >= swap.recommendedFee || feePerVbyte >= (yield this.bitcoin.getFeeRate()))) {
                         if (swap.state !== FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED)
                             return;
-                        swap.txSize = parsedTx.virtualSize();
+                        swap.txSize = tx.vsize;
                         swap.txFee = fee;
                         yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED);
                         yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
@@ -248,7 +210,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     return;
                 }
             }
-            if (swap.doubleSpent || tx == null || foundVout == null || tx.id !== swap.txId) {
+            if (swap.doubleSpent || tx == null || foundVout == null || tx.txid !== swap.txId) {
                 if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE) {
                     yield swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CREATED);
                     return;
@@ -267,12 +229,12 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 return;
             }
             else {
-                if (!tx.is_confirmed && !this.doubleSpendWatchdogSwaps.has(swap)) {
+                if (tx.confirmations <= 0 && !this.doubleSpendWatchdogSwaps.has(swap)) {
                     this.swapLogger.debug(swap, "processPastSwap(): Adding swap transaction to double spend watchdog list: ", swap.txId);
                     this.doubleSpendWatchdogSwaps.add(swap);
                 }
             }
-            if (tx.confirmation_count > 0 && this.doubleSpendWatchdogSwaps.delete(swap)) {
+            if (tx.confirmations > 0 && this.doubleSpendWatchdogSwaps.delete(swap)) {
                 this.swapLogger.debug(swap, "processPastSwap(): Removing confirmed swap transaction from double spend watchdog list: ", swap.txId);
             }
             if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED) {
@@ -329,16 +291,18 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             }
             if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CONFIRMED) {
                 this.processedTxIds.set(swap.getHash(), {
-                    txId: swap.txIds.init,
+                    txId: swap.txId,
+                    scTxId: swap.txIds.init,
                     adjustedAmount: swap.adjustedInput,
                     adjustedTotal: swap.adjustedOutput
                 });
-                if (tx.confirmation_count > 0)
+                if (tx.confirmations > 0)
                     yield this.removeSwapData(swap, FromBtcTrustedSwap_1.FromBtcTrustedSwapState.FINISHED);
             }
         });
     }
     processPastSwaps() {
+        var _a, _b, _c;
         return __awaiter(this, void 0, void 0, function* () {
             const queriedData = yield this.storageManager.query([
                 {
@@ -356,11 +320,24 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const startingBlockheight = queriedData.reduce((prev, swap) => Math.min(prev, swap.createdHeight), Infinity);
             if (startingBlockheight === Infinity)
                 return;
-            const { transactions } = yield (0, lightning_1.getChainTransactions)({ lnd: this.LND, after: startingBlockheight });
+            const transactions = yield this.bitcoin.getWalletTransactions(startingBlockheight);
+            const map = new Map();
+            transactions.forEach(tx => {
+                tx.outs.forEach((out, vout) => {
+                    const existing = map.get(out.scriptPubKey.hex);
+                    if (existing == null) {
+                        map.set(out.scriptPubKey.hex, [{ tx, vout }]);
+                    }
+                    else {
+                        existing.push({ tx, vout });
+                    }
+                });
+            });
             for (let swap of queriedData) {
-                const tx = transactions.find(tx => tx.output_addresses.includes(swap.btcAddress));
+                const outputScript = this.bitcoin.toOutputScript(swap.btcAddress).toString("hex");
+                const txs = (_a = map.get(outputScript)) !== null && _a !== void 0 ? _a : [];
                 try {
-                    yield this.processPastSwap(swap, tx);
+                    yield this.processPastSwap(swap, (_b = txs[0]) === null || _b === void 0 ? void 0 : _b.tx, (_c = txs[0]) === null || _c === void 0 ? void 0 : _c.vout);
                 }
                 catch (e) {
                     this.swapLogger.error(swap, "processPastSwaps(): Error ocurred while processing swap: ", e);
@@ -370,7 +347,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     }
     isValidBitcoinAddress(address) {
         try {
-            bitcoin.address.toOutputScript(address, this.config.bitcoinNetwork);
+            this.bitcoin.toOutputScript(address);
             return true;
         }
         catch (e) { }
@@ -435,8 +412,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Make sure we have MORE THAN ENOUGH to honor the swap request
             yield this.checkBalance(totalInToken.mul(new BN(4)), balancePrefetch, abortController.signal);
             metadata.times.balanceChecked = Date.now();
-            const { current_block_height } = yield (0, lightning_1.getHeight)({ lnd: this.LND });
-            const feeRate = yield this.config.feeEstimator.estimateFee();
+            const blockHeight = yield this.bitcoin.getBlockheight();
+            const feeRate = yield this.bitcoin.getFeeRate();
             const recommendedFee = Math.ceil(feeRate * this.config.recommendFeeMultiplier);
             if (recommendedFee === 0)
                 throw {
@@ -445,18 +422,16 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     msg: "Cannot estimate bitcoin fee!"
                 };
             metadata.times.feeEstimated = Date.now();
-            const { address: receiveAddress } = yield (0, lightning_1.createChainAddress)({
-                lnd: this.LND,
-                format: "p2wpkh"
-            });
+            const receiveAddress = yield this.bitcoin.getAddress();
+            const outputScript = this.bitcoin.toOutputScript(receiveAddress).toString("hex");
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
-            const createdSwap = new FromBtcTrustedSwap_1.FromBtcTrustedSwap(chainIdentifier, swapFee, swapFeeInToken, receiveAddress, amountBD, parsedBody.address, totalInToken, current_block_height, Date.now() + (this.config.swapAddressExpiry * 1000), recommendedFee, refundAddress);
+            const createdSwap = new FromBtcTrustedSwap_1.FromBtcTrustedSwap(chainIdentifier, swapFee, swapFeeInToken, receiveAddress, amountBD, parsedBody.address, totalInToken, blockHeight, Date.now() + (this.config.swapAddressExpiry * 1000), recommendedFee, refundAddress);
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
             yield this.storageManager.saveData(createdSwap.getHash(), createdSwap.getSequence(), createdSwap);
-            this.subscriptions.set(createdSwap.btcAddress, createdSwap);
+            this.subscriptions.set(outputScript, createdSwap);
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: " + createdSwap.btcAddress + " amount: " + amountBD.toString(10));
             yield responseStream.writeParamsAndEnd({
                 msg: "Success",
@@ -503,7 +478,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     data: {
                         adjustedAmount: processedTxData.adjustedAmount.toString(10),
                         adjustedTotal: processedTxData.adjustedTotal.toString(10),
-                        txId: processedTxData.txId
+                        txId: processedTxData.txId,
+                        scTxId: processedTxData.scTxId
                     }
                 };
             const refundTxId = this.refundedSwaps.get(parsedBody.paymentHash);
@@ -546,7 +522,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     msg: "Bitcoin received, payment processing",
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
-                        adjustedTotal: invoiceData.adjustedOutput.toString(10)
+                        adjustedTotal: invoiceData.adjustedOutput.toString(10),
+                        txId: invoiceData.txId
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED)
@@ -556,7 +533,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     msg: "Bitcoin accepted, payment processing",
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
-                        adjustedTotal: invoiceData.adjustedOutput.toString(10)
+                        adjustedTotal: invoiceData.adjustedOutput.toString(10),
+                        txId: invoiceData.txId
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.SENT)
@@ -567,7 +545,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
                         adjustedTotal: invoiceData.adjustedOutput.toString(10),
-                        txId: invoiceData.txIds.init
+                        txId: invoiceData.txId,
+                        scTxId: invoiceData.txIds.init
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CONFIRMED || invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.FINISHED)
@@ -578,13 +557,14 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10),
                         adjustedTotal: invoiceData.adjustedOutput.toString(10),
-                        txId: invoiceData.txIds.init
+                        txId: invoiceData.txId,
+                        scTxId: invoiceData.txIds.init
                     }
                 };
             if (invoiceData.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE)
                 throw {
                     _httpStatus: 200,
-                    code: 10015,
+                    code: 10016,
                     msg: "Refundable",
                     data: {
                         adjustedAmount: invoiceData.adjustedInput.toString(10)
@@ -646,10 +626,10 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     checkDoubleSpends() {
         return __awaiter(this, void 0, void 0, function* () {
             for (let swap of this.doubleSpendWatchdogSwaps.keys()) {
-                const tx = yield this.bitcoinRpc.getTransaction(swap.txId);
+                const tx = yield this.bitcoin.getWalletTransaction(swap.txId);
                 if (tx == null) {
                     this.swapLogger.debug(swap, "checkDoubleSpends(): Swap was double spent, burning... - original txId: " + swap.txId);
-                    this.processPastSwap(swap, null);
+                    this.processPastSwap(swap, null, null);
                 }
             }
         });
@@ -665,13 +645,12 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         });
     }
     listenToTxns() {
-        const res = (0, lightning_1.subscribeToTransactions)({ lnd: this.LND });
-        res.on("chain_transaction", (tx) => {
-            for (let address of tx.output_addresses) {
-                const savedSwap = this.subscriptions.get(address);
+        this.bitcoin.subscribeToWalletTransactions((btcTx) => {
+            for (let out of btcTx.outs) {
+                const savedSwap = this.subscriptions.get(out.scriptPubKey.hex);
                 if (savedSwap == null)
                     continue;
-                this.processPastSwap(savedSwap, tx);
+                this.processPastSwap(savedSwap, btcTx, out.n);
                 return;
             }
         });

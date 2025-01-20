@@ -1,15 +1,12 @@
-import {Express, Request, Response} from "express";
+import {Express, Request} from "express";
 import {ISwapPrice} from "./ISwapPrice";
 import {
-    AbstractSigner,
     ChainType,
     ClaimEvent,
     InitializeEvent, RefundEvent,
-    SwapContract,
     SwapData,
     SwapEvent
 } from "@atomiqlabs/base";
-import {AuthenticatedLnd} from "lightning";
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {PluginManager} from "../plugins/PluginManager";
 import {IIntermediaryStorage} from "../storage/IIntermediaryStorage";
@@ -48,7 +45,6 @@ export type SwapBaseConfig = {
     feePPM: BN,
     max: BN,
     min: BN,
-    maxSkew: number,
     safetyFactor: BN,
     swapCheckInterval: number
 };
@@ -88,7 +84,6 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
     readonly chains: MultichainData;
     readonly allowedTokens: {[chainId: string]: Set<string>};
     readonly swapPricing: ISwapPrice;
-    readonly LND: AuthenticatedLnd;
 
     abstract config: SwapBaseConfig;
 
@@ -110,14 +105,12 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
         storageDirectory: IIntermediaryStorage<V>,
         path: string,
         chainsData: MultichainData,
-        lnd: AuthenticatedLnd,
         swapPricing: ISwapPrice
     ) {
         this.storageManager = storageDirectory;
         this.chains = chainsData;
         if(this.chains.chains[this.chains.default]==null) throw new Error("Invalid default chain specified");
         this.path = path;
-        this.LND = lnd;
         this.swapPricing = swapPricing;
         this.allowedTokens = {};
         for(let chainId in chainsData.chains) {

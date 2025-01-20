@@ -90,5 +90,6 @@ export declare abstract class ToBtcBaseSwapHandler<V extends SwapHandlerSwap<Swa
         prefix: string;
         timeout: string;
         signature: string;
+        feeRate: string;
     }>;
 }

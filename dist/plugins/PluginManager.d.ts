@@ -2,9 +2,10 @@ import { BitcoinRpc, SwapData } from "@atomiqlabs/base";
 import { IPlugin, PluginQuote, QuoteAmountTooHigh, QuoteAmountTooLow, QuoteSetFees, QuoteThrow, ToBtcPluginQuote } from "./IPlugin";
 import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
-import { AuthenticatedLnd } from "lightning";
 import * as BN from "bn.js";
 import { FromBtcLnTrustedRequestType } from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
+import { ILightningWallet } from "../wallets/ILightningWallet";
 export type FailSwapResponse = {
     type: "fail";
     code?: number;
@@ -26,7 +27,7 @@ export declare class PluginManager {
     static plugins: Map<string, IPlugin>;
     static registerPlugin(name: string, plugin: IPlugin): void;
     static unregisterPlugin(name: string): boolean;
-    static enable<T extends SwapData>(chainsData: MultichainData, bitcoinRpc: BitcoinRpc<any>, lnd: AuthenticatedLnd, swapPricing: ISwapPrice, tokens: {
+    static enable<T extends SwapData>(chainsData: MultichainData, bitcoinRpc: BitcoinRpc<any>, bitcoinWallet: IBitcoinWallet, lightningWallet: ILightningWallet, swapPricing: ISwapPrice, tokens: {
         [ticker: string]: {
             [chainId: string]: {
                 address: string;

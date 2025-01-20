@@ -24,6 +24,11 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
     readonly swapFee: BN;
     readonly swapFeeInToken: BN;
 
+    prefix: string;
+    timeout: string;
+    signature: string;
+    feeRate: string;
+
     protected constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN);
     protected constructor(obj: any);
 
@@ -42,6 +47,10 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
             this.state = obj.state;
             this.swapFee = deserializeBN(obj.swapFee);
             this.swapFeeInToken = deserializeBN(obj.swapFeeInToken);
+            this.prefix = obj.prefix;
+            this.timeout = obj.timeout;
+            this.signature = obj.signature;
+            this.feeRate = obj.feeRate;
         }
     }
 
@@ -53,7 +62,11 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
             metadata: this.metadata,
             txIds: this.txIds,
             swapFee: serializeBN(this.swapFee),
-            swapFeeInToken: serializeBN(this.swapFeeInToken)
+            swapFeeInToken: serializeBN(this.swapFeeInToken),
+            prefix: this.prefix,
+            timeout: this.timeout,
+            signature: this.signature,
+            feeRate: this.feeRate
         }
     }
 

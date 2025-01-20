@@ -4,10 +4,10 @@ import { FromBtcLnSwapAbs, FromBtcLnSwapState } from "./FromBtcLnSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
 import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
-import { AuthenticatedLnd } from "lightning";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { FromBtcBaseConfig } from "../FromBtcBaseSwapHandler";
 import { FromBtcLnBaseSwapHandler } from "../FromBtcLnBaseSwapHandler";
+import { ILightningWallet } from "../../wallets/ILightningWallet";
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number;
     minCltv: BN;
@@ -27,7 +27,7 @@ export type FromBtcLnRequestType = {
 export declare class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN;
     readonly config: FromBtcLnConfig;
-    constructor(storageDirectory: IIntermediaryStorage<FromBtcLnSwapAbs>, path: string, chains: MultichainData, lnd: AuthenticatedLnd, swapPricing: ISwapPrice, config: FromBtcLnConfig);
+    constructor(storageDirectory: IIntermediaryStorage<FromBtcLnSwapAbs>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: FromBtcLnConfig);
     protected processPastSwap(swap: FromBtcLnSwapAbs): Promise<"REFUND" | "SETTLE" | "CANCEL" | null>;
     protected refundSwaps(refundSwaps: FromBtcLnSwapAbs[]): Promise<void>;
     protected cancelInvoices(swaps: FromBtcLnSwapAbs[]): Promise<void>;

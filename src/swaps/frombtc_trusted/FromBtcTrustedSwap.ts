@@ -1,4 +1,4 @@
-import {SwapData} from "@atomiqlabs/base";
+import {BtcTx, SwapData} from "@atomiqlabs/base";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
 import * as BN from "bn.js";
 import {deserializeBN, serializeBN} from "../../utils/Utils";
@@ -22,7 +22,6 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
 
     readonly sequence: BN;
     readonly btcAddress: string;
-    readonly inputSats: BN;
 
     readonly dstAddress: string;
     readonly outputTokens: BN;
@@ -38,7 +37,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
     doubleSpent: boolean;
     scRawTx: string;
 
-    rawTx: string;
+    btcTx: BtcTx;
     txFee: number;
     txSize: number;
     txId: string;
@@ -76,12 +75,11 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         refundAddress?: string
     ) {
         if(typeof(objOrChainIdentifier)==="string") {
-            super(objOrChainIdentifier, swapFee, swapFeeInToken);
+            super(objOrChainIdentifier, inputSats, swapFee, swapFeeInToken);
             this.state = FromBtcTrustedSwapState.CREATED;
             this.doubleSpent = false;
             this.sequence = new BN(randomBytes(8));
             this.btcAddress = btcAddress;
-            this.inputSats = inputSats;
             this.dstAddress = dstAddress;
             this.outputTokens = outputTokens;
             this.createdHeight = createdHeight;
@@ -92,7 +90,6 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
             super(objOrChainIdentifier);
             this.btcAddress = objOrChainIdentifier.btcAddress;
             this.sequence = deserializeBN(objOrChainIdentifier.sequence);
-            this.inputSats = deserializeBN(objOrChainIdentifier.inputSats);
             this.dstAddress = objOrChainIdentifier.dstAddress;
             this.outputTokens = deserializeBN(objOrChainIdentifier.outputTokens);
             this.adjustedInput = deserializeBN(objOrChainIdentifier.adjustedInput);
@@ -103,7 +100,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
             this.refundAddress = objOrChainIdentifier.refundAddress;
             this.doubleSpent = objOrChainIdentifier.doubleSpent;
             this.scRawTx = objOrChainIdentifier.scRawTx;
-            this.rawTx = objOrChainIdentifier.rawTx;
+            this.btcTx = objOrChainIdentifier.btcTx;
             this.txFee = objOrChainIdentifier.txFee;
             this.txSize = objOrChainIdentifier.txSize;
             this.txId = objOrChainIdentifier.txId;
@@ -117,7 +114,6 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         const partialSerialized = super.serialize();
         partialSerialized.btcAddress = this.btcAddress;
         partialSerialized.sequence = serializeBN(this.sequence);
-        partialSerialized.inputSats = serializeBN(this.inputSats);
         partialSerialized.dstAddress = this.dstAddress;
         partialSerialized.outputTokens = serializeBN(this.outputTokens);
         partialSerialized.adjustedInput = serializeBN(this.adjustedInput);
@@ -128,7 +124,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         partialSerialized.refundAddress = this.refundAddress;
         partialSerialized.doubleSpent = this.doubleSpent;
         partialSerialized.scRawTx = this.scRawTx;
-        partialSerialized.rawTx = this.rawTx;
+        partialSerialized.btcTx = this.btcTx;
         partialSerialized.txFee = this.txFee;
         partialSerialized.txSize = this.txSize;
         partialSerialized.txId = this.txId;
@@ -151,7 +147,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
     }
 
     getTotalInputAmount(): BN {
-        return this.adjustedInput || this.inputSats;
+        return this.adjustedInput || this.amount;
     }
 
     isFailed(): boolean {

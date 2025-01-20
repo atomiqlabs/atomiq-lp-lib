@@ -13,17 +13,12 @@ export declare enum FromBtcLnSwapState {
 export declare class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcLnSwapState> {
     readonly pr: string;
     nonce: number;
-    prefix: string;
-    timeout: string;
-    signature: string;
-    feeRate: string;
     secret: string;
-    constructor(chainIdentifier: string, pr: string, swapFee: BN, swapFeeInToken: BN);
+    constructor(chainIdentifier: string, pr: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN);
     constructor(obj: any);
     serialize(): any;
     getSequence(): BN;
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;
-    getTotalInputAmount(): BN;
 }

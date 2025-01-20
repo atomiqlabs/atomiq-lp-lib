@@ -1,7 +1,6 @@
 import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
-import * as bolt11 from "@atomiqlabs/bolt11";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
 
 export enum FromBtcLnSwapState {
@@ -19,19 +18,15 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
     readonly pr: string;
 
     nonce: number;
-    prefix: string;
-    timeout: string;
-    signature: string;
-    feeRate: string;
 
     secret: string;
 
-    constructor(chainIdentifier: string, pr: string, swapFee: BN, swapFeeInToken: BN);
+    constructor(chainIdentifier: string, pr: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN);
     constructor(obj: any);
 
-    constructor(chainIdOrObj: string | any, pr?: string, swapFee?: BN, swapFeeInToken?: BN) {
+    constructor(chainIdOrObj: string | any, pr?: string, amountMtokens?: BN, swapFee?: BN, swapFeeInToken?: BN) {
         if(typeof(chainIdOrObj)==="string") {
-            super(chainIdOrObj, swapFee, swapFeeInToken);
+            super(chainIdOrObj, amountMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
             this.state = FromBtcLnSwapState.CREATED;
             this.pr = pr;
         } else {
@@ -39,10 +34,6 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
             this.pr = chainIdOrObj.pr;
             this.secret = chainIdOrObj.secret;
             this.nonce = chainIdOrObj.nonce;
-            this.prefix = chainIdOrObj.prefix;
-            this.timeout = chainIdOrObj.timeout;
-            this.signature = chainIdOrObj.signature;
-            this.feeRate = chainIdOrObj.feeRate;
         }
         this.type = SwapHandlerType.FROM_BTCLN;
     }
@@ -52,10 +43,6 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         partialSerialized.pr = this.pr;
         partialSerialized.secret = this.secret;
         partialSerialized.nonce = this.nonce;
-        partialSerialized.prefix = this.prefix;
-        partialSerialized.timeout = this.timeout;
-        partialSerialized.signature = this.signature;
-        partialSerialized.feeRate = this.feeRate;
         return partialSerialized;
     }
 
@@ -73,10 +60,6 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
 
     isSuccess(): boolean {
         return this.state===FromBtcLnSwapState.SETTLED;
-    }
-
-    getTotalInputAmount(): BN {
-        return new BN(bolt11.decode(this.pr).millisatoshis).add(new BN(999)).div(new BN(1000));
     }
 
 }

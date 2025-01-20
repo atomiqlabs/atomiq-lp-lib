@@ -1,7 +1,5 @@
 import {Express, Request, Response} from "express";
 import * as BN from "bn.js";
-import * as bitcoin from "bitcoinjs-lib";
-import * as lncli from "ln-service";
 import {ToBtcSwapAbs, ToBtcSwapState} from "./ToBtcSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import {ISwapPrice} from "../ISwapPrice";
@@ -16,13 +14,9 @@ import {
     BitcoinRpc, 
     BtcBlock
 } from "@atomiqlabs/base";
-import {AuthenticatedLnd} from "lightning";
 import {expressHandlerWrapper, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../storage/IIntermediaryStorage";
-import {IBtcFeeEstimator} from "../../fees/IBtcFeeEstimator";
-import {coinSelect} from "../../utils/coinselect2";
-import {CoinselectTxInput, CoinselectTxOutput, utils} from "../../utils/coinselect2/utils";
 import {randomBytes} from "crypto";
 import {FieldTypeEnum, verifySchema} from "../../utils/paramcoders/SchemaVerifier";
 import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDecoder";
@@ -30,36 +24,22 @@ import {IParamReader} from "../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEncoder";
 import {ToBtcBaseConfig, ToBtcBaseSwapHandler} from "../ToBtcBaseSwapHandler";
 import {PromiseQueue} from "promise-queue-ts";
+import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
-
-type SpendableUtxo = {
-    address: string,
-    address_format: string,
-    confirmation_count: number,
-    output_script: string,
-    tokens: number,
-    transaction_id: string,
-    transaction_vout: number
-};
 
 export type ToBtcConfig = ToBtcBaseConfig & {
     sendSafetyFactor: BN,
 
-    bitcoinNetwork: bitcoin.networks.Network,
-
     minChainCltv: BN,
 
-    networkFeeMultiplierPPM: BN,
+    networkFeeMultiplier: number,
     minConfirmations: number,
     maxConfirmations: number,
     maxConfTarget: number,
     minConfTarget: number,
 
-    txCheckInterval: number,
-
-    feeEstimator?: IBtcFeeEstimator,
-    onchainReservedPerChannel?: number
+    txCheckInterval: number
 };
 
 export type ToBtcRequestType = {
@@ -77,28 +57,11 @@ export type ToBtcRequestType = {
  * Handler for to BTC swaps, utilizing PTLCs (proof-time locked contracts) using btc relay (on-chain bitcoin SPV)
  */
 export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>  {
-    protected readonly CONFIRMATIONS_REQUIRED = 1;
-    protected readonly ADDRESS_FORMAT_MAP = {
-        "p2wpkh": "p2wpkh",
-        "np2wpkh": "p2sh-p2wpkh",
-        "p2tr" : "p2tr"
-    };
-    protected readonly LND_CHANGE_OUTPUT_TYPE = "p2tr";
-    protected readonly UTXO_CACHE_TIMEOUT = 5*1000;
-    protected readonly CHANNEL_COUNT_CACHE_TIMEOUT = 30*1000;
-
     readonly type = SwapHandlerType.TO_BTC;
 
     activeSubscriptions: {[txId: string]: ToBtcSwapAbs} = {};
-    cachedUtxos: {
-        utxos: (CoinselectTxInput & {confirmations: number})[],
-        timestamp: number
-    };
-    cachedChannelCount: {
-        count: number,
-        timestamp: number
-    };
     bitcoinRpc: BitcoinRpc<BtcBlock>;
+    bitcoin: IBitcoinWallet;
     sendBtcQueue: PromiseQueue = new PromiseQueue();
 
     readonly config: ToBtcConfig;
@@ -107,15 +70,15 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         storageDirectory: IIntermediaryStorage<ToBtcSwapAbs>,
         path: string,
         chainData: MultichainData,
-        lnd: AuthenticatedLnd,
+        bitcoin: IBitcoinWallet,
         swapPricing: ISwapPrice,
         bitcoinRpc: BitcoinRpc<BtcBlock>,
         config: ToBtcConfig
     ) {
-        super(storageDirectory, path, chainData, lnd, swapPricing);
+        super(storageDirectory, path, chainData, swapPricing);
         this.bitcoinRpc = bitcoinRpc;
+        this.bitcoin = bitcoin;
         this.config = config;
-        this.config.onchainReservedPerChannel = this.config.onchainReservedPerChannel || 40000;
     }
 
     /**
@@ -125,217 +88,18 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param address
      * @param nonce
      * @param amount
-     * @param bitcoinNetwork
      */
-    private getHash(chainIdentifier: string, address: string, nonce: BN, amount: BN, bitcoinNetwork: bitcoin.networks.Network): Buffer {
-        const parsedOutputScript = bitcoin.address.toOutputScript(address, bitcoinNetwork);
+    private getHash(chainIdentifier: string, address: string, nonce: BN, amount: BN): Buffer {
+        const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const {swapContract} = this.getChain(chainIdentifier);
         return swapContract.getHashForOnchain(parsedOutputScript, amount, nonce);
-    }
-
-    /**
-     * Returns spendable UTXOs, these are either confirmed UTXOs, or unconfirmed ones that are either whitelisted,
-     *  or created by our transactions (and therefore only we could doublespend)
-     *
-     * @private
-     */
-    protected async getSpendableUtxos(): Promise<SpendableUtxo[]> {
-        const resBlockheight = await lncli.getHeight({
-            lnd: this.LND
-        });
-
-        const blockheight: number = resBlockheight.current_block_height;
-
-        const resChainTxns = await lncli.getChainTransactions({
-            lnd: this.LND,
-            after: blockheight-this.CONFIRMATIONS_REQUIRED
-        });
-
-        const selfUTXOs: Set<string> = PluginManager.getWhitelistedTxIds();
-
-        const transactions = resChainTxns.transactions;
-        for(let tx of transactions) {
-            if(tx.is_outgoing) {
-                selfUTXOs.add(tx.id);
-            }
-        }
-
-        const resUtxos = await lncli.getUtxos({
-            lnd: this.LND
-        });
-
-        return resUtxos.utxos.filter(utxo => utxo.confirmation_count>=this.CONFIRMATIONS_REQUIRED || selfUTXOs.has(utxo.transaction_id));
-    }
-
-    /**
-     * Returns utxo pool to be used by the coinselection algorithm
-     *
-     * @private
-     */
-    protected async getUtxoPool(useCached: boolean = false): Promise<(CoinselectTxInput & {confirmations: number})[]> {
-        if(!useCached || this.cachedUtxos==null || this.cachedUtxos.timestamp<Date.now()-this.UTXO_CACHE_TIMEOUT) {
-            const utxos = await this.getSpendableUtxos();
-
-            let totalSpendable = 0;
-            const utxoPool = utxos.map(utxo => {
-                totalSpendable += utxo.tokens;
-                return {
-                    vout: utxo.transaction_vout,
-                    txId: utxo.transaction_id,
-                    value: utxo.tokens,
-                    type: this.ADDRESS_FORMAT_MAP[utxo.address_format],
-                    outputScript: Buffer.from(utxo.output_script, "hex"),
-                    address: utxo.address,
-                    confirmations: utxo.confirmation_count
-                };
-            });
-
-            this.cachedUtxos = {
-                utxos: utxoPool,
-                timestamp: Date.now()
-            };
-
-            this.logger.info("getUtxoPool(): total spendable value: "+totalSpendable+" num utxos: "+utxoPool.length);
-        }
-
-        return this.cachedUtxos.utxos;
-    }
-
-    /**
-     * Checks whether a coinselect result leaves enough funds to cover potential lightning anchor transaction fees
-     *
-     * @param utxoPool
-     * @param obj
-     * @param satsPerVbyte
-     * @param useCached Whether to use a cached channel count
-     * @param initialOutputLength
-     * @private
-     * @returns true if alright, false if the coinselection doesn't leave enough funds for anchor fees
-     */
-    protected async isLeavingEnoughForLightningAnchors(
-        utxoPool: CoinselectTxInput[],
-        obj: {inputs?: CoinselectTxInput[], outputs?: CoinselectTxOutput[]},
-        satsPerVbyte: BN,
-        useCached: boolean = false,
-        initialOutputLength: number = 1
-    ): Promise<boolean> {
-        if(obj.inputs==null || obj.outputs==null) return false;
-        const spentInputs = new Set<string>();
-        obj.inputs.forEach(txIn => {
-            spentInputs.add(txIn.txId+":"+txIn.vout);
-        });
-
-        let leavesValue: BN = new BN(0);
-        utxoPool.forEach(val => {
-            const utxoEconomicalValue: BN = new BN(val.value).sub(satsPerVbyte.mul(new BN(utils.inputBytes(val).length)));
-            if (
-                //Utxo not spent
-                !spentInputs.has(val.txId + ":" + val.vout) &&
-                //Only economical utxos at current fees
-                !utxoEconomicalValue.isNeg()
-            ) {
-                leavesValue = leavesValue.add(utxoEconomicalValue);
-            }
-        });
-        if(obj.outputs.length>initialOutputLength) {
-            const changeUtxo = obj.outputs[obj.outputs.length-1];
-            leavesValue = leavesValue.add(
-                new BN(changeUtxo.value).sub(satsPerVbyte.mul(new BN(utils.inputBytes(changeUtxo).length)))
-            );
-        }
-
-        if(!useCached || this.cachedChannelCount==null || this.cachedChannelCount.timestamp<Date.now()-this.CHANNEL_COUNT_CACHE_TIMEOUT) {
-            const {channels} = await lncli.getChannels({lnd: this.LND});
-            this.cachedChannelCount = {
-                count: channels.length,
-                timestamp: Date.now()
-            }
-        }
-
-        return leavesValue.gt(new BN(this.config.onchainReservedPerChannel).mul(new BN(this.cachedChannelCount.count)));
-    }
-
-    /**
-     * Gets the change address from the underlying LND instance
-     *
-     * @private
-     */
-    protected getChangeAddress(): Promise<string> {
-        return new Promise((resolve, reject) => {
-            this.LND.wallet.nextAddr({
-                type: 4,
-                change: true
-            }, (err, res) => {
-                if(err!=null) {
-                    reject([503, 'UnexpectedErrGettingNextAddr', {err}]);
-                    return;
-                }
-                resolve(res.addr);
-            });
-        });
-    }
-
-    /**
-     * Computes bitcoin on-chain network fee, takes channel reserve & network fee multiplier into consideration
-     *
-     * @param targetAddress Bitcoin address to send the funds to
-     * @param targetAmount Amount of funds to send to the address
-     * @param estimate Whether the chain fee should be just estimated and therefore cached utxo set could be used
-     * @param multiplierPPM Multiplier for the sats/vB returned from the fee estimator in PPM (parts per million)
-     * @private
-     * @returns Fee estimate & inputs/outputs to use when constructing transaction, or null in case of not enough funds
-     */
-    private async getChainFee(targetAddress: string, targetAmount: number, estimate: boolean = false, multiplierPPM?: BN): Promise<{
-        satsPerVbyte: BN,
-        networkFee: BN,
-        inputs: CoinselectTxInput[],
-        outputs: CoinselectTxOutput[]
-    } | null> {
-        let feeRate: number | null = this.config.feeEstimator==null
-            ? await lncli.getChainFeeRate({lnd: this.LND})
-                .then(res => res.tokens_per_vbyte)
-                .catch(e => this.logger.error("getChainFee(): LND getChainFeeRate error", e))
-            : await this.config.feeEstimator.estimateFee();
-
-        if(feeRate==null) return null;
-
-        let satsPerVbyte = new BN(Math.ceil(feeRate));
-        if(multiplierPPM!=null) satsPerVbyte = satsPerVbyte.mul(multiplierPPM).div(new BN(1000000));
-
-        const utxoPool: CoinselectTxInput[] = await this.getUtxoPool(estimate);
-
-        let obj = coinSelect(utxoPool, [{
-            address: targetAddress,
-            value: targetAmount,
-            script: bitcoin.address.toOutputScript(targetAddress, this.config.bitcoinNetwork)
-        }], satsPerVbyte.toNumber(), this.LND_CHANGE_OUTPUT_TYPE);
-
-        if(obj.inputs==null || obj.outputs==null) return null;
-
-        if(!await this.isLeavingEnoughForLightningAnchors(utxoPool, obj, satsPerVbyte, estimate)) return null;
-
-        this.logger.info("getChainFee(): fee estimated,"+
-            " target: "+targetAddress+
-            " amount: "+targetAmount.toString(10)+
-            " fee: "+obj.fee+
-            " sats/vB: "+satsPerVbyte+
-            " inputs: "+obj.inputs.length+
-            " outputs: "+obj.outputs.length+
-            " multiplier: "+(multiplierPPM==null ? 1 : multiplierPPM.toNumber()/1000000));
-
-        return {
-            networkFee: new BN(obj.fee),
-            satsPerVbyte,
-            outputs: obj.outputs,
-            inputs: obj.inputs
-        };
     }
 
     /**
      * Tries to claim the swap after our transaction was confirmed
      *
      * @param tx
-     * @param payment
+     * @param swap
      * @param vout
      */
     private async tryClaimSwap(tx: {blockhash: string, confirmations: number, txid: string, hex: string}, swap: ToBtcSwapAbs, vout: number): Promise<boolean> {
@@ -365,10 +129,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     protected async processPastSwap(swap: ToBtcSwapAbs) {
         const {swapContract, signer} = this.getChain(swap.chainIdentifier);
 
-        const timestamp = new BN(Math.floor(Date.now()/1000)).sub(new BN(this.config.maxSkew));
-
-        if(swap.state===ToBtcSwapState.SAVED && swap.signatureExpiry!=null) {
-            const isSignatureExpired = swap.signatureExpiry.lt(timestamp);
+        if(swap.state===ToBtcSwapState.SAVED) {
+            const isSignatureExpired = swapContract.isInitAuthorizationExpired(swap.data, swap);
             if(isSignatureExpired) {
                 const isCommitted = await swapContract.isCommited(swap.data);
                 if(!isCommitted) {
@@ -384,8 +146,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         }
 
         if(swap.state===ToBtcSwapState.NON_PAYABLE || swap.state===ToBtcSwapState.SAVED) {
-            const isSwapExpired = swap.data.getExpiry().lt(timestamp);
-            if(isSwapExpired) {
+            if(swapContract.isExpired(signer.getAddress(), swap.data)) {
                 this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE|SAVED): swap expired, cancelling, address: "+swap.address);
                 await this.removeSwapData(swap, ToBtcSwapState.CANCELED);
                 return;
@@ -450,7 +211,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         this.swapLogger.debug(swap, "processBtcTx(): address: "+swap.address+" amount: "+swap.amount.toString(10)+" btcTx: "+tx);
 
         //Search for required transaction output (vout)
-        const outputScript = bitcoin.address.toOutputScript(swap.address, this.config.bitcoinNetwork);
+        const outputScript = this.bitcoin.toOutputScript(swap.address);
         const vout = tx.outs.find(e => new BN(e.value).eq(swap.amount) && Buffer.from(e.scriptPubKey.hex, "hex").equals(outputScript));
         if(vout==null) {
             this.swapLogger.warn(swap, "processBtcTx(): cannot find correct vout,"+
@@ -477,7 +238,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             const swap: ToBtcSwapAbs = this.activeSubscriptions[txId];
             //TODO: RBF the transaction if it's already taking too long to confirm
             try {
-                let tx: BtcTx = await this.bitcoinRpc.getTransaction(txId);
+                let tx: BtcTx = await this.bitcoin.getWalletTransaction(txId);
                 if(tx==null) continue;
 
                 if(await this.processBtcTx(swap, tx)) {
@@ -549,131 +310,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             code: 90003,
             msg: "Fee changed too much!",
             data: {
-                quotedFee: actualSatsPerVbyte.toString(10),
-                actualFee: quotedSatsPerVbyte.toString(10)
+                quotedFee: quotedSatsPerVbyte.toString(10),
+                actualFee: actualSatsPerVbyte.toString(10)
             }
         };
-    }
-
-    /**
-     * Runs sanity check on the calculated fee for the transaction
-     *
-     * @param psbt
-     * @param tx
-     * @param maxAllowedSatsPerVbyte
-     * @param actualSatsPerVbyte
-     * @private
-     * @throws {Error} Will throw an error if the fee sanity check doesn't pass
-     */
-    protected checkPsbtFee(
-        psbt: bitcoin.Psbt,
-        tx: bitcoin.Transaction,
-        maxAllowedSatsPerVbyte: BN,
-        actualSatsPerVbyte: BN
-    ): BN {
-        const txFee = new BN(psbt.getFee());
-
-        //Sanity check on sats/vB
-        const maxAllowedFee = new BN(tx.virtualSize())
-            //Considering the extra output was not added, because was detrminetal
-            .add(new BN(utils.outputBytes({type: this.LND_CHANGE_OUTPUT_TYPE})))
-            //Multiply by maximum allowed feerate
-            .mul(maxAllowedSatsPerVbyte)
-            //Possibility that extra output was not added due to it being lower than dust
-            .add(new BN(utils.dustThreshold({type: this.LND_CHANGE_OUTPUT_TYPE})));
-
-        if(txFee.gt(maxAllowedFee)) throw new Error("Generated tx fee too high: "+JSON.stringify({
-            maxAllowedFee: maxAllowedFee.toString(10),
-            actualFee: txFee.toString(10),
-            psbtHex: psbt.toHex(),
-            maxAllowedSatsPerVbyte: maxAllowedSatsPerVbyte.toString(10),
-            actualSatsPerVbyte: actualSatsPerVbyte.toString(10)
-        }));
-
-        return txFee;
-    }
-
-    /**
-     * Create PSBT for swap payout from coinselection result
-     *
-     * @param address
-     * @param amount
-     * @param escrowNonce
-     * @param coinselectResult
-     * @private
-     */
-    private async getPsbt(
-        address: string,
-        amount: BN,
-        escrowNonce: BN,
-        coinselectResult: {inputs: CoinselectTxInput[], outputs: CoinselectTxOutput[]}
-    ): Promise<bitcoin.Psbt> {
-        let psbt = new bitcoin.Psbt();
-
-        //Apply nonce
-        const nonceBuffer = Buffer.from(escrowNonce.toArray("be", 8));
-
-        const locktimeBN = new BN(nonceBuffer.slice(0, 5), "be");
-        let locktime = locktimeBN.toNumber() + 500000000;
-        psbt.setLocktime(locktime);
-
-        const sequenceBN = new BN(nonceBuffer.slice(5, 8), "be");
-        const sequence = 0xFE000000 + sequenceBN.toNumber();
-        psbt.addInputs(coinselectResult.inputs.map(input => {
-            return {
-                hash: input.txId,
-                index: input.vout,
-                witnessUtxo: {
-                    script: input.outputScript,
-                    value: input.value
-                },
-                sighashType: 0x01,
-                sequence
-            };
-        }));
-
-        psbt.addOutput({
-            script: bitcoin.address.toOutputScript(address, this.config.bitcoinNetwork),
-            value: amount.toNumber()
-        });
-
-        //Add change output
-        if(coinselectResult.outputs.length>1) psbt.addOutput({
-            script: bitcoin.address.toOutputScript(await this.getChangeAddress(), this.config.bitcoinNetwork),
-            value: coinselectResult.outputs[1].value
-        });
-
-        return psbt;
-    }
-
-    /**
-     * Signs provided PSBT and also returns a raw signed transaction
-     *
-     * @param psbt
-     * @private
-     */
-    protected async signPsbt(psbt: bitcoin.Psbt): Promise<{psbt: bitcoin.Psbt, rawTx: string}> {
-        const signedPsbt = await lncli.signPsbt({
-            lnd: this.LND,
-            psbt: psbt.toHex()
-        });
-        return {
-            psbt: bitcoin.Psbt.fromHex(signedPsbt.psbt),
-            rawTx: signedPsbt.transaction
-        };
-    }
-
-    /**
-     * Sends raw bitcoin transaction
-     *
-     * @param rawTx
-     * @private
-     */
-    protected async sendRawTransaction(rawTx: string): Promise<void> {
-        await lncli.broadcastChainTransaction({
-            lnd: this.LND,
-            transaction: rawTx
-        });
     }
 
     /**
@@ -691,37 +331,32 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             this.checkExpiresTooSoon(swap);
             if(swap.metadata!=null) swap.metadata.times.payCLTVChecked = Date.now();
 
-            const coinselectResult = await this.getChainFee(swap.address, swap.amount.toNumber());
-            if(coinselectResult==null) throw {
-                code: 90002,
-                msg: "Failed to run coinselect algorithm (not enough funds?)"
-            }
+            const satsPerVbyte = await this.bitcoin.getFeeRate();
+            this.checkCalculatedTxFee(swap.satsPerVbyte, new BN(satsPerVbyte));
             if(swap.metadata!=null) swap.metadata.times.payChainFee = Date.now();
 
-            this.checkCalculatedTxFee(swap.satsPerVbyte, coinselectResult.satsPerVbyte);
-
-            //Construct payment PSBT
-            let unsignedPsbt = await this.getPsbt(swap.address, swap.amount, swap.data.getEscrowNonce(), coinselectResult);
-            this.swapLogger.debug(swap, "sendBitcoinPayment(): generated psbt: "+unsignedPsbt.toHex());
-
-            //Sign the PSBT
-            const {psbt, rawTx} = await this.signPsbt(unsignedPsbt);
+            const signResult = await this.bitcoin.getSignedTransaction(
+                swap.address,
+                swap.amount.toNumber(),
+                satsPerVbyte,
+                swap.data.getEscrowNonce(),
+                swap.satsPerVbyte.toNumber()
+            );
+            if(signResult==null) throw {
+                code: 90002,
+                msg: "Failed to create signed transaction (not enough funds?)"
+            }
             if(swap.metadata!=null) swap.metadata.times.paySignPSBT = Date.now();
-            this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: "+rawTx);
 
-            const tx = bitcoin.Transaction.fromHex(rawTx);
-            const txFee = this.checkPsbtFee(psbt, tx, swap.satsPerVbyte, coinselectResult.satsPerVbyte);
-
-            swap.txId = tx.getId();
-            swap.setRealNetworkFee(txFee);
+            this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: "+signResult.raw);
+            swap.txId = signResult.tx.getId();
+            swap.setRealNetworkFee(new BN(signResult.networkFee));
             await swap.setState(ToBtcSwapState.BTC_SENDING);
             await this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
 
-            await this.sendRawTransaction(rawTx);
+            await this.bitcoin.sendRawTransaction(signResult.raw);
             if(swap.metadata!=null) swap.metadata.times.payTxSent = Date.now();
-            this.swapLogger.info(swap, "sendBitcoinPayment(): btc transaction generated, signed & broadcasted, txId: "+tx.getId()+" address: "+swap.address);
-            //Invalidate the UTXO cache
-            this.cachedUtxos = null;
+            this.swapLogger.info(swap, "sendBitcoinPayment(): btc transaction generated, signed & broadcasted, txId: "+signResult.tx.getId()+" address: "+swap.address);
 
             await swap.setState(ToBtcSwapState.BTC_SENT);
             await this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
@@ -736,7 +371,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     private async processInitialized(swap: ToBtcSwapAbs) {
         if(swap.state===ToBtcSwapState.BTC_SENDING) {
             //Bitcoin transaction was signed (maybe also sent)
-            const tx = await this.bitcoinRpc.getTransaction(swap.txId);
+            const tx = await this.bitcoin.getWalletTransaction(swap.txId);
 
             const isTxSent = tx!=null;
             if(!isTxSent) {
@@ -913,7 +548,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         let parsedOutputScript: Buffer;
 
         try {
-            parsedOutputScript = bitcoin.address.toOutputScript(address, this.config.bitcoinNetwork);
+            parsedOutputScript = this.bitcoin.toOutputScript(address);
         } catch (e) {
             throw {
                 code: 20031,
@@ -934,7 +569,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @throws {DefinedRuntimeError} will throw an error if the swap is expired
      */
     protected checkExpired(swap: ToBtcSwapAbs) {
-        const isExpired = swap.data.getExpiry().lt(new BN(Math.floor(Date.now()/1000)).sub(new BN(this.config.maxSkew)));
+        const {swapContract, signer} = this.getChain(swap.chainIdentifier);
+        const isExpired = swapContract.isExpired(signer.getAddress(), swap.data);
         if(isExpired) throw {
             _httpStatus: 200,
             code: 20010,
@@ -950,7 +586,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @throws {DefinedRuntimeError} will throw an error if there are not enough BTC funds
      */
     private async checkAndGetNetworkFee(address: string, amount: BN): Promise<{ networkFee: BN, satsPerVbyte: BN }> {
-        let chainFeeResp = await this.getChainFee(address, amount.toNumber(), true, this.config.networkFeeMultiplierPPM);
+        let chainFeeResp = await this.bitcoin.estimateFee(address, amount.toNumber(), null, this.config.networkFeeMultiplier);
 
         const hasEnoughFunds = chainFeeResp!=null;
         if(!hasEnoughFunds) throw {
@@ -958,7 +594,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             msg: "Not enough liquidity"
         };
 
-        return chainFeeResp;
+        return {
+            networkFee: new BN(chainFeeResp.networkFee),
+            satsPerVbyte: new BN(chainFeeResp.satsPerVbyte)
+        };
     }
 
     startRestServer(restServer: Express) {
@@ -1047,7 +686,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             }, abortController.signal, pricePrefetchPromise);
             metadata.times.priceCalculated = Date.now();
 
-            const paymentHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.nonce, amountBD, this.config.bitcoinNetwork).toString("hex");
+            const paymentHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.nonce, amountBD).toString("hex");
 
             //Add grace period another time, so the user has 1 hour to commit
             const expirySeconds = this.getExpiryFromCLTV(parsedBody.confirmationTarget, parsedBody.confirmations).add(new BN(this.config.gracePeriod));
@@ -1087,11 +726,14 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 networkFeeInToken,
                 networkFeeData.satsPerVbyte,
                 parsedBody.nonce,
-                parsedBody.confirmationTarget,
-                new BN(sigData.timeout)
+                parsedBody.confirmationTarget
             );
             createdSwap.data = payObject;
             createdSwap.metadata = metadata;
+            createdSwap.prefix = sigData.prefix;
+            createdSwap.timeout = sigData.timeout;
+            createdSwap.signature = sigData.signature
+            createdSwap.feeRate = sigData.feeRate;
 
             await PluginManager.swapCreate(createdSwap);
             await this.storageManager.saveData(paymentHash, sequence, createdSwap);
@@ -1147,8 +789,6 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 msg: "Payment not found"
             };
 
-            const {swapContract, signer} = this.getChain(payment.chainIdentifier);
-
             this.checkExpired(payment);
 
             if (payment.state === ToBtcSwapState.COMMITED) throw {
@@ -1165,6 +805,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     txId: payment.txId
                 }
             };
+
+            const {swapContract, signer} = this.getChain(payment.chainIdentifier);
 
             if (payment.state === ToBtcSwapState.NON_PAYABLE) {
                 const isCommited = await swapContract.isCommited(payment.data);

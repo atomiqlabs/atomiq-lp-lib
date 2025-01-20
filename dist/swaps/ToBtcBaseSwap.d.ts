@@ -2,11 +2,12 @@ import { SwapHandlerSwap } from "./SwapHandlerSwap";
 import { SwapData } from "@atomiqlabs/base";
 import * as BN from "bn.js";
 export declare abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> extends SwapHandlerSwap<T, S> {
+    amount: BN;
     quotedNetworkFee: BN;
     readonly quotedNetworkFeeInToken: BN;
     realNetworkFee: BN;
     realNetworkFeeInToken: BN;
-    protected constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
+    protected constructor(chainIdentifier: string, amount: BN, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
     protected constructor(obj: any);
     serialize(): any;
     setRealNetworkFee(networkFeeInBtc: BN): void;
@@ -32,4 +33,5 @@ export declare abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = a
         inInputToken: BN;
         inOutputToken: BN;
     };
+    getOutputAmount(): BN;
 }

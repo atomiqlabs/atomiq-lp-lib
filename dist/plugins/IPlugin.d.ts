@@ -1,10 +1,11 @@
 import { BitcoinRpc } from "@atomiqlabs/base";
 import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
-import { AuthenticatedLnd } from "lightning";
 import * as BN from "bn.js";
 import { Command } from "@atomiqlabs/server-base";
 import { FromBtcLnTrustedRequestType } from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
+import { ILightningWallet } from "../wallets/ILightningWallet";
 export type QuoteThrow = {
     type: "throw";
     message: string;
@@ -55,7 +56,7 @@ export interface IPlugin {
     name: string;
     author: string;
     description: string;
-    onEnable(chainsData: MultichainData, bitcoinRpc: BitcoinRpc<any>, lnd: AuthenticatedLnd, swapPricing: ISwapPrice, tokens: {
+    onEnable(chainsData: MultichainData, bitcoinRpc: BitcoinRpc<any>, bitcoinWallet: IBitcoinWallet, lightningWallet: ILightningWallet, swapPricing: ISwapPrice, tokens: {
         [ticker: string]: {
             [chainId: string]: {
                 address: string;

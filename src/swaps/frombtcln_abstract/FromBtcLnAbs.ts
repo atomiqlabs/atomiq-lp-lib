@@ -1,8 +1,6 @@
 import * as BN from "bn.js";
 import {Express, Request, Response} from "express";
-import * as lncli from "ln-service";
 import {createHash} from "crypto";
-import * as bolt11 from "@atomiqlabs/bolt11";
 import {FromBtcLnSwapAbs, FromBtcLnSwapState} from "./FromBtcLnSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import {ISwapPrice} from "../ISwapPrice";
@@ -13,7 +11,6 @@ import {
     RefundEvent,
     SwapData
 } from "@atomiqlabs/base";
-import {AuthenticatedLnd} from "lightning";
 import {expressHandlerWrapper, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../storage/IIntermediaryStorage";
@@ -21,8 +18,14 @@ import {FieldTypeEnum, verifySchema} from "../../utils/paramcoders/SchemaVerifie
 import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDecoder";
 import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEncoder";
 import {IParamReader} from "../../utils/paramcoders/IParamReader";
-import {FromBtcBaseConfig, FromBtcBaseSwapHandler} from "../FromBtcBaseSwapHandler";
+import {FromBtcBaseConfig} from "../FromBtcBaseSwapHandler";
 import {FromBtcLnBaseSwapHandler} from "../FromBtcLnBaseSwapHandler";
+import {
+    HodlInvoiceInit,
+    ILightningWallet,
+    LightningNetworkChannel,
+    LightningNetworkInvoice
+} from "../../wallets/ILightningWallet";
 
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -52,29 +55,26 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         storageDirectory: IIntermediaryStorage<FromBtcLnSwapAbs>,
         path: string,
         chains: MultichainData,
-        lnd: AuthenticatedLnd,
+        lightning: ILightningWallet,
         swapPricing: ISwapPrice,
         config: FromBtcLnConfig
     ) {
-        super(storageDirectory, path, chains, lnd, swapPricing);
+        super(storageDirectory, path, chains, lightning, swapPricing);
         this.config = config;
         this.config.invoiceTimeoutSeconds = this.config.invoiceTimeoutSeconds || 90;
     }
 
     protected async processPastSwap(swap: FromBtcLnSwapAbs): Promise<"REFUND" | "SETTLE" | "CANCEL" | null> {
-        const {swapContract} = this.getChain(swap.chainIdentifier);
+        const {swapContract, signer} = this.getChain(swap.chainIdentifier);
         if(swap.state===FromBtcLnSwapState.CREATED) {
             //Check if already paid
-            const parsedPR = bolt11.decode(swap.pr);
-            const invoice = await lncli.getInvoice({
-                id: parsedPR.tagsObject.payment_hash,
-                lnd: this.LND
-            });
+            const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
+            const invoice = await this.lightning.getInvoice(parsedPR.id);
 
-            const isBeingPaid = invoice.is_held;
+            const isBeingPaid = invoice.status==="held";
             if(!isBeingPaid) {
                 //Not paid
-                const isInvoiceExpired = parsedPR.timeExpireDate<Date.now()/1000;
+                const isInvoiceExpired = parsedPR.expiryEpochMillis<Date.now();
                 if(!isInvoiceExpired) return null;
 
                 this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap LN invoice expired, cancelling, invoice: "+swap.pr);
@@ -100,8 +100,6 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         }
 
         if(swap.state===FromBtcLnSwapState.RECEIVED) {
-            const parsedPR = bolt11.decode(swap.pr);
-
             const isAuthorizationExpired = await swapContract.isInitAuthorizationExpired(swap.data, swap);
             if(isAuthorizationExpired) {
                 const isCommited = await swapContract.isCommited(swap.data);
@@ -119,11 +117,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         }
 
         if(swap.state===FromBtcLnSwapState.RECEIVED || swap.state===FromBtcLnSwapState.COMMITED) {
-            const expiryTime = swap.data.getExpiry();
-            const currentTime = new BN(Math.floor(Date.now()/1000)-this.config.maxSkew);
-
-            const isExpired = expiryTime!=null && expiryTime.lt(currentTime);
-            if(!isExpired) return null;
+            if(!swapContract.isExpired(signer.getAddress(), swap.data)) return null;
 
             const isCommited = await swapContract.isCommited(swap.data);
             if(isCommited) {
@@ -159,10 +153,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             //Refund
             const paymentHash = swap.data.getHash();
             try {
-                await lncli.cancelHodlInvoice({
-                    lnd: this.LND,
-                    id: paymentHash
-                });
+                await this.lightning.cancelHodlInvoice(paymentHash);
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
                 await this.removeSwapData(swap);
             } catch (e) {
@@ -174,10 +165,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
     protected async settleInvoices(swaps: FromBtcLnSwapAbs[]) {
         for(let swap of swaps) {
             try {
-                await lncli.settleHodlInvoice({
-                    lnd: this.LND,
-                    secret: swap.secret
-                });
+                await this.lightning.settleHodlInvoice(swap.secret);
                 if(swap.metadata!=null) swap.metadata.times.htlcSettled = Date.now();
                 await this.removeSwapData(swap, FromBtcLnSwapState.SETTLED);
 
@@ -272,10 +260,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         this.swapLogger.info(savedSwap, "SC: ClaimEvent: swap HTLC successfully claimed by the client, invoice: "+savedSwap.pr);
 
         try {
-            await lncli.settleHodlInvoice({
-                lnd: this.LND,
-                secret: secretHex
-            });
+            await this.lightning.settleHodlInvoice(secretHex);
             this.swapLogger.info(savedSwap, "SC: ClaimEvent: invoice settled, secret: "+secretHex);
             savedSwap.secret = secretHex;
             if(savedSwap.metadata!=null) savedSwap.metadata.times.htlcSettled = Date.now();
@@ -302,10 +287,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         this.swapLogger.info(savedSwap, "SC: RefundEvent: swap refunded to us, invoice: "+savedSwap.pr);
 
         try {
-            await lncli.cancelHodlInvoice({
-                lnd: this.LND,
-                id: event.paymentHash
-            });
+            await this.lightning.cancelHodlInvoice(event.paymentHash);
             this.swapLogger.info(savedSwap, "SC: RefundEvent: invoice cancelled");
             await this.removeSwapData(savedSwap, FromBtcLnSwapState.REFUNDED);
         } catch (e) {
@@ -425,7 +407,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
      * @param abortController
      */
     private getBlockheightPrefetch(abortController: AbortController): Promise<number> {
-        return lncli.getHeight({lnd: this.LND}).then(res => res.current_block_height).catch(e => {
+        return this.lightning.getBlockheight().catch(e => {
             this.logger.error("getBlockheightPrefetch(): error", e);
             abortController.abort(e);
             return null;
@@ -438,8 +420,8 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
      * @param responseStream
      */
     private sendPublicKeyAsync(responseStream: ServerParamEncoder) {
-        lncli.getWalletInfo({lnd: this.LND}).then(resp => responseStream.writeParams({
-            lnPublicKey: resp.public_key
+        this.lightning.getIdentityPublicKey().then(publicKey => responseStream.writeParams({
+            lnPublicKey: publicKey
         })).catch(e => {
             this.logger.error("sendPublicKeyAsync(): error", e);
         });
@@ -451,7 +433,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
      *
      * @param invoice
      */
-    private getInvoicePaymentsTimeout(invoice: {payments: {timeout: number}[]}) {
+    private getInvoicePaymentsTimeout(invoice: LightningNetworkInvoice) {
         let timeout: number = null;
         invoice.payments.forEach((curr) => {
             if (timeout == null || timeout > curr.timeout) timeout = curr.timeout;
@@ -468,7 +450,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
      * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
      * @returns expiry timeout in seconds
      */
-    private async checkHtlcExpiry(invoice: {payments: {timeout: number}[]}, blockheightPrefetch: Promise<number>, signal: AbortSignal): Promise<BN> {
+    private async checkHtlcExpiry(invoice: LightningNetworkInvoice, blockheightPrefetch: Promise<number>, signal: AbortSignal): Promise<BN> {
         const timeout: number = this.getInvoicePaymentsTimeout(invoice);
         const current_block_height = await blockheightPrefetch;
         signal.throwIfAborted();
@@ -499,10 +481,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         if(invoiceData.state!==FromBtcLnSwapState.CREATED) return;
         await invoiceData.setState(FromBtcLnSwapState.CANCELED);
         const paymentHash = invoiceData.data.getHash();
-        await lncli.cancelHodlInvoice({
-            id: paymentHash,
-            lnd: this.LND
-        });
+        await this.lightning.cancelHodlInvoice(paymentHash);
         await this.removeSwapData(invoiceData);
         this.swapLogger.info(invoiceData, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", invoiceData.pr);
     };
@@ -536,10 +515,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
      * @returns the fetched lightning invoice
      */
     private async checkInvoiceStatus(paymentHash: string): Promise<any> {
-        const invoice = await lncli.getInvoice({
-            id: paymentHash,
-            lnd: this.LND
-        });
+        const invoice = await this.lightning.getInvoice(paymentHash);
         if(invoice==null) throw {
             _httpStatus: 200,
             code: 10001,
@@ -563,26 +539,28 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             msg: "Invoice expired/canceled"
         };
 
-        const isBeingPaid = invoice.is_held;
-        if (!isBeingPaid) {
-            if (invoice.is_canceled) throw {
-                _httpStatus: 200,
-                code: 10001,
-                msg: "Invoice expired/canceled"
-            }
-            if (invoice.is_confirmed) throw {
-                _httpStatus: 200,
-                code: 10002,
-                msg: "Invoice already paid"
-            };
-            throw {
-                _httpStatus: 200,
-                code: 10003,
-                msg: "Invoice yet unpaid"
-            };
+        switch(invoice.status) {
+            case "canceled":
+                throw {
+                    _httpStatus: 200,
+                    code: 10001,
+                    msg: "Invoice expired/canceled"
+                }
+            case "confirmed":
+                throw {
+                    _httpStatus: 200,
+                    code: 10002,
+                    msg: "Invoice already paid"
+                };
+            case "unpaid":
+                throw {
+                    _httpStatus: 200,
+                    code: 10003,
+                    msg: "Invoice yet unpaid"
+                };
+            default:
+                return invoice;
         }
-
-        return invoice;
     }
 
     startRestServer(restServer: Express) {
@@ -654,7 +632,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             //Pre-fetch data
             const {pricePrefetchPromise, securityDepositPricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, abortController);
             const balancePrefetch: Promise<BN> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
-            const channelsPrefetch: Promise<{channels: any[]}> = this.getChannelsPrefetch(abortController);
+            const channelsPrefetch: Promise<LightningNetworkChannel[]> = this.getChannelsPrefetch(abortController);
 
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address, parsedBody.paymentHash);
             abortController.signal.throwIfAborted();
@@ -678,23 +656,28 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             metadata.times.balanceChecked = Date.now();
 
             //Create swap
-            const hodlInvoiceObj: any = {
+            const hodlInvoiceObj: HodlInvoiceInit = {
                 description: chainIdentifier+"-"+parsedBody.address,
-                cltv_delta: this.config.minCltv.add(new BN(5)).toString(10),
-                expires_at: new Date(Date.now()+(this.config.invoiceTimeoutSeconds*1000)).toISOString(),
+                cltvDelta: this.config.minCltv.add(new BN(5)).toNumber(),
+                expiresAt: Date.now()+(this.config.invoiceTimeoutSeconds*1000),
                 id: parsedBody.paymentHash,
-                tokens: amountBD.toString(10),
-                description_hash: parsedBody.descriptionHash
+                mtokens: amountBD.mul(new BN(1000)),
+                descriptionHash: parsedBody.descriptionHash
             };
-            metadata.invoiceRequest = {...hodlInvoiceObj};
-            hodlInvoiceObj.lnd = this.LND;
+            metadata.invoiceRequest = hodlInvoiceObj;
 
-            const hodlInvoice = await lncli.createHodlInvoice(hodlInvoiceObj);
+            const hodlInvoice = await this.lightning.createHodlInvoice(hodlInvoiceObj);
             abortController.signal.throwIfAborted();
             metadata.times.invoiceCreated = Date.now();
             metadata.invoiceResponse = {...hodlInvoice};
 
-            const createdSwap = new FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, swapFee, swapFeeInToken);
+            const createdSwap = new FromBtcLnSwapAbs(
+                chainIdentifier,
+                hodlInvoice.request,
+                hodlInvoice.mtokens,
+                swapFee,
+                swapFeeInToken
+            );
 
             //Pre-compute the security deposit
             const expiryTimeout = this.config.minCltv.mul(this.config.bitcoinBlocktime.div(this.config.safetyFactor)).sub(this.config.gracePeriod);
@@ -850,6 +833,13 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
 
     async init() {
         await this.storageManager.loadData(FromBtcLnSwapAbs);
+        //Check if all swaps contain a valid amount
+        for(let swap of await this.storageManager.query([])) {
+            if(swap.amount==null) {
+                const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
+                swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+            }
+        }
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }

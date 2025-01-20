@@ -18,15 +18,5 @@ export declare function getLogger(prefix: string): {
     error: (msg: any, ...args: any[]) => void;
 };
 export declare const HEX_REGEX: RegExp;
-export declare function shuffle(array: any[]): void;
 export declare function serializeBN(bn: BN | null): string | null;
 export declare function deserializeBN(str: string | null): BN | null;
-/**
- * Handles & throws LND error if the error is:
- *  - network error
- *  - server side (LND) internal error
- *  - malformed input data error
- *
- * @param e
- */
-export declare function handleLndError(e: any): void;

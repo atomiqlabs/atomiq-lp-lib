@@ -1,4 +1,4 @@
-import { SwapData } from "@atomiqlabs/base";
+import { BtcTx, SwapData } from "@atomiqlabs/base";
 import { FromBtcBaseSwap } from "../FromBtcBaseSwap";
 import * as BN from "bn.js";
 export declare enum FromBtcTrustedSwapState {
@@ -16,7 +16,6 @@ export declare enum FromBtcTrustedSwapState {
 export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcTrustedSwapState> {
     readonly sequence: BN;
     readonly btcAddress: string;
-    readonly inputSats: BN;
     readonly dstAddress: string;
     readonly outputTokens: BN;
     readonly createdHeight: number;
@@ -27,7 +26,7 @@ export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends F
     adjustedOutput: BN;
     doubleSpent: boolean;
     scRawTx: string;
-    rawTx: string;
+    btcTx: BtcTx;
     txFee: number;
     txSize: number;
     txId: string;

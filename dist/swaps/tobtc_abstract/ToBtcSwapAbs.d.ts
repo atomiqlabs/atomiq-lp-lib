@@ -13,17 +13,14 @@ export declare enum ToBtcSwapState {
 }
 export declare class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
     readonly address: string;
-    readonly amount: BN;
     readonly satsPerVbyte: BN;
     readonly nonce: BN;
     readonly preferedConfirmationTarget: number;
-    readonly signatureExpiry: BN;
     txId: string;
-    constructor(chainIdentifier: string, address: string, amount: BN, swapFee: BN, swapFeeInToken: BN, networkFee: BN, networkFeeInToken: BN, satsPerVbyte: BN, nonce: BN, preferedConfirmationTarget: number, signatureExpiry: BN);
+    constructor(chainIdentifier: string, address: string, amount: BN, swapFee: BN, swapFeeInToken: BN, networkFee: BN, networkFeeInToken: BN, satsPerVbyte: BN, nonce: BN, preferedConfirmationTarget: number);
     constructor(obj: any);
     serialize(): any;
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;
-    getOutputAmount(): BN;
 }

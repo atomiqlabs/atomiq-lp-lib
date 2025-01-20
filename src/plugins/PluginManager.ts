@@ -16,11 +16,12 @@ import {
     ToBtcRequestType
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
-import {AuthenticatedLnd} from "lightning";
 import * as BN from "bn.js";
 import * as fs from "fs";
 import {getLogger} from "../utils/Utils";
 import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
+import {ILightningWallet} from "../wallets/ILightningWallet";
 
 export type FailSwapResponse = {
     type: "fail",
@@ -67,7 +68,8 @@ export class PluginManager {
         chainsData: MultichainData,
 
         bitcoinRpc: BitcoinRpc<any>,
-        lnd: AuthenticatedLnd,
+        bitcoinWallet: IBitcoinWallet,
+        lightningWallet: ILightningWallet,
 
         swapPricing: ISwapPrice,
         tokens: {
@@ -92,7 +94,8 @@ export class PluginManager {
                 await plugin.onEnable(
                     chainsData,
                     bitcoinRpc,
-                    lnd,
+                    bitcoinWallet,
+                    lightningWallet,
                     swapPricing,
                     tokens,
                     directory+"/"+name
