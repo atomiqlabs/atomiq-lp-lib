@@ -188,23 +188,42 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
                 }
                 if (invoiceData.state !== FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED)
                     return;
-                let unlock = invoiceData.lock(30 * 1000);
+                const txns = yield swapContract.txsTransfer(signer.getAddress(), swapContract.getNativeCurrencyAddress(), invoiceData.output, invoiceData.dstAddress);
+                let unlock = invoiceData.lock(Infinity);
                 if (unlock == null)
                     return;
-                const txns = yield swapContract.txsTransfer(signer.getAddress(), swapContract.getNativeCurrencyAddress(), invoiceData.output, invoiceData.dstAddress);
-                yield swapContract.sendAndConfirm(signer, txns, true, null, false, (txId, rawTx) => __awaiter(this, void 0, void 0, function* () {
+                const result = yield swapContract.sendAndConfirm(signer, txns, true, null, false, (txId, rawTx) => __awaiter(this, void 0, void 0, function* () {
                     invoiceData.txIds = { init: txId };
                     invoiceData.scRawTx = rawTx;
                     if (invoiceData.state === FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED) {
                         yield invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.SENT);
                         yield this.storageManager.saveData(invoice.id, null, invoiceData);
                     }
-                    if (unlock != null)
-                        unlock();
-                    unlock = null;
-                }));
+                })).catch(e => console.error(e));
+                if (result == null) {
+                    //Cancel invoice
+                    yield invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.REFUNDED);
+                    yield this.storageManager.saveData(invoice.id, null, invoiceData);
+                    yield this.lightning.cancelHodlInvoice(invoice.id);
+                    this.unsubscribeInvoice(invoice.id);
+                    yield this.removeSwapData(invoice.id, null);
+                    this.swapLogger.info(invoiceData, "htlcReceived(): transaction sending failed, refunding lightning: ", invoiceData.pr);
+                    throw {
+                        code: 20002,
+                        msg: "Transaction sending failed"
+                    };
+                }
+                else {
+                    //Successfully paid
+                    yield invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED);
+                    yield this.storageManager.saveData(invoice.id, null, invoiceData);
+                }
+                unlock();
+                unlock = null;
             }
             if (invoiceData.state === FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.SENT) {
+                if (invoiceData.isLocked())
+                    return;
                 const txStatus = yield swapContract.getTxStatus(invoiceData.scRawTx);
                 if (txStatus === "not_found") {
                     //Retry

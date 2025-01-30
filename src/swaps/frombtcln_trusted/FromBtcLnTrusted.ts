@@ -217,23 +217,45 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             if(invoiceData.state!==FromBtcLnTrustedSwapState.RECEIVED) return;
 
-            let unlock = invoiceData.lock(30*1000);
+            const txns = await swapContract.txsTransfer(signer.getAddress(), swapContract.getNativeCurrencyAddress(), invoiceData.output, invoiceData.dstAddress);
+
+            let unlock = invoiceData.lock(Infinity);
             if(unlock==null) return;
 
-            const txns = await swapContract.txsTransfer(signer.getAddress(), swapContract.getNativeCurrencyAddress(), invoiceData.output, invoiceData.dstAddress);
-            await swapContract.sendAndConfirm(signer, txns, true, null, false, async (txId: string, rawTx: string) => {
+            const result = await swapContract.sendAndConfirm(signer, txns, true, null, false, async (txId: string, rawTx: string) => {
                 invoiceData.txIds = {init: txId};
                 invoiceData.scRawTx = rawTx;
                 if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
                     await invoiceData.setState(FromBtcLnTrustedSwapState.SENT);
                     await this.storageManager.saveData(invoice.id, null, invoiceData);
                 }
-                if(unlock!=null) unlock();
-                unlock = null;
-            });
+            }).catch(e => console.error(e));
+
+            if(result==null) {
+                //Cancel invoice
+                await invoiceData.setState(FromBtcLnTrustedSwapState.REFUNDED);
+                await this.storageManager.saveData(invoice.id, null, invoiceData);
+                await this.lightning.cancelHodlInvoice(invoice.id);
+                this.unsubscribeInvoice(invoice.id);
+                await this.removeSwapData(invoice.id, null);
+                this.swapLogger.info(invoiceData, "htlcReceived(): transaction sending failed, refunding lightning: ", invoiceData.pr);
+                throw {
+                    code: 20002,
+                    msg: "Transaction sending failed"
+                };
+            } else {
+                //Successfully paid
+                await invoiceData.setState(FromBtcLnTrustedSwapState.CONFIRMED);
+                await this.storageManager.saveData(invoice.id, null, invoiceData);
+            }
+
+            unlock();
+            unlock = null;
         }
 
         if(invoiceData.state===FromBtcLnTrustedSwapState.SENT) {
+            if(invoiceData.isLocked()) return;
+
             const txStatus = await swapContract.getTxStatus(invoiceData.scRawTx);
             if(txStatus==="not_found") {
                 //Retry

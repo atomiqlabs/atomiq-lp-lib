@@ -17,6 +17,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./info/InfoHandler"), exports);
 __exportStar(require("./prices/CoinGeckoSwapPrice"), exports);
 __exportStar(require("./prices/BinanceSwapPrice"), exports);
+__exportStar(require("./prices/OKXSwapPrice"), exports);
 __exportStar(require("./storage/IIntermediaryStorage"), exports);
 __exportStar(require("./storagemanager/StorageManager"), exports);
 __exportStar(require("./storagemanager/IntermediaryStorageManager"), exports);
