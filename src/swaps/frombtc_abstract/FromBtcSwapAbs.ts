@@ -14,19 +14,22 @@ export enum FromBtcSwapState {
 export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcSwapState> {
 
     readonly address: string;
+    readonly confirmations: number;
     txId: string;
 
-    constructor(chainIdentifier: string, address: string, amount: BN, swapFee: BN, swapFeeInToken: BN);
+    constructor(chainIdentifier: string, address: string, confirmations: number, amount: BN, swapFee: BN, swapFeeInToken: BN);
     constructor(obj: any);
 
-    constructor(prOrObj: string | any, address?: string, amount?: BN, swapFee?: BN, swapFeeInToken?: BN) {
+    constructor(prOrObj: string | any, address?: string, confirmations?: number, amount?: BN, swapFee?: BN, swapFeeInToken?: BN) {
         if(typeof(prOrObj)==="string") {
             super(prOrObj, amount, swapFee, swapFeeInToken);
             this.state = FromBtcSwapState.CREATED;
             this.address = address;
+            this.confirmations = confirmations;
         } else {
             super(prOrObj);
             this.address = prOrObj.address;
+            this.confirmations = prOrObj.confirmations;
             this.txId = prOrObj.txId;
         }
         this.type = SwapHandlerType.FROM_BTC;
@@ -35,12 +38,9 @@ export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSw
     serialize(): any {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
+        partialSerialized.confirmations = this.confirmations;
         partialSerialized.txId = this.txId;
         return partialSerialized;
-    }
-
-    getTxoHash(): Buffer {
-        return Buffer.from(this.data.getTxoHash(), "hex");
     }
 
     isInitiated(): boolean {

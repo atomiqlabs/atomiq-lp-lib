@@ -256,12 +256,12 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
         if(swap.data!=null) this.escrowHashMap.delete(swap.chainIdentifier+"_"+swap.data.getEscrowHash());
-        await this.storageManager.removeData(swap.getClaimHash(), swap.getSequence());
+        await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
 
     protected async saveSwapData(swap: V) {
         this.escrowHashMap.set(swap.chainIdentifier+"_"+swap.getEscrowHash(), swap);
-        await this.storageManager.saveData(swap.data.getClaimHash(), swap.data.getSequence==null ? null : swap.data.getSequence(), swap);
+        await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
     }
 
     protected getSwapByEscrowHash(chainIdentifier: string, escrowHash: string) {

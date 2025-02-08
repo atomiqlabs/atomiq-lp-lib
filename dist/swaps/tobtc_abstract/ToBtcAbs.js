@@ -724,7 +724,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this.storageManager.loadData(ToBtcSwapAbs_1.ToBtcSwapAbs);
+            yield this.loadData(ToBtcSwapAbs_1.ToBtcSwapAbs);
             this.subscribeToEvents();
             yield PluginManager_1.PluginManager.serviceInitialize(this);
         });

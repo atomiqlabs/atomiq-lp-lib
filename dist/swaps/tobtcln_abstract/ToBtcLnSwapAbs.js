@@ -35,6 +35,9 @@ class ToBtcLnSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         }
         this.type = __1.SwapHandlerType.TO_BTCLN;
     }
+    getIdentifierHash() {
+        return this.lnPaymentHash;
+    }
     serialize() {
         const partialSerialized = super.serialize();
         partialSerialized.pr = this.pr;

@@ -30,13 +30,6 @@ export declare class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, F
     readonly bitcoin: IBitcoinWallet;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcSwapAbs>, path: string, chains: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, config: FromBtcConfig);
     /**
-     * Returns the TXO hash of the specific address and amount - sha256(u64le(amount) + outputScript(address))
-     *
-     * @param address
-     * @param amount
-     */
-    private getTxoHash;
-    /**
      * Returns the payment hash of the swap, takes swap nonce into account. Payment hash is chain-specific.
      *
      * @param chainIdentifier

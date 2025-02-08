@@ -2,6 +2,7 @@ import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
+import {deserializeBN, serializeBN} from "../../utils/Utils";
 
 export enum FromBtcLnSwapState {
     REFUNDED = -2,
@@ -16,24 +17,73 @@ export enum FromBtcLnSwapState {
 export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcLnSwapState> {
 
     readonly pr: string;
+    lnPaymentHash: string;
 
-    nonce: number;
+    readonly claimer: string;
+    readonly token: string;
+    readonly totalTokens: BN;
+    readonly claimHash: string;
+    readonly securityDeposit: BN;
 
     secret: string;
 
-    constructor(chainIdentifier: string, pr: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN);
+    constructor(
+        chainIdentifier: string,
+        pr: string,
+        lnPaymentHash: string,
+        amountMtokens: BN,
+        swapFee: BN,
+        swapFeeInToken: BN,
+        claimer: string,
+        token: string,
+        totalTokens: BN,
+        claimHash: string,
+        securityDeposit: BN
+    );
     constructor(obj: any);
 
-    constructor(chainIdOrObj: string | any, pr?: string, amountMtokens?: BN, swapFee?: BN, swapFeeInToken?: BN) {
+    constructor(
+        chainIdOrObj: string | any,
+        pr?: string,
+        lnPaymentHash?: string,
+        amountMtokens?: BN,
+        swapFee?: BN,
+        swapFeeInToken?: BN,
+        claimer?: string,
+        token?: string,
+        totalTokens?: BN,
+        claimHash?: string,
+        securityDeposit?: BN
+    ) {
         if(typeof(chainIdOrObj)==="string") {
             super(chainIdOrObj, amountMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
             this.state = FromBtcLnSwapState.CREATED;
             this.pr = pr;
+            this.lnPaymentHash = lnPaymentHash;
+            this.claimer = claimer;
+            this.token = token;
+            this.totalTokens = totalTokens;
+            this.claimHash = claimHash;
+            this.securityDeposit = securityDeposit;
         } else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
+            this.lnPaymentHash = chainIdOrObj.lnPaymentHash;
+            this.claimer = chainIdOrObj.claimer;
+            this.token = chainIdOrObj.token;
+            this.totalTokens = deserializeBN(chainIdOrObj.totalTokens);
+            this.claimHash = chainIdOrObj.claimHash;
+            this.securityDeposit = deserializeBN(chainIdOrObj.securityDeposit);
             this.secret = chainIdOrObj.secret;
-            this.nonce = chainIdOrObj.nonce;
+
+            //Compatibility
+            if(this.state===FromBtcLnSwapState.CREATED && this.data!=null) {
+                this.claimer = this.data.getClaimer();
+                this.token = this.data.getToken();
+                this.totalTokens = this.data.getAmount();
+                this.claimHash = this.data.getClaimHash();
+                this.securityDeposit = this.data.getSecurityDeposit();
+            }
         }
         this.type = SwapHandlerType.FROM_BTCLN;
     }
@@ -42,12 +92,21 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         const partialSerialized = super.serialize();
         partialSerialized.pr = this.pr;
         partialSerialized.secret = this.secret;
-        partialSerialized.nonce = this.nonce;
+        partialSerialized.lnPaymentHash = this.lnPaymentHash;
+        partialSerialized.claimer = this.claimer;
+        partialSerialized.token = this.token;
+        partialSerialized.totalTokens = serializeBN(this.totalTokens);
+        partialSerialized.claimHash = this.claimHash;
+        partialSerialized.securityDeposit = serializeBN(this.securityDeposit);
         return partialSerialized;
     }
 
+    getIdentifierHash(): string {
+        return this.lnPaymentHash;
+    }
+
     getSequence(): BN {
-        return null;
+        return new BN(0);
     }
 
     isInitiated(): boolean {

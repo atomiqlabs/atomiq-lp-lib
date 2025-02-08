@@ -33,9 +33,20 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
      * @param newState
      */
     setState(newState: S): Promise<void>;
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
     getEscrowHash(): string;
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
     getClaimHash(): string;
-    getSequence(): BN;
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash(): string;
+    getSequence(): BN | null;
     /**
      * Returns unique identifier of the swap in the form <hash>_<sequence> or just <hash> if the swap type doesn't
      *  use sequence number

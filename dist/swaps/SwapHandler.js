@@ -159,13 +159,13 @@ class SwapHandler {
             this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
             if (swap.data != null)
                 this.escrowHashMap.delete(swap.chainIdentifier + "_" + swap.data.getEscrowHash());
-            yield this.storageManager.removeData(swap.getClaimHash(), swap.getSequence());
+            yield this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
         });
     }
     saveSwapData(swap) {
         return __awaiter(this, void 0, void 0, function* () {
             this.escrowHashMap.set(swap.chainIdentifier + "_" + swap.getEscrowHash(), swap);
-            yield this.storageManager.saveData(swap.data.getClaimHash(), swap.data.getSequence == null ? null : swap.data.getSequence(), swap);
+            yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
         });
     }
     getSwapByEscrowHash(chainIdentifier, escrowHash) {

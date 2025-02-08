@@ -16,6 +16,7 @@ export declare class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtc
     secret: string;
     constructor(chainIdentifier: string, lnPaymentHash: string, pr: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
     constructor(obj: any);
+    getIdentifierHash(): string;
     serialize(): any;
     isInitiated(): boolean;
     isFailed(): boolean;

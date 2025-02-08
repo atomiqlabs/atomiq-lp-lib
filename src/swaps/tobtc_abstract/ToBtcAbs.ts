@@ -856,7 +856,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     }
 
     async init() {
-        await this.storageManager.loadData(ToBtcSwapAbs);
+        await this.loadData(ToBtcSwapAbs);
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }

@@ -52,6 +52,10 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
         this.type = SwapHandlerType.TO_BTCLN;
     }
 
+    getIdentifierHash(): string {
+        return this.lnPaymentHash;
+    }
+
     serialize(): any {
         const partialSerialized = super.serialize();
         partialSerialized.pr = this.pr;

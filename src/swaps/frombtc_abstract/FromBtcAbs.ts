@@ -62,21 +62,6 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
     }
 
     /**
-     * Returns the TXO hash of the specific address and amount - sha256(u64le(amount) + outputScript(address))
-     *
-     * @param address
-     * @param amount
-     */
-    private getTxoHash(address: string, amount: BN): Buffer {
-        const parsedOutputScript = this.bitcoin.toOutputScript(address);
-
-        return createHash("sha256").update(Buffer.concat([
-            Buffer.from(amount.toArray("le", 8)),
-            parsedOutputScript
-        ])).digest();
-    }
-
-    /**
      * Returns the payment hash of the swap, takes swap nonce into account. Payment hash is chain-specific.
      *
      * @param chainIdentifier
@@ -383,7 +368,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 totalSecurityDeposit,
                 totalClaimerBounty
             );
-            data.setTxoHash(this.getTxoHash(receiveAddress, amountBD).toString("hex"));
+            data.setExtraData(swapContract.getExtraData(
+                this.bitcoin.toOutputScript(receiveAddress),
+                amountBD,
+                this.config.confirmations
+            ).toString("hex"));
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
 
@@ -391,7 +380,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const sigData = await this.getFromBtcSignatureData(chainIdentifier, data, req, abortController.signal, signDataPrefetchPromise);
             metadata.times.swapSigned = Date.now();
 
-            const createdSwap: FromBtcSwapAbs = new FromBtcSwapAbs(chainIdentifier, receiveAddress, amountBD, swapFee, swapFeeInToken);
+            const createdSwap: FromBtcSwapAbs = new FromBtcSwapAbs(chainIdentifier, receiveAddress, this.config.confirmations, amountBD, swapFee, swapFeeInToken);
             createdSwap.data = data;
             createdSwap.metadata = metadata;
             createdSwap.prefix = sigData.prefix;
@@ -413,6 +402,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                     address: signer.getAddress(),
                     swapFee: swapFeeInToken.toString(10),
                     total: totalInToken.toString(10),
+                    confirmations: this.config.confirmations,
                     data: data.serialize(),
                     prefix: sigData.prefix,
                     timeout: sigData.timeout,
@@ -429,7 +419,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * Initializes swap handler, loads data and subscribes to chain events
      */
     async init() {
-        await this.storageManager.loadData(FromBtcSwapAbs);
+        await this.loadData(FromBtcSwapAbs);
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }
