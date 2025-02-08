@@ -16,17 +16,19 @@ var ToBtcLnSwapState;
     ToBtcLnSwapState[ToBtcLnSwapState["CLAIMED"] = 3] = "CLAIMED";
 })(ToBtcLnSwapState = exports.ToBtcLnSwapState || (exports.ToBtcLnSwapState = {}));
 class ToBtcLnSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
-    constructor(chainIdOrObj, pr, amount, swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken) {
+    constructor(chainIdOrObj, lnPaymentHash, pr, amount, swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken) {
         var _a, _b;
         if (typeof (chainIdOrObj) === "string") {
             super(chainIdOrObj, amount.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken);
             this.state = ToBtcLnSwapState.SAVED;
+            this.lnPaymentHash = lnPaymentHash;
             this.pr = pr;
         }
         else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
             this.secret = chainIdOrObj.secret;
+            this.lnPaymentHash = chainIdOrObj.lnPaymentHash;
             //Compatibility with older versions
             (_a = this.quotedNetworkFee) !== null && _a !== void 0 ? _a : (this.quotedNetworkFee = (0, Utils_1.deserializeBN)(chainIdOrObj.maxFee));
             (_b = this.realNetworkFee) !== null && _b !== void 0 ? _b : (this.realNetworkFee = (0, Utils_1.deserializeBN)(chainIdOrObj.realRoutingFee));
@@ -36,6 +38,7 @@ class ToBtcLnSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
     serialize() {
         const partialSerialized = super.serialize();
         partialSerialized.pr = this.pr;
+        partialSerialized.lnPaymentHash = this.lnPaymentHash;
         partialSerialized.secret = this.secret;
         return partialSerialized;
     }

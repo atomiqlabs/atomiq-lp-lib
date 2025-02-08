@@ -54,8 +54,11 @@ class SwapHandlerSwap extends base_1.Lockable {
         this.state = newState;
         return PluginManager_1.PluginManager.swapStateChange(this, oldState);
     }
-    getHash() {
-        return this.data.getHash();
+    getEscrowHash() {
+        return this.data.getEscrowHash();
+    }
+    getClaimHash() {
+        return this.data.getClaimHash();
     }
     getSequence() {
         return this.data.getSequence();
@@ -65,10 +68,10 @@ class SwapHandlerSwap extends base_1.Lockable {
      *  use sequence number
      */
     getIdentifier() {
-        if (this.getSequence() != null) {
-            return this.chainIdentifier + "_" + this.getHash() + "_" + this.getSequence().toString(16);
+        if (this.getSequence != null) {
+            return this.chainIdentifier + "_" + this.getClaimHash() + "_" + this.getSequence().toString(16);
         }
-        return this.getHash();
+        return this.chainIdentifier + "_" + this.getClaimHash();
     }
     /**
      * Checks whether the swap is finished, such that it is final and either successful or failed

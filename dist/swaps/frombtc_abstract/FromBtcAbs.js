@@ -27,6 +27,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     constructor(storageDirectory, path, chains, bitcoin, swapPricing, config) {
         super(storageDirectory, path, chains, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC;
+        this.swapType = base_1.ChainSwapType.CHAIN;
         this.bitcoin = bitcoin;
         this.config = Object.assign(Object.assign({}, config), { swapTsCsvDelta: new BN(config.swapCsvDelta).mul(config.bitcoinBlocktime.div(config.safetyFactor)) });
     }
@@ -53,7 +54,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     getHash(chainIdentifier, address, amount) {
         const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const { swapContract } = this.getChain(chainIdentifier);
-        return swapContract.getHashForOnchain(parsedOutputScript, amount, new BN(0));
+        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations, new BN(0));
     }
     /**
      * Processes past swap
@@ -73,7 +74,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 if (isCommited) {
                     this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap was commited, but processed from watchdog, address: " + swap.address);
                     yield swap.setState(FromBtcSwapAbs_1.FromBtcSwapState.COMMITED);
-                    yield this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
+                    yield this.saveSwapData(swap);
                     return false;
                 }
                 this.swapLogger.info(swap, "processPastSwap(state=CREATED): removing past swap due to authorization expiry, address: " + swap.address);
@@ -140,57 +141,25 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             }
         });
     }
-    processInitializeEvent(chainIdentifier, event) {
-        var _a;
+    processInitializeEvent(chainIdentifier, savedSwap, event) {
         return __awaiter(this, void 0, void 0, function* () {
-            //Only process on-chain requests
-            if (event.swapType !== base_1.ChainSwapType.CHAIN)
-                return;
-            const swapData = yield event.swapData();
-            const { signer } = this.getChain(chainIdentifier);
-            if (!swapData.isOfferer(signer.getAddress()))
-                return;
-            //Only process requests that don't pay in from the program
-            if (swapData.isPayIn())
-                return;
-            const paymentHash = event.paymentHash;
-            const savedSwap = yield this.storageManager.getData(paymentHash, event.sequence);
-            if (savedSwap == null || savedSwap.chainIdentifier !== chainIdentifier)
-                return;
-            savedSwap.txIds.init = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
-            if (savedSwap.metadata != null)
-                savedSwap.metadata.times.initTxReceived = Date.now();
             this.swapLogger.info(savedSwap, "SC: InitializeEvent: swap initialized by the client, address: " + savedSwap.address);
             if (savedSwap.state === FromBtcSwapAbs_1.FromBtcSwapState.CREATED) {
                 yield savedSwap.setState(FromBtcSwapAbs_1.FromBtcSwapState.COMMITED);
-                savedSwap.data = swapData;
-                yield this.storageManager.saveData(paymentHash, event.sequence, savedSwap);
+                yield this.saveSwapData(savedSwap);
             }
         });
     }
-    processClaimEvent(chainIdentifier, event) {
-        var _a;
+    processClaimEvent(chainIdentifier, savedSwap, event) {
         return __awaiter(this, void 0, void 0, function* () {
-            const paymentHashHex = event.paymentHash;
-            const savedSwap = yield this.storageManager.getData(paymentHashHex, event.sequence);
-            if (savedSwap == null || savedSwap.chainIdentifier !== chainIdentifier)
-                return;
-            savedSwap.txId = Buffer.from(event.secret, "hex").reverse().toString("hex");
-            savedSwap.txIds.claim = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
-            if (savedSwap.metadata != null)
-                savedSwap.metadata.times.claimTxReceived = Date.now();
+            savedSwap.txId = Buffer.from(event.result, "hex").reverse().toString("hex");
             this.swapLogger.info(savedSwap, "SC: ClaimEvent: swap successfully claimed by the client, address: " + savedSwap.address);
             yield this.removeSwapData(savedSwap, FromBtcSwapAbs_1.FromBtcSwapState.CLAIMED);
         });
     }
-    processRefundEvent(chainIdentifier, event) {
+    processRefundEvent(chainIdentifier, savedSwap, event) {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
-            if (event.paymentHash == null)
-                return;
-            const savedSwap = yield this.storageManager.getData(event.paymentHash, event.sequence);
-            if (savedSwap == null || savedSwap.chainIdentifier !== chainIdentifier)
-                return;
             savedSwap.txIds.refund = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
             this.swapLogger.info(event, "SC: RefundEvent: swap refunded, address: " + savedSwap.address);
             yield this.bitcoin.addUnusedAddress(savedSwap.address);
@@ -232,7 +201,8 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     }
     getDummySwapData(chainIdentifier, useToken, address) {
         const { swapContract, signer } = this.getChain(chainIdentifier);
-        return swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), address, useToken, null, null, null, null, new BN(0), this.config.confirmations, false, true, null, null);
+        const dummyAmount = new BN((0, crypto_1.randomBytes)(3));
+        return swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), address, useToken, dummyAmount, swapContract.getHashForOnchain((0, crypto_1.randomBytes)(32), dummyAmount, 3, null).toString("hex"), new BN((0, crypto_1.randomBytes)(8)), new BN(Math.floor(Date.now() / 1000)).add(this.config.swapTsCsvDelta), false, true, new BN((0, crypto_1.randomBytes)(2)), new BN((0, crypto_1.randomBytes)(2)));
     }
     /**
      * Sets up required listeners for the REST server
@@ -323,7 +293,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const totalClaimerBounty = yield this.getClaimerBounty(req, expiry, abortController.signal);
             metadata.times.claimerBountyCalculated = Date.now();
             //Create swap data
-            const data = yield swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), parsedBody.address, useToken, totalInToken, paymentHash.toString("hex"), parsedBody.sequence, expiry, new BN(0), this.config.confirmations, false, true, totalSecurityDeposit, totalClaimerBounty);
+            const data = yield swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), parsedBody.address, useToken, totalInToken, paymentHash.toString("hex"), parsedBody.sequence, expiry, false, true, totalSecurityDeposit, totalClaimerBounty);
             data.setTxoHash(this.getTxoHash(receiveAddress, amountBD).toString("hex"));
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
@@ -338,7 +308,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             createdSwap.signature = sigData.signature;
             createdSwap.feeRate = sigData.feeRate;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
-            yield this.storageManager.saveData(createdSwap.data.getHash(), createdSwap.data.getSequence(), createdSwap);
+            yield this.saveSwapData(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: " + receiveAddress + " amount: " + amountBD.toString(10));
             yield responseStream.writeParamsAndEnd({
                 code: 20000,

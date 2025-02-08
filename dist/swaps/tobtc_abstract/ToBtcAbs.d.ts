@@ -3,7 +3,7 @@ import * as BN from "bn.js";
 import { ToBtcSwapAbs, ToBtcSwapState } from "./ToBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
-import { BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
+import { BtcTx, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { PromiseQueue } from "promise-queue-ts";
@@ -33,6 +33,7 @@ export type ToBtcRequestType = {
  */
 export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState> {
     readonly type = SwapHandlerType.TO_BTC;
+    readonly swapType = ChainSwapType.CHAIN_NONCED;
     activeSubscriptions: {
         [txId: string]: ToBtcSwapAbs;
     };
@@ -46,6 +47,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      *
      * @param chainIdentifier
      * @param address
+     * @param confirmations
      * @param nonce
      * @param amount
      */
@@ -106,9 +108,9 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param swap
      */
     private processInitialized;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: RefundEvent<SwapData>): Promise<void>;
     /**
      * Returns required expiry delta for swap params
      *

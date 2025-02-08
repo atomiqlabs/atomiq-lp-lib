@@ -16,12 +16,14 @@ export enum ToBtcLnSwapState {
 
 export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcLnSwapState> {
 
+    lnPaymentHash: string;
     readonly pr: string;
 
     secret: string;
 
     constructor(
         chainIdentifier: string,
+        lnPaymentHash: string,
         pr: string,
         amountMtokens: BN,
         swapFee: BN,
@@ -31,15 +33,17 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
     );
     constructor(obj: any);
 
-    constructor(chainIdOrObj: string | any, pr?: string, amount?: BN, swapFee?: BN, swapFeeInToken?: BN, quotedNetworkFee?: BN, quotedNetworkFeeInToken?: BN) {
+    constructor(chainIdOrObj: string | any, lnPaymentHash?: string, pr?: string, amount?: BN, swapFee?: BN, swapFeeInToken?: BN, quotedNetworkFee?: BN, quotedNetworkFeeInToken?: BN) {
         if(typeof(chainIdOrObj)==="string") {
             super(chainIdOrObj, amount.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken);
             this.state = ToBtcLnSwapState.SAVED;
+            this.lnPaymentHash = lnPaymentHash;
             this.pr = pr;
         } else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
             this.secret = chainIdOrObj.secret;
+            this.lnPaymentHash = chainIdOrObj.lnPaymentHash;
 
             //Compatibility with older versions
             this.quotedNetworkFee ??= deserializeBN(chainIdOrObj.maxFee);
@@ -51,6 +55,7 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
     serialize(): any {
         const partialSerialized = super.serialize();
         partialSerialized.pr = this.pr;
+        partialSerialized.lnPaymentHash = this.lnPaymentHash;
         partialSerialized.secret = this.secret;
         return partialSerialized;
     }

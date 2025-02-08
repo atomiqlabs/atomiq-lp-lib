@@ -24,6 +24,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         var _b;
         super(storageDirectory, path, chains, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_TRUSTED;
+        this.swapType = null;
         this.subscriptions = new Map();
         this.doubleSpendWatchdogSwaps = new Set();
         this.refundedSwaps = new Map();
@@ -674,13 +675,13 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     getInfoData() {
         return {};
     }
-    processClaimEvent(chainIdentifier, event) {
+    processClaimEvent(chainIdentifier, swap, event) {
         return Promise.resolve(undefined);
     }
-    processInitializeEvent(chainIdentifier, event) {
+    processInitializeEvent(chainIdentifier, swap, event) {
         return Promise.resolve(undefined);
     }
-    processRefundEvent(chainIdentifier, event) {
+    processRefundEvent(chainIdentifier, swap, event) {
         return Promise.resolve(undefined);
     }
 }

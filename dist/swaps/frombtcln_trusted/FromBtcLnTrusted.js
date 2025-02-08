@@ -26,6 +26,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
     constructor(storageDirectory, path, chains, lightning, swapPricing, config) {
         super(storageDirectory, path, chains, lightning, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTCLN_TRUSTED;
+        this.swapType = null;
         this.activeSubscriptions = new Map();
         this.processedTxIds = new Map();
         this.config = config;
@@ -504,13 +505,13 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
             minCltv: this.config.minCltv.toNumber()
         };
     }
-    processClaimEvent(chainIdentifier, event) {
+    processClaimEvent(chainIdentifier, swap, event) {
         return Promise.resolve();
     }
-    processInitializeEvent(chainIdentifier, event) {
+    processInitializeEvent(chainIdentifier, swap, event) {
         return Promise.resolve();
     }
-    processRefundEvent(chainIdentifier, event) {
+    processRefundEvent(chainIdentifier, swap, event) {
         return Promise.resolve();
     }
 }

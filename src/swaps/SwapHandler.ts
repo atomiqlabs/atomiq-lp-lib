@@ -1,6 +1,7 @@
 import {Express, Request} from "express";
 import {ISwapPrice} from "./ISwapPrice";
 import {
+    ChainSwapType,
     ChainType,
     ClaimEvent,
     InitializeEvent, RefundEvent,
@@ -77,8 +78,10 @@ export type RequestData<T> = {
 export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapHandlerSwap, S = any> {
 
     abstract readonly type: SwapHandlerType;
+    abstract readonly swapType: ChainSwapType;
 
     readonly storageManager: IIntermediaryStorage<V>;
+    readonly escrowHashMap: Map<string, V> = new Map();
     readonly path: string;
 
     readonly chains: MultichainData;
@@ -145,9 +148,9 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
         await rerun();
     }
 
-    protected abstract processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected abstract processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected abstract processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected abstract processInitializeEvent?(chainIdentifier: string, swap: V, event: InitializeEvent<SwapData>): Promise<void>;
+    protected abstract processClaimEvent?(chainIdentifier: string, swap: V, event: ClaimEvent<SwapData>): Promise<void>;
+    protected abstract processRefundEvent?(chainIdentifier: string, swap: V, event: RefundEvent<SwapData>): Promise<void>;
 
     /**
      * Chain event processor
@@ -156,16 +159,34 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @param eventData
      */
     protected async processEvent(chainIdentifier: string, eventData: SwapEvent<SwapData>[]): Promise<boolean> {
+        if(this.swapType==null) return true;
+
         for(let event of eventData) {
             if(event instanceof InitializeEvent) {
-                // this.swapLogger.debug(event, "SC: InitializeEvent: swap type: "+event.swapType);
-                await this.processInitializeEvent(chainIdentifier, event);
+                if(event.swapType!==this.swapType) continue;
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if(swap==null) continue;
+
+                swap.txIds.init = (event as any).meta?.txId;
+                if(swap.metadata!=null) swap.metadata.times.initTxReceived = Date.now();
+
+                await this.processInitializeEvent(chainIdentifier, swap, event);
             } else if(event instanceof ClaimEvent) {
-                // this.swapLogger.debug(event, "SC: ClaimEvent: swap secret: "+event.secret);
-                await this.processClaimEvent(chainIdentifier, event);
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if(swap==null) continue;
+
+                swap.txIds.claim = (event as any).meta?.txId;
+                if(swap.metadata!=null) swap.metadata.times.claimTxReceived = Date.now();
+
+                await this.processClaimEvent(chainIdentifier, swap, event);
             } else if(event instanceof RefundEvent) {
-                // this.swapLogger.debug(event, "SC: RefundEvent");
-                await this.processRefundEvent(chainIdentifier, event);
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if(swap==null) continue;
+
+                swap.txIds.refund = (event as any).meta?.txId;
+                if(swap.metadata!=null) swap.metadata.times.refundTxReceived = Date.now();
+
+                await this.processRefundEvent(chainIdentifier, swap, event);
             }
         }
 
@@ -186,6 +207,14 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * Initializes swap handler, loads data and subscribes to chain events
      */
     abstract init(): Promise<void>;
+
+    protected async loadData(ctor: new (data: any) => V) {
+        await this.storageManager.loadData(ctor);
+        //Check if all swaps contain a valid amount
+        for(let swap of await this.storageManager.query([])) {
+            if(swap.data!=null) this.escrowHashMap.set(swap.data.getEscrowHash(), swap);
+        }
+    }
 
     /**
      * Sets up required listeners for the REST server
@@ -226,7 +255,17 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
         }
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
-        await this.storageManager.removeData(swap.getHash(), swap.getSequence());
+        if(swap.data!=null) this.escrowHashMap.delete(swap.chainIdentifier+"_"+swap.data.getEscrowHash());
+        await this.storageManager.removeData(swap.getClaimHash(), swap.getSequence());
+    }
+
+    protected async saveSwapData(swap: V) {
+        this.escrowHashMap.set(swap.chainIdentifier+"_"+swap.getEscrowHash(), swap);
+        await this.storageManager.saveData(swap.data.getClaimHash(), swap.data.getSequence==null ? null : swap.data.getSequence(), swap);
+    }
+
+    protected getSwapByEscrowHash(chainIdentifier: string, escrowHash: string) {
+        return this.escrowHashMap.get(chainIdentifier+"_"+escrowHash);
     }
 
     /**
@@ -331,13 +370,16 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
     }
 
     protected getIdentifierFromEvent(event: SwapEvent<SwapData>): string {
-        if(event.sequence.isZero()) return event.paymentHash;
-        return event.paymentHash+"_"+event.sequence.toString(16);
+        const foundSwap = this.escrowHashMap.get(event.escrowHash);
+        if(foundSwap!=null) {
+            return foundSwap.getIdentifier();
+        }
+        return "UNKNOWN_"+event.escrowHash;
     }
 
     protected getIdentifierFromSwapData(swapData: SwapData): string {
-        if(swapData.getSequence().isZero()) return swapData.getHash();
-        return swapData.getHash()+"_"+swapData.getSequence().toString(16);
+        if(swapData.getSequence==null) return swapData.getClaimHash();
+        return swapData.getClaimHash()+"_"+swapData.getSequence().toString(16);
     }
 
     protected getIdentifier(swap: SwapHandlerSwap | SwapEvent<SwapData> | SwapData) {

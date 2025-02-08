@@ -30,6 +30,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         this.LIGHTNING_LIQUIDITY_CACHE_TIMEOUT = 5 * 1000;
         this.activeSubscriptions = new Set();
         this.type = SwapHandler_1.SwapHandlerType.TO_BTCLN;
+        this.swapType = base_1.ChainSwapType.HTLC;
         this.exactInAuths = {};
         this.lightning = lightning;
         const anyConfig = config;
@@ -156,7 +157,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 case "failed":
                     this.swapLogger.info(swap, "processPaymentResult(): invoice payment failed, cancelling swap, invoice: " + swap.pr);
                     yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE);
-                    yield this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
+                    yield this.saveSwapData(swap);
                     return;
                 case "confirmed":
                     const { swapContract, signer } = this.getChain(swap.chainIdentifier);
@@ -164,7 +165,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     swap.setRealNetworkFee(lnPaymentStatus.feeMtokens.div(new BN(1000)));
                     this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: " + swap.secret + " realRoutingFee: " + swap.realNetworkFee.toString(10) + " invoice: " + swap.pr);
                     yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.PAID);
-                    yield this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
+                    yield this.saveSwapData(swap);
                     //Check if escrow state exists
                     const isCommited = yield swapContract.isCommited(swap.data);
                     if (!isCommited) {
@@ -198,7 +199,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @param invoiceData
      */
     subscribeToPayment(invoiceData) {
-        const paymentHash = invoiceData.data.getHash();
+        const paymentHash = invoiceData.lnPaymentHash;
         if (this.activeSubscriptions.has(paymentHash))
             return false;
         this.lightning.waitForPayment(paymentHash).then(result => {
@@ -267,7 +268,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     processInitialized(swap) {
         return __awaiter(this, void 0, void 0, function* () {
             //Check if payment was already made
-            let lnPaymentStatus = yield this.lightning.getPayment(swap.getHash());
+            let lnPaymentStatus = yield this.lightning.getPayment(swap.lnPaymentHash);
             if (swap.metadata != null)
                 swap.metadata.times.payPaymentChecked = Date.now();
             const paymentExists = lnPaymentStatus != null;
@@ -281,7 +282,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                         if (swap.metadata != null)
                             swap.metadata.payError = e;
                         yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE);
-                        yield this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
+                        yield this.saveSwapData(swap);
                         return;
                     }
                     else
@@ -298,18 +299,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             yield this.processPaymentResult(swap, lnPaymentStatus);
         });
     }
-    processInitializeEvent(chainIdentifier, event) {
-        var _a;
+    processInitializeEvent(chainIdentifier, swap, event) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (event.swapType !== base_1.ChainSwapType.HTLC)
-                return;
-            const paymentHash = event.paymentHash;
-            const swap = yield this.storageManager.getData(paymentHash, event.sequence);
-            if (swap == null || swap.chainIdentifier !== chainIdentifier)
-                return;
-            swap.txIds.init = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
-            if (swap.metadata != null)
-                swap.metadata.times.txReceived = Date.now();
             this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, invoice: " + swap.pr);
             //Only process swaps in SAVED state
             if (swap.state !== ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED)
@@ -317,26 +308,14 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             yield this.processInitialized(swap);
         });
     }
-    processClaimEvent(chainIdentifier, event) {
-        var _a;
+    processClaimEvent(chainIdentifier, swap, event) {
         return __awaiter(this, void 0, void 0, function* () {
-            const paymentHash = event.paymentHash;
-            const swap = yield this.storageManager.getData(paymentHash, event.sequence);
-            if (swap == null || swap.chainIdentifier !== chainIdentifier)
-                return;
-            swap.txIds.claim = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
-            this.swapLogger.info(swap, "SC: ClaimEvent: swap claimed to us, secret: " + event.secret + " invoice: " + swap.pr);
+            this.swapLogger.info(swap, "SC: ClaimEvent: swap claimed to us, secret: " + event.result + " invoice: " + swap.pr);
             yield this.removeSwapData(swap, ToBtcLnSwapAbs_1.ToBtcLnSwapState.CLAIMED);
         });
     }
-    processRefundEvent(chainIdentifier, event) {
-        var _a;
+    processRefundEvent(chainIdentifier, swap, event) {
         return __awaiter(this, void 0, void 0, function* () {
-            const paymentHash = event.paymentHash;
-            const swap = yield this.storageManager.getData(paymentHash, event.sequence);
-            if (swap == null || swap.chainIdentifier !== chainIdentifier)
-                return;
-            swap.txIds.refund = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
             this.swapLogger.info(swap, "SC: RefundEvent: swap refunded back to the client, invoice: " + swap.pr);
             yield this.removeSwapData(swap, ToBtcLnSwapAbs_1.ToBtcLnSwapState.REFUNDED);
         });
@@ -627,15 +606,16 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const metadata = parsedAuth.metadata;
             const sequence = new BN((0, crypto_1.randomBytes)(8));
             const { swapContract, signer } = this.getChain(parsedAuth.chainIdentifier);
+            const claimHash = swapContract.getHashForHtlc(Buffer.from(parsedPR.id, "hex"));
             //Create swap data
-            const payObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, parsedAuth.offerer, signer.getAddress(), parsedAuth.token, parsedAuth.total, parsedPR.id, sequence, parsedAuth.swapExpiry, new BN(0), 0, true, false, new BN(0), new BN(0));
+            const payObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, parsedAuth.offerer, signer.getAddress(), parsedAuth.token, parsedAuth.total, claimHash.toString("hex"), sequence, parsedAuth.swapExpiry, true, false, new BN(0), new BN(0));
             metadata.times.swapCreated = Date.now();
             //Sign swap data
             const prefetchedSignData = parsedAuth.preFetchSignData;
             const sigData = yield this.getToBtcSignatureData(parsedAuth.chainIdentifier, payObject, req, abortSignal, prefetchedSignData);
             metadata.times.swapSigned = Date.now();
             //Create swap
-            const createdSwap = new ToBtcLnSwapAbs_1.ToBtcLnSwapAbs(parsedAuth.chainIdentifier, parsedBody.pr, parsedPR.mtokens, parsedAuth.swapFee, parsedAuth.swapFeeInToken, parsedAuth.quotedNetworkFee, parsedAuth.quotedNetworkFeeInToken);
+            const createdSwap = new ToBtcLnSwapAbs_1.ToBtcLnSwapAbs(parsedAuth.chainIdentifier, parsedPR.id, parsedBody.pr, parsedPR.mtokens, parsedAuth.swapFee, parsedAuth.swapFeeInToken, parsedAuth.quotedNetworkFee, parsedAuth.quotedNetworkFeeInToken);
             createdSwap.data = payObject;
             createdSwap.metadata = metadata;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
@@ -776,15 +756,16 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 return;
             }
             const sequence = new BN((0, crypto_1.randomBytes)(8));
+            const claimHash = swapContract.getHashForHtlc(Buffer.from(parsedPR.id, "hex"));
             //Create swap data
-            const payObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, parsedBody.offerer, signer.getAddress(), useToken, totalInToken, parsedPR.id, sequence, parsedBody.expiryTimestamp, new BN(0), 0, true, false, new BN(0), new BN(0));
+            const payObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, parsedBody.offerer, signer.getAddress(), useToken, totalInToken, claimHash.toString("hex"), sequence, parsedBody.expiryTimestamp, true, false, new BN(0), new BN(0));
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
             //Sign swap data
             const sigData = yield this.getToBtcSignatureData(chainIdentifier, payObject, req, abortController.signal, signDataPrefetchPromise);
             metadata.times.swapSigned = Date.now();
             //Create swap
-            const createdSwap = new ToBtcLnSwapAbs_1.ToBtcLnSwapAbs(chainIdentifier, parsedBody.pr, parsedPR.mtokens, swapFee, swapFeeInToken, networkFeeData.networkFee, networkFeeInToken);
+            const createdSwap = new ToBtcLnSwapAbs_1.ToBtcLnSwapAbs(chainIdentifier, parsedPR.id, parsedBody.pr, parsedPR.mtokens, swapFee, swapFeeInToken, networkFeeData.networkFee, networkFeeInToken);
             createdSwap.data = payObject;
             createdSwap.metadata = metadata;
             createdSwap.prefix = sigData.prefix;
@@ -792,7 +773,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             createdSwap.signature = sigData.signature;
             createdSwap.feeRate = sigData.feeRate;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
-            yield this.storageManager.saveData(parsedPR.id, sequence, createdSwap);
+            yield this.saveSwapData(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /payInvoice: created swap," +
                 " amount: " + amountBD.toString(10) +
                 " invoice: " + createdSwap.pr);
@@ -901,12 +882,13 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this.storageManager.loadData(ToBtcLnSwapAbs_1.ToBtcLnSwapAbs);
+            yield this.loadData(ToBtcLnSwapAbs_1.ToBtcLnSwapAbs);
             //Check if all swaps contain a valid amount
             for (let swap of yield this.storageManager.query([])) {
-                if (swap.amount == null) {
+                if (swap.amount == null || swap.lnPaymentHash == null) {
                     const parsedPR = yield this.lightning.parsePaymentRequest(swap.pr);
                     swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+                    swap.lnPaymentHash = parsedPR.id;
                 }
             }
             this.subscribeToEvents();

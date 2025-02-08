@@ -43,6 +43,7 @@ export type FromBtcLnTrustedRequestType = {
  */
 export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState> {
     readonly type: SwapHandlerType = SwapHandlerType.FROM_BTCLN_TRUSTED;
+    readonly swapType = null;
 
     activeSubscriptions: Map<string, AbortController> = new Map<string, AbortController>();
     processedTxIds: Map<string, string> = new Map<string, string>();
@@ -581,15 +582,15 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         }
     }
 
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void> {
+    protected processClaimEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: ClaimEvent<SwapData>): Promise<void> {
         return Promise.resolve();
     }
 
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void> {
+    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: InitializeEvent<SwapData>): Promise<void> {
         return Promise.resolve();
     }
 
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void> {
+    protected processRefundEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: RefundEvent<SwapData>): Promise<void> {
         return Promise.resolve();
     }
 

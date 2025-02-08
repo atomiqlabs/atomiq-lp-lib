@@ -81,8 +81,12 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
         return PluginManager.swapStateChange(this, oldState);
     }
 
-    getHash(): string {
-        return this.data.getHash();
+    getEscrowHash(): string {
+        return this.data.getEscrowHash();
+    }
+
+    getClaimHash(): string {
+        return this.data.getClaimHash();
     }
 
     getSequence(): BN {
@@ -94,10 +98,10 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
      *  use sequence number
      */
     getIdentifier(): string {
-        if(this.getSequence()!=null) {
-            return this.chainIdentifier+"_"+this.getHash()+"_"+this.getSequence().toString(16);
+        if(this.getSequence!=null) {
+            return this.chainIdentifier+"_"+this.getClaimHash()+"_"+this.getSequence().toString(16);
         }
-        return this.getHash();
+        return this.chainIdentifier+"_"+this.getClaimHash();
     }
 
     /**

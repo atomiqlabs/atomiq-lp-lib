@@ -11,9 +11,10 @@ export declare enum ToBtcLnSwapState {
     CLAIMED = 3
 }
 export declare class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcLnSwapState> {
+    lnPaymentHash: string;
     readonly pr: string;
     secret: string;
-    constructor(chainIdentifier: string, pr: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
+    constructor(chainIdentifier: string, lnPaymentHash: string, pr: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
     constructor(obj: any);
     serialize(): any;
     isInitiated(): boolean;

@@ -33,7 +33,8 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
      * @param newState
      */
     setState(newState: S): Promise<void>;
-    getHash(): string;
+    getEscrowHash(): string;
+    getClaimHash(): string;
     getSequence(): BN;
     /**
      * Returns unique identifier of the swap in the form <hash>_<sequence> or just <hash> if the swap type doesn't

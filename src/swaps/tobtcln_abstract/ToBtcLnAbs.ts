@@ -93,6 +93,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
     };
 
     readonly type = SwapHandlerType.TO_BTCLN;
+    readonly swapType = ChainSwapType.HTLC;
 
     readonly config: ToBtcLnConfig & {minTsSendCltv: BN};
 
@@ -240,7 +241,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             case "failed":
                 this.swapLogger.info(swap, "processPaymentResult(): invoice payment failed, cancelling swap, invoice: "+swap.pr);
                 await swap.setState(ToBtcLnSwapState.NON_PAYABLE);
-                await this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
+                await this.saveSwapData(swap);
                 return;
 
             case "confirmed":
@@ -250,7 +251,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 swap.setRealNetworkFee(lnPaymentStatus.feeMtokens.div(new BN(1000)));
                 this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: "+swap.secret+" realRoutingFee: "+swap.realNetworkFee.toString(10)+" invoice: "+swap.pr);
                 await swap.setState(ToBtcLnSwapState.PAID);
-                await this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
+                await this.saveSwapData(swap);
 
                 //Check if escrow state exists
                 const isCommited = await swapContract.isCommited(swap.data);
@@ -285,7 +286,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      * @param invoiceData
      */
     private subscribeToPayment(invoiceData: ToBtcLnSwapAbs): boolean {
-        const paymentHash = invoiceData.data.getHash();
+        const paymentHash = invoiceData.lnPaymentHash;
         if(this.activeSubscriptions.has(paymentHash)) return false;
 
         this.lightning.waitForPayment(paymentHash).then(result => {
@@ -357,7 +358,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      */
     private async processInitialized(swap: ToBtcLnSwapAbs) {
         //Check if payment was already made
-        let lnPaymentStatus = await this.lightning.getPayment(swap.getHash());
+        let lnPaymentStatus = await this.lightning.getPayment(swap.lnPaymentHash);
         if(swap.metadata!=null) swap.metadata.times.payPaymentChecked = Date.now();
 
         const paymentExists = lnPaymentStatus!=null;
@@ -369,7 +370,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 if(isDefinedRuntimeError(e)) {
                     if(swap.metadata!=null) swap.metadata.payError = e;
                     await swap.setState(ToBtcLnSwapState.NON_PAYABLE);
-                    await this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
+                    await this.saveSwapData(swap);
                     return;
                 } else throw e;
             }
@@ -386,17 +387,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         await this.processPaymentResult(swap, lnPaymentStatus);
     }
 
-    protected async processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void> {
-        if(event.swapType!==ChainSwapType.HTLC) return;
-
-        const paymentHash = event.paymentHash;
-
-        const swap = await this.storageManager.getData(paymentHash, event.sequence);
-        if(swap==null || swap.chainIdentifier!==chainIdentifier) return;
-
-        swap.txIds.init = (event as any).meta?.txId;
-        if(swap.metadata!=null) swap.metadata.times.txReceived = Date.now();
-
+    protected async processInitializeEvent(chainIdentifier: string, swap: ToBtcLnSwapAbs, event: InitializeEvent<SwapData>): Promise<void> {
         this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, invoice: "+swap.pr);
 
         //Only process swaps in SAVED state
@@ -404,27 +395,13 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         await this.processInitialized(swap);
     }
 
-    protected async processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void> {
-        const paymentHash = event.paymentHash;
-
-        const swap = await this.storageManager.getData(paymentHash, event.sequence);
-        if(swap==null || swap.chainIdentifier!==chainIdentifier) return;
-
-        swap.txIds.claim = (event as any).meta?.txId;
-
-        this.swapLogger.info(swap, "SC: ClaimEvent: swap claimed to us, secret: "+event.secret+" invoice: "+swap.pr);
+    protected async processClaimEvent(chainIdentifier: string, swap: ToBtcLnSwapAbs, event: ClaimEvent<SwapData>): Promise<void> {
+        this.swapLogger.info(swap, "SC: ClaimEvent: swap claimed to us, secret: "+event.result+" invoice: "+swap.pr);
 
         await this.removeSwapData(swap, ToBtcLnSwapState.CLAIMED);
     }
 
-    protected async processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void> {
-        const paymentHash = event.paymentHash;
-
-        const swap = await this.storageManager.getData(paymentHash, event.sequence);
-        if(swap==null || swap.chainIdentifier!==chainIdentifier) return;
-
-        swap.txIds.refund = (event as any).meta?.txId;
-
+    protected async processRefundEvent(chainIdentifier: string, swap: ToBtcLnSwapAbs, event: RefundEvent<SwapData>): Promise<void> {
         this.swapLogger.info(swap, "SC: RefundEvent: swap refunded back to the client, invoice: "+swap.pr);
 
         await this.removeSwapData(swap, ToBtcLnSwapState.REFUNDED);
@@ -742,6 +719,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             const sequence = new BN(randomBytes(8));
 
             const {swapContract, signer} = this.getChain(parsedAuth.chainIdentifier);
+            const claimHash = swapContract.getHashForHtlc(Buffer.from(parsedPR.id, "hex"))
 
             //Create swap data
             const payObject: SwapData = await swapContract.createSwapData(
@@ -750,11 +728,9 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 signer.getAddress(),
                 parsedAuth.token,
                 parsedAuth.total,
-                parsedPR.id,
+                claimHash.toString("hex"),
                 sequence,
                 parsedAuth.swapExpiry,
-                new BN(0),
-                0,
                 true,
                 false,
                 new BN(0),
@@ -770,6 +746,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             //Create swap
             const createdSwap = new ToBtcLnSwapAbs(
                 parsedAuth.chainIdentifier,
+                parsedPR.id,
                 parsedBody.pr,
                 parsedPR.mtokens,
                 parsedAuth.swapFee,
@@ -957,6 +934,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             }
 
             const sequence = new BN(randomBytes(8));
+            const claimHash = swapContract.getHashForHtlc(Buffer.from(parsedPR.id, "hex"));
 
             //Create swap data
             const payObject: SwapData = await swapContract.createSwapData(
@@ -965,11 +943,9 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 signer.getAddress(),
                 useToken,
                 totalInToken,
-                parsedPR.id,
+                claimHash.toString("hex"),
                 sequence,
                 parsedBody.expiryTimestamp,
-                new BN(0),
-                0,
                 true,
                 false,
                 new BN(0),
@@ -985,6 +961,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             //Create swap
             const createdSwap = new ToBtcLnSwapAbs(
                 chainIdentifier,
+                parsedPR.id,
                 parsedBody.pr,
                 parsedPR.mtokens,
                 swapFee,
@@ -1000,7 +977,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             createdSwap.feeRate = sigData.feeRate;
 
             await PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(parsedPR.id, sequence, createdSwap);
+            await this.saveSwapData(createdSwap);
 
             this.swapLogger.info(createdSwap, "REST: /payInvoice: created swap,"+
                 " amount: "+amountBD.toString(10)+
@@ -1123,12 +1100,13 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
     }
 
     async init() {
-        await this.storageManager.loadData(ToBtcLnSwapAbs);
+        await this.loadData(ToBtcLnSwapAbs);
         //Check if all swaps contain a valid amount
         for(let swap of await this.storageManager.query([])) {
-            if(swap.amount==null) {
+            if(swap.amount==null || swap.lnPaymentHash==null) {
                 const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
                 swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+                swap.lnPaymentHash = parsedPR.id;
             }
         }
         this.subscribeToEvents();
