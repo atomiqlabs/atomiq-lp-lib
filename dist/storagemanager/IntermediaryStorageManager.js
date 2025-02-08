@@ -26,7 +26,8 @@ class IntermediaryStorageManager {
         });
     }
     query(params) {
-        return Promise.resolve(Object.keys(this.data).map((val) => this.data[val]).filter((val) => {
+        return Promise.resolve(Object.keys(this.data).filter((key) => {
+            const val = this.data[key];
             for (let param of params) {
                 if (param.value != null) {
                     if (typeof param.value === "object") {
@@ -59,6 +60,14 @@ class IntermediaryStorageManager {
                 }
             }
             return true;
+        }).map(key => {
+            const [hash, sequenceStr] = key;
+            const sequence = new BN(sequenceStr, "hex");
+            return {
+                obj: this.data[key],
+                hash,
+                sequence
+            };
         }));
     }
     getData(paymentHash, sequence) {

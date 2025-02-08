@@ -158,7 +158,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         }
 
         if(swap.state===ToBtcSwapState.NON_PAYABLE || swap.state===ToBtcSwapState.SAVED) {
-            if(swapContract.isExpired(signer.getAddress(), swap.data)) {
+            if(await swapContract.isExpired(signer.getAddress(), swap.data)) {
                 this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE|SAVED): swap expired, cancelling, address: "+swap.address);
                 await this.removeSwapData(swap, ToBtcSwapState.CANCELED);
                 return;
@@ -206,7 +206,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             }
         ]);
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             await this.processPastSwap(swap);
         }
     }
@@ -558,7 +558,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      */
     protected checkExpired(swap: ToBtcSwapAbs) {
         const {swapContract, signer} = this.getChain(swap.chainIdentifier);
-        const isExpired = swapContract.isExpired(signer.getAddress(), swap.data);
+        const isExpired = await swapContract.isExpired(signer.getAddress(), swap.data);
         if(isExpired) throw {
             _httpStatus: 200,
             code: 20010,

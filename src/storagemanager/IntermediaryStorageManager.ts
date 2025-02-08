@@ -21,8 +21,9 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
         } catch (e) {}
     }
 
-    query(params: StorageQueryParam[]): Promise<T[]> {
-        return Promise.resolve(Object.keys(this.data).map((val) => this.data[val]).filter((val) => {
+    query(params: StorageQueryParam[]): Promise<{hash: string, sequence: BN, obj: T}[]> {
+        return Promise.resolve(Object.keys(this.data).filter((key) => {
+            const val = this.data[key];
             for(let param of params) {
                 if(param.value!=null) {
                     if(typeof param.value === "object") {
@@ -45,6 +46,14 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
                 }
             }
             return true;
+        }).map(key => {
+            const [hash, sequenceStr] = key;
+            const sequence = new BN(sequenceStr, "hex");
+            return {
+                obj: this.data[key],
+                hash,
+                sequence
+            }
         }));
     }
 

@@ -81,7 +81,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE) {
                 //Remove expired swaps (as these can already be unilaterally refunded by the client), so we don't need
                 // to be able to cooperatively refund them
-                if (swapContract.isExpired(signer.getAddress(), swap.data)) {
+                if (yield swapContract.isExpired(signer.getAddress(), swap.data)) {
                     this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE): swap expired, removing swap data, invoice: " + swap.pr);
                     yield this.removeSwapData(swap);
                 }
@@ -105,7 +105,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     ]
                 }
             ]);
-            for (let swap of queriedData) {
+            for (let { obj: swap } of queriedData) {
                 yield this.processPastSwap(swap);
             }
         });
@@ -816,7 +816,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const isSwapFound = data != null;
             if (isSwapFound) {
                 const { signer, swapContract } = this.getChain(data.chainIdentifier);
-                if (swapContract.isExpired(signer.getAddress(), data.data))
+                if (yield swapContract.isExpired(signer.getAddress(), data.data))
                     throw {
                         _httpStatus: 200,
                         code: 20010,
@@ -884,7 +884,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.loadData(ToBtcLnSwapAbs_1.ToBtcLnSwapAbs);
             //Check if all swaps contain a valid amount
-            for (let swap of yield this.storageManager.query([])) {
+            for (let { obj: swap } of yield this.storageManager.query([])) {
                 if (swap.amount == null || swap.lnPaymentHash == null) {
                     const parsedPR = yield this.lightning.parsePaymentRequest(swap.pr);
                     swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));

@@ -117,7 +117,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         }
 
         if(swap.state===FromBtcLnSwapState.RECEIVED || swap.state===FromBtcLnSwapState.COMMITED) {
-            if(!swapContract.isExpired(signer.getAddress(), swap.data)) return null;
+            if(!await swapContract.isExpired(signer.getAddress(), swap.data)) return null;
 
             const isCommited = await swapContract.isCommited(swap.data);
             if(isCommited) {
@@ -198,7 +198,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             }
         ]);
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             switch(await this.processPastSwap(swap)) {
                 case "CANCEL":
                     cancelInvoices.push(swap);
@@ -786,7 +786,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
     async init() {
         await this.loadData(FromBtcLnSwapAbs);
         //Check if all swaps contain a valid amount
-        for(let swap of await this.storageManager.query([])) {
+        for(let {obj: swap} of await this.storageManager.query([])) {
             if(swap.amount==null) {
                 const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
                 swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));

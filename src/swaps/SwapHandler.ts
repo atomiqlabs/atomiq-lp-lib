@@ -211,7 +211,15 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
     protected async loadData(ctor: new (data: any) => V) {
         await this.storageManager.loadData(ctor);
         //Check if all swaps contain a valid amount
-        for(let swap of await this.storageManager.query([])) {
+        for(let {obj: swap, hash, sequence} of await this.storageManager.query([])) {
+            if(hash!==swap.getIdentifierHash() || !sequence.eq(swap.getSequence() ?? new BN(0))) {
+                this.swapLogger.info(swap, "loadData(): Swap storage key or sequence mismatch, fixing,"+
+                    " old hash: "+hash+" new hash: "+swap.getIdentifierHash()+
+                    " old seq: "+sequence.toString(10)+" new seq: "+(swap.getSequence() ?? new BN(0)).toString(10));
+
+                await this.storageManager.removeData(hash, sequence);
+                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+            }
             if(swap.data!=null) this.escrowHashMap.set(swap.data.getEscrowHash(), swap);
         }
     }

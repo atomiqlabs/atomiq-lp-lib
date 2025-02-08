@@ -132,10 +132,18 @@ class SwapHandler {
         this.logger.info("SC: Events: subscribed to smartchain events");
     }
     loadData(ctor) {
+        var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             yield this.storageManager.loadData(ctor);
             //Check if all swaps contain a valid amount
-            for (let swap of yield this.storageManager.query([])) {
+            for (let { obj: swap, hash, sequence } of yield this.storageManager.query([])) {
+                if (hash !== swap.getIdentifierHash() || !sequence.eq((_a = swap.getSequence()) !== null && _a !== void 0 ? _a : new BN(0))) {
+                    this.swapLogger.info(swap, "loadData(): Swap storage key or sequence mismatch, fixing," +
+                        " old hash: " + hash + " new hash: " + swap.getIdentifierHash() +
+                        " old seq: " + sequence.toString(10) + " new seq: " + ((_b = swap.getSequence()) !== null && _b !== void 0 ? _b : new BN(0)).toString(10));
+                    yield this.storageManager.removeData(hash, sequence);
+                    yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                }
                 if (swap.data != null)
                     this.escrowHashMap.set(swap.data.getEscrowHash(), swap);
             }

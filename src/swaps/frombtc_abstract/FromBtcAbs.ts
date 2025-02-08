@@ -104,7 +104,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
         //Check if commited swap expired by now
         if(swap.state===FromBtcSwapState.COMMITED) {
-            if(!swapContract.isExpired(signer.getAddress(), swap.data)) return false;
+            if(!await swapContract.isExpired(signer.getAddress(), swap.data)) return false;
 
             const isCommited = await swapContract.isCommited(swap.data);
             if(isCommited) {
@@ -135,7 +135,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
         const refundSwaps: FromBtcSwapAbs[] = [];
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             if(await this.processPastSwap(swap)) refundSwaps.push(swap);
         }
 

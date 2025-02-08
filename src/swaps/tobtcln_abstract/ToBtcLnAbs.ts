@@ -166,7 +166,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         if (swap.state === ToBtcLnSwapState.NON_PAYABLE) {
             //Remove expired swaps (as these can already be unilaterally refunded by the client), so we don't need
             // to be able to cooperatively refund them
-            if(swapContract.isExpired(signer.getAddress(), swap.data)) {
+            if(await swapContract.isExpired(signer.getAddress(), swap.data)) {
                 this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE): swap expired, removing swap data, invoice: "+swap.pr);
                 await this.removeSwapData(swap);
             }
@@ -191,7 +191,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             }
         ]);
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             await this.processPastSwap(swap);
         }
     }
@@ -1029,7 +1029,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             if(isSwapFound) {
                 const {signer, swapContract} = this.getChain(data.chainIdentifier);
 
-                if(swapContract.isExpired(signer.getAddress(), data.data)) throw {
+                if(await swapContract.isExpired(signer.getAddress(), data.data)) throw {
                     _httpStatus: 200,
                     code: 20010,
                     msg: "Payment expired"
@@ -1102,7 +1102,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
     async init() {
         await this.loadData(ToBtcLnSwapAbs);
         //Check if all swaps contain a valid amount
-        for(let swap of await this.storageManager.query([])) {
+        for(let {obj: swap} of await this.storageManager.query([])) {
             if(swap.amount==null || swap.lnPaymentHash==null) {
                 const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
                 swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));

@@ -102,7 +102,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 }
             }
             if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.NON_PAYABLE || swap.state === ToBtcSwapAbs_1.ToBtcSwapState.SAVED) {
-                if (swapContract.isExpired(signer.getAddress(), swap.data)) {
+                if (yield swapContract.isExpired(signer.getAddress(), swap.data)) {
                     this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE|SAVED): swap expired, cancelling, address: " + swap.address);
                     yield this.removeSwapData(swap, ToBtcSwapAbs_1.ToBtcSwapState.CANCELED);
                     return;
@@ -149,7 +149,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     ]
                 }
             ]);
-            for (let swap of queriedData) {
+            for (let { obj: swap } of queriedData) {
                 yield this.processPastSwap(swap);
             }
         });
@@ -483,7 +483,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      */
     checkExpired(swap) {
         const { swapContract, signer } = this.getChain(swap.chainIdentifier);
-        const isExpired = swapContract.isExpired(signer.getAddress(), swap.data);
+        const isExpired = yield swapContract.isExpired(signer.getAddress(), swap.data);
         if (isExpired)
             throw {
                 _httpStatus: 200,
