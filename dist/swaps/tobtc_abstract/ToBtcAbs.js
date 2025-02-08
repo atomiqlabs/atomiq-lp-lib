@@ -84,7 +84,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         return __awaiter(this, void 0, void 0, function* () {
             const { swapContract, signer } = this.getChain(swap.chainIdentifier);
             if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.SAVED) {
-                const isSignatureExpired = swapContract.isInitAuthorizationExpired(swap.data, swap);
+                const isSignatureExpired = yield swapContract.isInitAuthorizationExpired(swap.data, swap);
                 if (isSignatureExpired) {
                     const isCommitted = yield swapContract.isCommited(swap.data);
                     if (!isCommitted) {
