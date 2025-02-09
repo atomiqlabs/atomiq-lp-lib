@@ -602,7 +602,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             createdSwap.signature = sigData.signature;
             createdSwap.feeRate = sigData.feeRate;
             yield PluginManager_1.PluginManager.swapCreate(createdSwap);
-            yield this.storageManager.saveData(paymentHash, sequence, createdSwap);
+            yield this.saveSwapData(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /payInvoice: created swap address: " + createdSwap.address + " amount: " + amountBD.toString(10));
             yield responseStream.writeParamsAndEnd({
                 code: 20000,

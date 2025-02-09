@@ -723,7 +723,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             createdSwap.feeRate = sigData.feeRate;
 
             await PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(paymentHash, sequence, createdSwap);
+            await this.saveSwapData(createdSwap);
 
             this.swapLogger.info(createdSwap, "REST: /payInvoice: created swap address: "+createdSwap.address+" amount: "+amountBD.toString(10));
 
