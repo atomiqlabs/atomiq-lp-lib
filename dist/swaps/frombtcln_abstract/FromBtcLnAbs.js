@@ -271,7 +271,7 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
             }
             const { swapContract, signer } = this.getChain(invoiceData.chainIdentifier);
             //Create real swap data
-            const payInvoiceObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.token, useToken, escrowAmount, invoiceData.claimHash, new BN(0), new BN(Math.floor(Date.now() / 1000)).add(expiryTimeout), false, true, invoiceData.securityDeposit, new BN(0));
+            const payInvoiceObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.claimer, useToken, escrowAmount, invoiceData.claimHash, new BN(0), new BN(Math.floor(Date.now() / 1000)).add(expiryTimeout), false, true, invoiceData.securityDeposit, new BN(0));
             abortController.signal.throwIfAborted();
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcSwapCreated = Date.now();

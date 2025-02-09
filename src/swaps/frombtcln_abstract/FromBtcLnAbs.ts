@@ -312,7 +312,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         const payInvoiceObject: SwapData = await swapContract.createSwapData(
             ChainSwapType.HTLC,
             signer.getAddress(),
-            invoiceData.token,
+            invoiceData.claimer,
             useToken,
             escrowAmount,
             invoiceData.claimHash,
