@@ -144,8 +144,7 @@ class SwapHandler {
                     yield this.storageManager.removeData(hash, sequence);
                     yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
                 }
-                if (swap.data != null)
-                    this.escrowHashMap.set(swap.data.getEscrowHash(), swap);
+                this.saveSwapToEscrowHashMap(swap);
             }
         });
     }
@@ -165,16 +164,23 @@ class SwapHandler {
             if (swap != null)
                 yield PluginManager_1.PluginManager.swapRemove(swap);
             this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
-            if (swap.data != null)
-                this.escrowHashMap.delete(swap.chainIdentifier + "_" + swap.data.getEscrowHash());
+            this.removeSwapFromEscrowHashMap(swap);
             yield this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
         });
     }
     saveSwapData(swap) {
         return __awaiter(this, void 0, void 0, function* () {
-            this.escrowHashMap.set(swap.chainIdentifier + "_" + swap.getEscrowHash(), swap);
+            this.saveSwapToEscrowHashMap(swap);
             yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
         });
+    }
+    saveSwapToEscrowHashMap(swap) {
+        if (swap.data != null)
+            this.escrowHashMap.set(swap.chainIdentifier + "_" + swap.getEscrowHash(), swap);
+    }
+    removeSwapFromEscrowHashMap(swap) {
+        if (swap.data != null)
+            this.escrowHashMap.delete(swap.chainIdentifier + "_" + swap.data.getEscrowHash());
     }
     getSwapByEscrowHash(chainIdentifier, escrowHash) {
         return this.escrowHashMap.get(chainIdentifier + "_" + escrowHash);

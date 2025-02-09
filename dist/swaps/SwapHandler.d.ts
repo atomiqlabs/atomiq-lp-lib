@@ -135,6 +135,8 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      */
     protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
     protected saveSwapData(swap: V): Promise<void>;
+    protected saveSwapToEscrowHashMap(swap: V): void;
+    protected removeSwapFromEscrowHashMap(swap: V): void;
     protected getSwapByEscrowHash(chainIdentifier: string, escrowHash: string): V;
     /**
      * Checks whether the bitcoin amount is within specified min/max bounds
