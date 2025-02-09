@@ -61,7 +61,7 @@ class IntermediaryStorageManager {
             }
             return true;
         }).map(key => {
-            const [hash, sequenceStr] = key;
+            const [hash, sequenceStr] = key.split("_");
             const sequence = new BN(sequenceStr, "hex");
             return {
                 obj: this.data[key],
