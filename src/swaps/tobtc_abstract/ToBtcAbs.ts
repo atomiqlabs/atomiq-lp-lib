@@ -556,7 +556,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param swap
      * @throws {DefinedRuntimeError} will throw an error if the swap is expired
      */
-    protected checkExpired(swap: ToBtcSwapAbs) {
+    protected async checkExpired(swap: ToBtcSwapAbs) {
         const {swapContract, signer} = this.getChain(swap.chainIdentifier);
         const isExpired = await swapContract.isExpired(signer.getAddress(), swap.data);
         if(isExpired) throw {
@@ -776,7 +776,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 msg: "Payment not found"
             };
 
-            this.checkExpired(payment);
+            await this.checkExpired(payment);
 
             if (payment.state === ToBtcSwapState.COMMITED) throw {
                 _httpStatus: 200,

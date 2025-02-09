@@ -482,14 +482,16 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the swap is expired
      */
     checkExpired(swap) {
-        const { swapContract, signer } = this.getChain(swap.chainIdentifier);
-        const isExpired = yield swapContract.isExpired(signer.getAddress(), swap.data);
-        if (isExpired)
-            throw {
-                _httpStatus: 200,
-                code: 20010,
-                msg: "Payment expired"
-            };
+        return __awaiter(this, void 0, void 0, function* () {
+            const { swapContract, signer } = this.getChain(swap.chainIdentifier);
+            const isExpired = yield swapContract.isExpired(signer.getAddress(), swap.data);
+            if (isExpired)
+                throw {
+                    _httpStatus: 200,
+                    code: 20010,
+                    msg: "Payment expired"
+                };
+        });
     }
     /**
      * Checks & returns the network fee needed for a transaction
@@ -646,7 +648,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     code: 20007,
                     msg: "Payment not found"
                 };
-            this.checkExpired(payment);
+            yield this.checkExpired(payment);
             if (payment.state === ToBtcSwapAbs_1.ToBtcSwapState.COMMITED)
                 throw {
                     _httpStatus: 200,

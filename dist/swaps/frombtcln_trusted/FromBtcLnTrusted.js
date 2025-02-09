@@ -141,7 +141,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
                     ]
                 }
             ]);
-            for (let swap of queriedData) {
+            for (let { obj: swap } of queriedData) {
                 if (yield this.processPastSwap(swap))
                     cancelInvoices.push(swap);
             }
@@ -491,7 +491,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
         return __awaiter(this, void 0, void 0, function* () {
             yield this.storageManager.loadData(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwap);
             //Check if all swaps contain a valid amount
-            for (let swap of yield this.storageManager.query([])) {
+            for (let { obj: swap } of yield this.storageManager.query([])) {
                 if (swap.amount == null) {
                     const parsedPR = yield this.lightning.parsePaymentRequest(swap.pr);
                     swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));

@@ -358,7 +358,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             }
         ]);
 
-        const startingBlockheight = queriedData.reduce((prev, swap) => Math.min(prev, swap.createdHeight), Infinity);
+        const startingBlockheight = queriedData.reduce((prev, {obj: swap}) => Math.min(prev, swap.createdHeight), Infinity);
         if(startingBlockheight===Infinity) return;
         const transactions = await this.bitcoin.getWalletTransactions(startingBlockheight);
 
@@ -374,7 +374,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             })
         });
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             const outputScript = this.bitcoin.toOutputScript(swap.btcAddress).toString("hex");
             const txs = map.get(outputScript) ?? [];
             try {

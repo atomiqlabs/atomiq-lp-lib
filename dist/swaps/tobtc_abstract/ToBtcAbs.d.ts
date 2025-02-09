@@ -152,7 +152,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param swap
      * @throws {DefinedRuntimeError} will throw an error if the swap is expired
      */
-    protected checkExpired(swap: ToBtcSwapAbs): void;
+    protected checkExpired(swap: ToBtcSwapAbs): Promise<void>;
     /**
      * Checks & returns the network fee needed for a transaction
      *
