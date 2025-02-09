@@ -29,6 +29,7 @@ var SwapHandlerType;
  */
 class SwapHandler {
     constructor(storageDirectory, path, chainsData, swapPricing) {
+        this.escrowHashMap = new Map();
         this.logger = {
             debug: (msg, ...args) => console.debug("SwapHandler(" + this.type + "): " + msg, ...args),
             info: (msg, ...args) => console.info("SwapHandler(" + this.type + "): " + msg, ...args),
@@ -83,19 +84,39 @@ class SwapHandler {
      * @param eventData
      */
     processEvent(chainIdentifier, eventData) {
+        var _a, _b, _c;
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.swapType == null)
+                return true;
             for (let event of eventData) {
                 if (event instanceof base_1.InitializeEvent) {
-                    // this.swapLogger.debug(event, "SC: InitializeEvent: swap type: "+event.swapType);
-                    yield this.processInitializeEvent(chainIdentifier, event);
+                    if (event.swapType !== this.swapType)
+                        continue;
+                    const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                    if (swap == null)
+                        continue;
+                    swap.txIds.init = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
+                    if (swap.metadata != null)
+                        swap.metadata.times.initTxReceived = Date.now();
+                    yield this.processInitializeEvent(chainIdentifier, swap, event);
                 }
                 else if (event instanceof base_1.ClaimEvent) {
-                    // this.swapLogger.debug(event, "SC: ClaimEvent: swap secret: "+event.secret);
-                    yield this.processClaimEvent(chainIdentifier, event);
+                    const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                    if (swap == null)
+                        continue;
+                    swap.txIds.claim = (_b = event.meta) === null || _b === void 0 ? void 0 : _b.txId;
+                    if (swap.metadata != null)
+                        swap.metadata.times.claimTxReceived = Date.now();
+                    yield this.processClaimEvent(chainIdentifier, swap, event);
                 }
                 else if (event instanceof base_1.RefundEvent) {
-                    // this.swapLogger.debug(event, "SC: RefundEvent");
-                    yield this.processRefundEvent(chainIdentifier, event);
+                    const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                    if (swap == null)
+                        continue;
+                    swap.txIds.refund = (_c = event.meta) === null || _c === void 0 ? void 0 : _c.txId;
+                    if (swap.metadata != null)
+                        swap.metadata.times.refundTxReceived = Date.now();
+                    yield this.processRefundEvent(chainIdentifier, swap, event);
                 }
             }
             return true;
@@ -109,6 +130,23 @@ class SwapHandler {
             this.chains.chains[key].chainEvents.registerListener((events) => this.processEvent(key, events));
         }
         this.logger.info("SC: Events: subscribed to smartchain events");
+    }
+    loadData(ctor) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.storageManager.loadData(ctor);
+            //Check if all swaps contain a valid amount
+            for (let { obj: swap, hash, sequence } of yield this.storageManager.query([])) {
+                if (hash !== swap.getIdentifierHash() || !sequence.eq((_a = swap.getSequence()) !== null && _a !== void 0 ? _a : new BN(0))) {
+                    this.swapLogger.info(swap, "loadData(): Swap storage key or sequence mismatch, fixing," +
+                        " old hash: " + hash + " new hash: " + swap.getIdentifierHash() +
+                        " old seq: " + sequence.toString(10) + " new seq: " + ((_b = swap.getSequence()) !== null && _b !== void 0 ? _b : new BN(0)).toString(10));
+                    yield this.storageManager.removeData(hash, sequence);
+                    yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                }
+                this.saveSwapToEscrowHashMap(swap);
+            }
+        });
     }
     removeSwapData(hashOrSwap, sequenceOrUltimateState) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -126,8 +164,26 @@ class SwapHandler {
             if (swap != null)
                 yield PluginManager_1.PluginManager.swapRemove(swap);
             this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
-            yield this.storageManager.removeData(swap.getHash(), swap.getSequence());
+            this.removeSwapFromEscrowHashMap(swap);
+            yield this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
         });
+    }
+    saveSwapData(swap) {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.saveSwapToEscrowHashMap(swap);
+            yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+        });
+    }
+    saveSwapToEscrowHashMap(swap) {
+        if (swap.data != null)
+            this.escrowHashMap.set(swap.chainIdentifier + "_" + swap.getEscrowHash(), swap);
+    }
+    removeSwapFromEscrowHashMap(swap) {
+        if (swap.data != null)
+            this.escrowHashMap.delete(swap.chainIdentifier + "_" + swap.data.getEscrowHash());
+    }
+    getSwapByEscrowHash(chainIdentifier, escrowHash) {
+        return this.escrowHashMap.get(chainIdentifier + "_" + escrowHash);
     }
     /**
      * Checks whether the bitcoin amount is within specified min/max bounds
@@ -227,14 +283,16 @@ class SwapHandler {
         return signDataPrefetchPromise;
     }
     getIdentifierFromEvent(event) {
-        if (event.sequence.isZero())
-            return event.paymentHash;
-        return event.paymentHash + "_" + event.sequence.toString(16);
+        const foundSwap = this.escrowHashMap.get(event.escrowHash);
+        if (foundSwap != null) {
+            return foundSwap.getIdentifier();
+        }
+        return "UNKNOWN_" + event.escrowHash;
     }
     getIdentifierFromSwapData(swapData) {
-        if (swapData.getSequence().isZero())
-            return swapData.getHash();
-        return swapData.getHash() + "_" + swapData.getSequence().toString(16);
+        if (swapData.getSequence == null)
+            return swapData.getClaimHash();
+        return swapData.getClaimHash() + "_" + swapData.getSequence().toString(16);
     }
     getIdentifier(swap) {
         if (swap instanceof SwapHandlerSwap_1.SwapHandlerSwap) {

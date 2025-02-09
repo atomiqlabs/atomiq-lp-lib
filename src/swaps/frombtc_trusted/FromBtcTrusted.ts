@@ -37,6 +37,7 @@ export type FromBtcTrustedRequestType = {
 
 export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
     readonly type: SwapHandlerType = SwapHandlerType.FROM_BTC_TRUSTED;
+    readonly swapType = null;
 
     readonly config: FromBtcTrustedConfig;
     readonly bitcoin: IBitcoinWallet;
@@ -357,7 +358,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             }
         ]);
 
-        const startingBlockheight = queriedData.reduce((prev, swap) => Math.min(prev, swap.createdHeight), Infinity);
+        const startingBlockheight = queriedData.reduce((prev, {obj: swap}) => Math.min(prev, swap.createdHeight), Infinity);
         if(startingBlockheight===Infinity) return;
         const transactions = await this.bitcoin.getWalletTransactions(startingBlockheight);
 
@@ -373,7 +374,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             })
         });
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             const outputScript = this.bitcoin.toOutputScript(swap.btcAddress).toString("hex");
             const txs = map.get(outputScript) ?? [];
             try {
@@ -747,15 +748,15 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
         return {};
     }
 
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void> {
+    protected processClaimEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: ClaimEvent<SwapData>): Promise<void> {
         return Promise.resolve(undefined);
     }
 
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void> {
+    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: InitializeEvent<SwapData>): Promise<void> {
         return Promise.resolve(undefined);
     }
 
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void> {
+    protected processRefundEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: RefundEvent<SwapData>): Promise<void> {
         return Promise.resolve(undefined);
     }
 

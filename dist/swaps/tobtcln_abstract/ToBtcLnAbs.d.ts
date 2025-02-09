@@ -3,7 +3,7 @@ import { Express } from "express";
 import { ToBtcLnSwapAbs, ToBtcLnSwapState } from "./ToBtcLnSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
-import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
+import { ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { ILightningWallet, ParsedPaymentRequest } from "../../wallets/ILightningWallet";
@@ -62,6 +62,7 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
         timestamp: number;
     };
     readonly type = SwapHandlerType.TO_BTCLN;
+    readonly swapType = ChainSwapType.HTLC;
     readonly config: ToBtcLnConfig & {
         minTsSendCltv: BN;
     };
@@ -109,9 +110,9 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
      * @param swap
      */
     private processInitialized;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, swap: ToBtcLnSwapAbs, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, swap: ToBtcLnSwapAbs, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, swap: ToBtcLnSwapAbs, event: RefundEvent<SwapData>): Promise<void>;
     /**
      * Checks if the amount was supplied in the exactIn request
      *
