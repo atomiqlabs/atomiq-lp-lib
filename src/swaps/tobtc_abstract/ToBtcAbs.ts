@@ -758,7 +758,6 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             const parsedBody = verifySchema({...req.body, ...req.query}, {
                 paymentHash: (val: string) => val!=null &&
                     typeof(val)==="string" &&
-                    val.length===64 &&
                     HEX_REGEX.test(val) ? val: null,
                 sequence: FieldTypeEnum.BN
             });
