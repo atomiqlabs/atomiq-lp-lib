@@ -81,12 +81,30 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
         return PluginManager.swapStateChange(this, oldState);
     }
 
-    getHash(): string {
-        return this.data.getHash();
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash(): string {
+        return this.data.getEscrowHash();
     }
 
-    getSequence(): BN {
-        return this.data.getSequence();
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash(): string {
+        return this.data.getClaimHash();
+    }
+
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash(): string {
+        return this.getClaimHash();
+    }
+
+    getSequence(): BN | null {
+        return this.data?.getSequence==null ? null : this.data.getSequence();
     }
 
     /**
@@ -95,9 +113,9 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
      */
     getIdentifier(): string {
         if(this.getSequence()!=null) {
-            return this.chainIdentifier+"_"+this.getHash()+"_"+this.getSequence().toString(16);
+            return this.chainIdentifier+"_"+this.getIdentifierHash()+"_"+this.getSequence().toString(16);
         }
-        return this.getHash();
+        return this.chainIdentifier+"_"+this.getIdentifierHash();
     }
 
     /**

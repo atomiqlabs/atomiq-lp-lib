@@ -26,6 +26,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
     constructor(storageDirectory, path, chains, lightning, swapPricing, config) {
         super(storageDirectory, path, chains, lightning, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTCLN_TRUSTED;
+        this.swapType = null;
         this.activeSubscriptions = new Map();
         this.processedTxIds = new Map();
         this.config = config;
@@ -140,7 +141,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
                     ]
                 }
             ]);
-            for (let swap of queriedData) {
+            for (let { obj: swap } of queriedData) {
                 if (yield this.processPastSwap(swap))
                     cancelInvoices.push(swap);
             }
@@ -490,7 +491,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
         return __awaiter(this, void 0, void 0, function* () {
             yield this.storageManager.loadData(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwap);
             //Check if all swaps contain a valid amount
-            for (let swap of yield this.storageManager.query([])) {
+            for (let { obj: swap } of yield this.storageManager.query([])) {
                 if (swap.amount == null) {
                     const parsedPR = yield this.lightning.parsePaymentRequest(swap.pr);
                     swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
@@ -504,13 +505,13 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
             minCltv: this.config.minCltv.toNumber()
         };
     }
-    processClaimEvent(chainIdentifier, event) {
+    processClaimEvent(chainIdentifier, swap, event) {
         return Promise.resolve();
     }
-    processInitializeEvent(chainIdentifier, event) {
+    processInitializeEvent(chainIdentifier, swap, event) {
         return Promise.resolve();
     }
-    processRefundEvent(chainIdentifier, event) {
+    processRefundEvent(chainIdentifier, swap, event) {
         return Promise.resolve();
     }
 }

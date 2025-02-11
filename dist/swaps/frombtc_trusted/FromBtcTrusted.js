@@ -24,6 +24,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         var _b;
         super(storageDirectory, path, chains, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_TRUSTED;
+        this.swapType = null;
         this.subscriptions = new Map();
         this.doubleSpendWatchdogSwaps = new Set();
         this.refundedSwaps = new Map();
@@ -317,7 +318,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     ]
                 }
             ]);
-            const startingBlockheight = queriedData.reduce((prev, swap) => Math.min(prev, swap.createdHeight), Infinity);
+            const startingBlockheight = queriedData.reduce((prev, { obj: swap }) => Math.min(prev, swap.createdHeight), Infinity);
             if (startingBlockheight === Infinity)
                 return;
             const transactions = yield this.bitcoin.getWalletTransactions(startingBlockheight);
@@ -333,7 +334,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     }
                 });
             });
-            for (let swap of queriedData) {
+            for (let { obj: swap } of queriedData) {
                 const outputScript = this.bitcoin.toOutputScript(swap.btcAddress).toString("hex");
                 const txs = (_a = map.get(outputScript)) !== null && _a !== void 0 ? _a : [];
                 try {
@@ -674,13 +675,13 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     getInfoData() {
         return {};
     }
-    processClaimEvent(chainIdentifier, event) {
+    processClaimEvent(chainIdentifier, swap, event) {
         return Promise.resolve(undefined);
     }
-    processInitializeEvent(chainIdentifier, event) {
+    processInitializeEvent(chainIdentifier, swap, event) {
         return Promise.resolve(undefined);
     }
-    processRefundEvent(chainIdentifier, event) {
+    processRefundEvent(chainIdentifier, swap, event) {
         return Promise.resolve(undefined);
     }
 }

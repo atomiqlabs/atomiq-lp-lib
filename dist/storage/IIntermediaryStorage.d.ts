@@ -7,7 +7,11 @@ export type StorageQueryParam = {
 };
 export interface IIntermediaryStorage<T extends StorageObject> {
     init(): Promise<void>;
-    query(params: StorageQueryParam[]): Promise<T[]>;
+    query(params: StorageQueryParam[]): Promise<{
+        hash: string;
+        sequence: BN;
+        obj: T;
+    }[]>;
     getData(hash: string, sequence: BN | null): Promise<T>;
     saveData(hash: string, sequence: BN | null, object: T): Promise<void>;
     removeData(hash: string, sequence: BN | null): Promise<void>;

@@ -2,7 +2,7 @@ import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
 import {ToBtcBaseSwap} from "../ToBtcBaseSwap";
-import {deserializeBN, serializeBN} from "../../utils/Utils";
+import {deserializeBN} from "../../utils/Utils";
 
 export enum ToBtcSwapState {
     REFUNDED = -3,
@@ -20,6 +20,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
     readonly address: string;
     readonly satsPerVbyte: BN;
     readonly nonce: BN;
+    readonly requiredConfirmations: number;
     readonly preferedConfirmationTarget: number;
 
     txId: string;
@@ -34,6 +35,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         networkFeeInToken: BN,
         satsPerVbyte: BN,
         nonce: BN,
+        requiredConfirmations: number,
         preferedConfirmationTarget: number
     );
     constructor(obj: any);
@@ -48,6 +50,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         networkFeeInToken?: BN,
         satsPerVbyte?: BN,
         nonce?: BN,
+        requiredConfirmations?: number,
         preferedConfirmationTarget?: number
     ) {
         if(typeof(chainIdOrObj)==="string") {
@@ -56,12 +59,14 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
             this.address = address;
             this.satsPerVbyte = satsPerVbyte;
             this.nonce = nonce;
+            this.requiredConfirmations = requiredConfirmations;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
         } else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
             this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
             this.nonce = new BN(chainIdOrObj.nonce);
+            this.requiredConfirmations = chainIdOrObj.requiredConfirmations;
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
 
             this.txId = chainIdOrObj.txId;
@@ -76,6 +81,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
         partialSerialized.satsPerVbyte = this.satsPerVbyte.toString(10);
+        partialSerialized.requiredConfirmations = this.requiredConfirmations;
         partialSerialized.nonce = this.nonce.toString(10);
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
         partialSerialized.txId = this.txId;

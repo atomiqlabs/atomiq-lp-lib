@@ -17,7 +17,7 @@ var ToBtcSwapState;
     ToBtcSwapState[ToBtcSwapState["CLAIMED"] = 4] = "CLAIMED";
 })(ToBtcSwapState = exports.ToBtcSwapState || (exports.ToBtcSwapState = {}));
 class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
-    constructor(chainIdOrObj, address, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken, satsPerVbyte, nonce, preferedConfirmationTarget) {
+    constructor(chainIdOrObj, address, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken, satsPerVbyte, nonce, requiredConfirmations, preferedConfirmationTarget) {
         var _a;
         if (typeof (chainIdOrObj) === "string") {
             super(chainIdOrObj, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
@@ -25,6 +25,7 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
             this.address = address;
             this.satsPerVbyte = satsPerVbyte;
             this.nonce = nonce;
+            this.requiredConfirmations = requiredConfirmations;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
         }
         else {
@@ -32,6 +33,7 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
             this.address = chainIdOrObj.address;
             this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
             this.nonce = new BN(chainIdOrObj.nonce);
+            this.requiredConfirmations = chainIdOrObj.requiredConfirmations;
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
             this.txId = chainIdOrObj.txId;
             //Compatibility
@@ -43,6 +45,7 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
         partialSerialized.satsPerVbyte = this.satsPerVbyte.toString(10);
+        partialSerialized.requiredConfirmations = this.requiredConfirmations;
         partialSerialized.nonce = this.nonce.toString(10);
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
         partialSerialized.txId = this.txId;

@@ -54,11 +54,28 @@ class SwapHandlerSwap extends base_1.Lockable {
         this.state = newState;
         return PluginManager_1.PluginManager.swapStateChange(this, oldState);
     }
-    getHash() {
-        return this.data.getHash();
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash() {
+        return this.data.getEscrowHash();
+    }
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash() {
+        return this.data.getClaimHash();
+    }
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash() {
+        return this.getClaimHash();
     }
     getSequence() {
-        return this.data.getSequence();
+        var _a;
+        return ((_a = this.data) === null || _a === void 0 ? void 0 : _a.getSequence) == null ? null : this.data.getSequence();
     }
     /**
      * Returns unique identifier of the swap in the form <hash>_<sequence> or just <hash> if the swap type doesn't
@@ -66,9 +83,9 @@ class SwapHandlerSwap extends base_1.Lockable {
      */
     getIdentifier() {
         if (this.getSequence() != null) {
-            return this.chainIdentifier + "_" + this.getHash() + "_" + this.getSequence().toString(16);
+            return this.chainIdentifier + "_" + this.getIdentifierHash() + "_" + this.getSequence().toString(16);
         }
-        return this.getHash();
+        return this.chainIdentifier + "_" + this.getIdentifierHash();
     }
     /**
      * Checks whether the swap is finished, such that it is final and either successful or failed
