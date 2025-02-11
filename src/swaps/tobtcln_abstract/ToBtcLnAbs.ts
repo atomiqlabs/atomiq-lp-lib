@@ -151,7 +151,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 } else {
                     this.swapLogger.info(swap, "processPastSwap(state=SAVED): swap committed (detected from processPastSwap), invoice: "+swap.pr);
                     await swap.setState(ToBtcLnSwapState.COMMITED);
-                    await this.storageManager.saveData(swap.data.getHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                 }
             }
             //Cancel the swaps where lightning invoice is expired
