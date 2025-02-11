@@ -143,11 +143,17 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             //Cancel the swaps where signature is expired
             const isSignatureExpired = await swapContract.isInitAuthorizationExpired(swap.data, swap);
             if(isSignatureExpired) {
-                this.swapLogger.info(swap, "processPastSwap(state=SAVED): signature expired, cancel uncommited swap, invoice: "+swap.pr);
-                await this.removeSwapData(swap, ToBtcLnSwapState.CANCELED);
-                return;
+                const isCommitted = await swapContract.isCommited(swap.data);
+                if(!isCommitted) {
+                    this.swapLogger.info(swap, "processPastSwap(state=SAVED): authorization expired & swap not committed, cancelling swap, invoice: "+swap.pr);
+                    await this.removeSwapData(swap, ToBtcLnSwapState.CANCELED);
+                    return;
+                } else {
+                    this.swapLogger.info(swap, "processPastSwap(state=SAVED): swap committed (detected from processPastSwap), invoice: "+swap.pr);
+                    await swap.setState(ToBtcLnSwapState.COMMITED);
+                    await this.storageManager.saveData(swap.data.getHash(), swap.getSequence(), swap);
+                }
             }
-
             //Cancel the swaps where lightning invoice is expired
             const decodedPR = await this.lightning.parsePaymentRequest(swap.pr);
             const isInvoiceExpired = decodedPR.expiryEpochMillis < Date.now();

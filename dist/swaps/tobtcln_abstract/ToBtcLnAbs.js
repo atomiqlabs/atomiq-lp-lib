@@ -61,9 +61,17 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 //Cancel the swaps where signature is expired
                 const isSignatureExpired = yield swapContract.isInitAuthorizationExpired(swap.data, swap);
                 if (isSignatureExpired) {
-                    this.swapLogger.info(swap, "processPastSwap(state=SAVED): signature expired, cancel uncommited swap, invoice: " + swap.pr);
-                    yield this.removeSwapData(swap, ToBtcLnSwapAbs_1.ToBtcLnSwapState.CANCELED);
-                    return;
+                    const isCommitted = yield swapContract.isCommited(swap.data);
+                    if (!isCommitted) {
+                        this.swapLogger.info(swap, "processPastSwap(state=SAVED): authorization expired & swap not committed, cancelling swap, invoice: " + swap.pr);
+                        yield this.removeSwapData(swap, ToBtcLnSwapAbs_1.ToBtcLnSwapState.CANCELED);
+                        return;
+                    }
+                    else {
+                        this.swapLogger.info(swap, "processPastSwap(state=SAVED): swap committed (detected from processPastSwap), invoice: " + swap.pr);
+                        yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
+                        yield this.storageManager.saveData(swap.data.getHash(), swap.getSequence(), swap);
+                    }
                 }
                 //Cancel the swaps where lightning invoice is expired
                 const decodedPR = yield this.lightning.parsePaymentRequest(swap.pr);
