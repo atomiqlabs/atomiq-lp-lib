@@ -276,7 +276,7 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcSwapCreated = Date.now();
             //Sign swap data
-            const sigData = yield swapContract.getInitSignature(signer, payInvoiceObject, this.config.authorizationTimeout, signDataPrefetchPromise == null ? null : yield signDataPrefetchPromise, invoiceData.feeRate);
+            const sigData = yield swapContract.getInitSignature(signer, payInvoiceObject, this.getInitAuthorizationTimeout(invoiceData.chainIdentifier), signDataPrefetchPromise == null ? null : yield signDataPrefetchPromise, invoiceData.feeRate);
             //No need to check abortController anymore since all pending promises are resolved by now
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcSwapSigned = Date.now();

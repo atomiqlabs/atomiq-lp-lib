@@ -671,7 +671,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                         code: 20005,
                         msg: "Not committed"
                     };
-                const refundResponse = yield swapContract.getRefundSignature(signer, payment.data, this.config.authorizationTimeout);
+                const refundResponse = yield swapContract.getRefundSignature(signer, payment.data, this.config.refundAuthorizationTimeout);
                 //Double check the state after promise result
                 if (payment.state !== ToBtcSwapAbs_1.ToBtcSwapState.NON_PAYABLE)
                     throw {

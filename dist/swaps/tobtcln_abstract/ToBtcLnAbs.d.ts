@@ -131,6 +131,7 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
     /**
      * Checks and parses a payment request (bolt11 invoice), additionally also checks expiration time of the invoice
      *
+     * @param chainIdentifier
      * @param pr
      * @throws {DefinedRuntimeError} will throw an error if the pr is invalid, without amount or expired
      */

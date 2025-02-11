@@ -801,7 +801,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     msg: "Not committed"
                 };
 
-                const refundResponse = await swapContract.getRefundSignature(signer, payment.data, this.config.authorizationTimeout);
+                const refundResponse = await swapContract.getRefundSignature(signer, payment.data, this.config.refundAuthorizationTimeout);
 
                 //Double check the state after promise result
                 if (payment.state !== ToBtcSwapState.NON_PAYABLE) throw {

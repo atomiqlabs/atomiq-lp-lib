@@ -449,10 +449,11 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
     /**
      * Checks and parses a payment request (bolt11 invoice), additionally also checks expiration time of the invoice
      *
+     * @param chainIdentifier
      * @param pr
      * @throws {DefinedRuntimeError} will throw an error if the pr is invalid, without amount or expired
      */
-    private async checkPaymentRequest(pr: string): Promise<{
+    private async checkPaymentRequest(chainIdentifier: string, pr: string): Promise<{
         parsedPR: ParsedPaymentRequest,
         halfConfidence: boolean
     }> {
@@ -473,7 +474,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         };
 
         let halfConfidence = false;
-        if(parsedPR.expiryEpochMillis < Date.now()+((this.config.authorizationTimeout+(2*60))*1000) ) {
+        if(parsedPR.expiryEpochMillis < Date.now()+((this.getInitAuthorizationTimeout(chainIdentifier)+(2*60))*1000) ) {
             if(!this.config.allowShortExpiry) {
                 throw {
                     code: 20020,
@@ -717,7 +718,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
             //Check request params
             const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
-            const {parsedPR, halfConfidence} = await this.checkPaymentRequest(parsedBody.pr);
+            const {parsedPR, halfConfidence} = await this.checkPaymentRequest(parsedAuth.chainIdentifier, parsedBody.pr);
             await this.checkPaymentRequestMatchesInitial(parsedBody.pr, parsedAuth);
 
             const metadata = parsedAuth.metadata;
@@ -858,7 +859,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             this.checkMaxFee(parsedBody.maxFee);
             this.checkExpiry(parsedBody.expiryTimestamp, currentTimestamp);
             await this.checkVaultInitialized(chainIdentifier, parsedBody.token);
-            const {parsedPR, halfConfidence} = await this.checkPaymentRequest(parsedBody.pr);
+            const {parsedPR, halfConfidence} = await this.checkPaymentRequest(chainIdentifier, parsedBody.pr);
             const requestedAmount = {
                 input: !!parsedBody.exactIn,
                 amount: !!parsedBody.exactIn ? parsedBody.amount : parsedPR.mtokens.add(new BN(999)).div(new BN(1000))
@@ -1042,7 +1043,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 };
 
                 if(data.state===ToBtcLnSwapState.NON_PAYABLE) {
-                    const refundSigData = await swapContract.getRefundSignature(signer, data.data, this.config.authorizationTimeout);
+                    const refundSigData = await swapContract.getRefundSignature(signer, data.data, this.config.refundAuthorizationTimeout);
 
                     //Double check the state after promise result
                     if (data.state !== ToBtcLnSwapState.NON_PAYABLE) throw {

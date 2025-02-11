@@ -26,7 +26,10 @@ export type SwapHandlerInfoType = {
     data?: any;
 };
 export type SwapBaseConfig = {
-    authorizationTimeout: number;
+    initAuthorizationTimeout: number;
+    initAuthorizationTimeouts?: {
+        [chainId: string]: number;
+    };
     bitcoinBlocktime: BN;
     baseFee: BN;
     feePPM: BN;
@@ -187,4 +190,5 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      */
     protected isTokenSupported(chainId: string, token: string): boolean;
     getInfo(): SwapHandlerInfoType;
+    protected getInitAuthorizationTimeout(chainIdentifier: string): number;
 }

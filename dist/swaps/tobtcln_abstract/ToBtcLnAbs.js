@@ -362,10 +362,11 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     /**
      * Checks and parses a payment request (bolt11 invoice), additionally also checks expiration time of the invoice
      *
+     * @param chainIdentifier
      * @param pr
      * @throws {DefinedRuntimeError} will throw an error if the pr is invalid, without amount or expired
      */
-    checkPaymentRequest(pr) {
+    checkPaymentRequest(chainIdentifier, pr) {
         return __awaiter(this, void 0, void 0, function* () {
             let parsedPR;
             try {
@@ -383,7 +384,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     msg: "Invalid request body (pr - needs to have amount)"
                 };
             let halfConfidence = false;
-            if (parsedPR.expiryEpochMillis < Date.now() + ((this.config.authorizationTimeout + (2 * 60)) * 1000)) {
+            if (parsedPR.expiryEpochMillis < Date.now() + ((this.getInitAuthorizationTimeout(chainIdentifier) + (2 * 60)) * 1000)) {
                 if (!this.config.allowShortExpiry) {
                     throw {
                         code: 20020,
@@ -609,7 +610,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const abortSignal = responseStream.getAbortSignal();
             //Check request params
             const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
-            const { parsedPR, halfConfidence } = yield this.checkPaymentRequest(parsedBody.pr);
+            const { parsedPR, halfConfidence } = yield this.checkPaymentRequest(parsedAuth.chainIdentifier, parsedBody.pr);
             yield this.checkPaymentRequestMatchesInitial(parsedBody.pr, parsedAuth);
             const metadata = parsedAuth.metadata;
             const sequence = new BN((0, crypto_1.randomBytes)(8));
@@ -703,7 +704,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             this.checkMaxFee(parsedBody.maxFee);
             this.checkExpiry(parsedBody.expiryTimestamp, currentTimestamp);
             yield this.checkVaultInitialized(chainIdentifier, parsedBody.token);
-            const { parsedPR, halfConfidence } = yield this.checkPaymentRequest(parsedBody.pr);
+            const { parsedPR, halfConfidence } = yield this.checkPaymentRequest(chainIdentifier, parsedBody.pr);
             const requestedAmount = {
                 input: !!parsedBody.exactIn,
                 amount: !!parsedBody.exactIn ? parsedBody.amount : parsedPR.mtokens.add(new BN(999)).div(new BN(1000))
@@ -831,7 +832,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                         msg: "Payment expired"
                     };
                 if (data.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE) {
-                    const refundSigData = yield swapContract.getRefundSignature(signer, data.data, this.config.authorizationTimeout);
+                    const refundSigData = yield swapContract.getRefundSignature(signer, data.data, this.config.refundAuthorizationTimeout);
                     //Double check the state after promise result
                     if (data.state !== ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE)
                         throw {

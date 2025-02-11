@@ -345,5 +345,9 @@ class SwapHandler {
             chainTokens
         };
     }
+    getInitAuthorizationTimeout(chainIdentifier) {
+        var _a, _b;
+        return (_b = (_a = this.config.initAuthorizationTimeouts) === null || _a === void 0 ? void 0 : _a[chainIdentifier]) !== null && _b !== void 0 ? _b : this.config.initAuthorizationTimeout;
+    }
 }
 exports.SwapHandler = SwapHandler;

@@ -330,7 +330,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
         const sigData = await swapContract.getInitSignature(
             signer,
             payInvoiceObject,
-            this.config.authorizationTimeout,
+            this.getInitAuthorizationTimeout(invoiceData.chainIdentifier),
             signDataPrefetchPromise==null ? null : await signDataPrefetchPromise,
             invoiceData.feeRate
         );

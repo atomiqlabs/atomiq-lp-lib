@@ -364,7 +364,7 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
         const sigData = await swapContract.getInitSignature(
             signer,
             swapObject,
-            this.config.authorizationTimeout,
+            this.getInitAuthorizationTimeout(chainIdentifier),
             prefetchedSignData,
             feeRate
         );

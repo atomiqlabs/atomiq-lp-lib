@@ -40,7 +40,10 @@ export type SwapHandlerInfoType = {
 };
 
 export type SwapBaseConfig = {
-    authorizationTimeout: number,
+    initAuthorizationTimeout: number,
+    initAuthorizationTimeouts?: {
+        [chainId: string]: number
+    },
     bitcoinBlocktime: BN,
     baseFee: BN,
     feePPM: BN,
@@ -450,6 +453,10 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
             tokens: Array.from<string>(this.allowedTokens[this.chains.default]),
             chainTokens
         };
+    }
+
+    protected getInitAuthorizationTimeout(chainIdentifier: string) {
+        return this.config.initAuthorizationTimeouts?.[chainIdentifier] ?? this.config.initAuthorizationTimeout;
     }
 
 }
