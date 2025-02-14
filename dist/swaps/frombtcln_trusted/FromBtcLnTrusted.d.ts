@@ -16,6 +16,7 @@ export type FromBtcLnTrustedRequestType = {
     address: string;
     amount: BN;
     exactOut?: boolean;
+    token?: string;
 };
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps

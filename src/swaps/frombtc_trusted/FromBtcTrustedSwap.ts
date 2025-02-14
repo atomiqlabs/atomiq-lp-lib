@@ -29,6 +29,9 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
     readonly createdHeight: number;
     readonly expiresAt: number;
     readonly recommendedFee: number;
+
+    readonly token: string;
+
     refundAddress: string;
 
     adjustedInput: BN;
@@ -57,7 +60,8 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         createdHeight: number,
         expiresAt: number,
         recommendedFee: number,
-        refundAddress: string
+        refundAddress: string,
+        token: string
     );
     constructor(obj: any);
 
@@ -72,7 +76,8 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         createdHeight?: number,
         expiresAt?: number,
         recommendedFee?: number,
-        refundAddress?: string
+        refundAddress?: string,
+        token?: string
     ) {
         if(typeof(objOrChainIdentifier)==="string") {
             super(objOrChainIdentifier, inputSats, swapFee, swapFeeInToken);
@@ -86,6 +91,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
             this.expiresAt = expiresAt;
             this.recommendedFee = recommendedFee;
             this.refundAddress = refundAddress;
+            this.token = token;
         } else {
             super(objOrChainIdentifier);
             this.btcAddress = objOrChainIdentifier.btcAddress;
@@ -107,6 +113,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
             this.vout = objOrChainIdentifier.vout;
             this.burnTxId = objOrChainIdentifier.burnTxId;
             this.refundTxId = objOrChainIdentifier.refundTxId;
+            this.token = objOrChainIdentifier.token;
         }
     }
 
@@ -131,6 +138,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         partialSerialized.vout = this.vout;
         partialSerialized.burnTxId = this.burnTxId;
         partialSerialized.refundTxId = this.refundTxId;
+        partialSerialized.token = this.token;
         return partialSerialized;
     }
 

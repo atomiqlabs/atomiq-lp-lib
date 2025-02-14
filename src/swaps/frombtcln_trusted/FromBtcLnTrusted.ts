@@ -35,7 +35,8 @@ export type SwapForGasServerConfig = FromBtcBaseConfig & {
 export type FromBtcLnTrustedRequestType = {
     address: string,
     amount: BN,
-    exactOut?: boolean
+    exactOut?: boolean,
+    token?: string
 };
 
 /**
@@ -61,9 +62,6 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         super(storageDirectory, path, chains, lightning, swapPricing);
         this.config = config;
         this.config.invoiceTimeoutSeconds = this.config.invoiceTimeoutSeconds || 90;
-        for(let chainId in chains.chains) {
-            this.allowedTokens[chainId] = new Set<string>([chains.chains[chainId].swapContract.getNativeCurrencyAddress()]);
-        }
     }
 
     /**
@@ -207,7 +205,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         }
 
         if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
-            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), swapContract.getNativeCurrencyAddress(), false);
+            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), invoiceData.token, false);
             try {
                 await this.checkBalance(invoiceData.output, balance, null);
                 if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcBalanceChecked = Date.now();
@@ -218,7 +216,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             if(invoiceData.state!==FromBtcLnTrustedSwapState.RECEIVED) return;
 
-            const txns = await swapContract.txsTransfer(signer.getAddress(), swapContract.getNativeCurrencyAddress(), invoiceData.output, invoiceData.dstAddress);
+            const txns = await swapContract.txsTransfer(signer.getAddress(), invoiceData.token, invoiceData.output, invoiceData.dstAddress);
 
             let unlock = invoiceData.lock(Infinity);
             if(unlock==null) return;
@@ -383,10 +381,15 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
              * amount: string               amount (in lamports/smart chain base units) of the invoice
              */
 
-            const parsedBody: FromBtcLnTrustedRequestType = await req.paramReader.getParams({
+            req.query.token ??= swapContract.getNativeCurrencyAddress();
+
+            const parsedBody: FromBtcLnTrustedRequestType = verifySchema(req.query,{
                 address: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     swapContract.isValidAddress(val) ? val : null,
+                token: (val: string) => val!=null &&
+                    typeof(val)==="string" &&
+                    this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: FieldTypeEnum.BN,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
@@ -403,7 +406,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                 parsed: parsedBody,
                 metadata
             };
-            const useToken = swapContract.getNativeCurrencyAddress();
+            const useToken = parsedBody.token;
 
             //Check request params
             const fees = await this.preCheckAmounts(request, requestedAmount, useToken);
@@ -414,7 +417,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             const abortController = this.getAbortController(responseStream);
 
             //Pre-fetch data
-            const {pricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, swapContract.getNativeCurrencyAddress(), abortController);
+            const {pricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, useToken, abortController);
             const balancePrefetch = swapContract.getBalance(signer.getAddress(), useToken, false).catch(e => {
                 this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
                 abortController.abort(e);
@@ -463,7 +466,8 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                 swapFeeInToken,
                 totalInToken,
                 secret.toString("hex"),
-                parsedBody.address
+                parsedBody.address,
+                useToken
             );
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;

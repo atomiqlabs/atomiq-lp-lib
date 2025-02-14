@@ -20,6 +20,7 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
     readonly output: BN;
     readonly dstAddress: string;
     readonly secret: string;
+    readonly token: string;
 
     scRawTx: string;
 
@@ -31,11 +32,22 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
         swapFeeInToken: BN,
         output: BN,
         secret: string,
-        dstAddress: string
+        dstAddress: string,
+        token: string
     );
     constructor(obj: any);
 
-    constructor(chainIdOrObj: string | any, pr?: string, inputMtokens?: BN, swapFee?: BN, swapFeeInToken?: BN, output?: BN, secret?: string, dstAddress?: string) {
+    constructor(
+        chainIdOrObj: string | any,
+        pr?: string,
+        inputMtokens?: BN,
+        swapFee?: BN,
+        swapFeeInToken?: BN,
+        output?: BN,
+        secret?: string,
+        dstAddress?: string,
+        token?: string
+    ) {
         if(typeof(chainIdOrObj)==="string") {
             super(chainIdOrObj, inputMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
             this.state = FromBtcLnTrustedSwapState.CREATED;
@@ -43,12 +55,14 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
             this.output = output;
             this.secret = secret;
             this.dstAddress = dstAddress;
+            this.token = token;
         } else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
             this.output = deserializeBN(chainIdOrObj.output);
             this.secret = chainIdOrObj.secret;
             this.dstAddress = chainIdOrObj.dstAddress;
+            this.token = chainIdOrObj.token;
             this.scRawTx = chainIdOrObj.scRawTx;
         }
         this.type = null;
@@ -68,6 +82,7 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
         partialSerialized.output = serializeBN(this.output);
         partialSerialized.secret = this.secret;
         partialSerialized.dstAddress = this.dstAddress;
+        partialSerialized.token = this.token;
         partialSerialized.scRawTx = this.scRawTx;
         return partialSerialized;
     }

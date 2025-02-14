@@ -32,7 +32,9 @@ export type FromBtcTrustedConfig = FromBtcBaseConfig & {
 export type FromBtcTrustedRequestType = {
     address: string,
     amount: BN,
-    exactOut?: boolean
+    exactOut?: boolean,
+    refundAddress?: string,
+    token?: string
 };
 
 export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
@@ -64,9 +66,6 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
         this.config.recommendFeeMultiplier ??= 1.25;
         this.bitcoin = bitcoin;
         this.bitcoinRpc = bitcoinRpc;
-        for(let chainId in chains.chains) {
-            this.allowedTokens[chainId] = new Set<string>([chains.chains[chainId].swapContract.getNativeCurrencyAddress()]);
-        }
     }
 
     private getAllAncestors(tx: BtcTx): Promise<{tx: BtcTx, vout: number}[]> {
@@ -282,7 +281,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
 
         if(swap.state===FromBtcTrustedSwapState.BTC_CONFIRMED) {
             //Send gas token
-            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), swapContract.getNativeCurrencyAddress(), false);
+            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), swap.token, false);
             try {
                 await this.checkBalance(swap.adjustedOutput, balance, null);
                 if(swap.metadata!=null) swap.metadata.times.receivedBalanceChecked = Date.now();
@@ -297,7 +296,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             let unlock = swap.lock(30*1000);
             if(unlock==null) return;
 
-            const txns = await swapContract.txsTransfer(signer.getAddress(), swapContract.getNativeCurrencyAddress(), swap.adjustedOutput, swap.dstAddress);
+            const txns = await swapContract.txsTransfer(signer.getAddress(), swap.token, swap.adjustedOutput, swap.dstAddress);
             await swapContract.sendAndConfirm(signer, txns, true, null, false, async (txId: string, rawTx: string) => {
                 swap.txIds = {init: txId};
                 swap.scRawTx = rawTx;
@@ -413,10 +412,17 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
              * amount: string               amount (in lamports/smart chain base units) of the invoice
              * exactOut: boolean            whether to create and exact output swap
              */
-            const parsedBody: FromBtcTrustedRequestType = await req.paramReader.getParams({
+            req.query.token ??= swapContract.getNativeCurrencyAddress();
+            const parsedBody: FromBtcTrustedRequestType = verifySchema(req.query,{
                 address: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     swapContract.isValidAddress(val) ? val : null,
+                refundAddress: (val: string) => val==null ? "" :
+                    typeof(val)==="string" &&
+                    this.isValidBitcoinAddress(val) ? val : null,
+                token: (val: string) => val!=null &&
+                    typeof(val)==="string" &&
+                    this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: FieldTypeEnum.BN,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
@@ -426,12 +432,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             };
             metadata.request = parsedBody;
 
-            const refundAddressData = req.paramReader.getExistingParamsOrNull({
-                refundAddress: (val: string) => val!=null &&
-                    typeof(val)==="string" &&
-                    this.isValidBitcoinAddress(val) ? val : null
-            });
-            const refundAddress = refundAddressData?.refundAddress;
+            const refundAddress = parsedBody.refundAddress==="" ? null : parsedBody.refundAddress;
 
             const requestedAmount = {input: !parsedBody.exactOut, amount: parsedBody.amount};
             const request = {
@@ -440,7 +441,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 parsed: parsedBody,
                 metadata
             };
-            const useToken = swapContract.getNativeCurrencyAddress();
+            const useToken = parsedBody.token;
 
             //Check request params
             const fees = await this.preCheckAmounts(request, requestedAmount, useToken);
@@ -451,7 +452,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             const abortController = this.getAbortController(responseStream);
 
             //Pre-fetch data
-            const {pricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, swapContract.getNativeCurrencyAddress(), abortController);
+            const {pricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, useToken, abortController);
             const balancePrefetch = swapContract.getBalance(signer.getAddress(), useToken, false).catch(e => {
                 this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
                 abortController.abort(e);
@@ -497,7 +498,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 blockHeight,
                 Date.now()+(this.config.swapAddressExpiry*1000),
                 recommendedFee,
-                refundAddress
+                refundAddress,
+                useToken
             );
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;

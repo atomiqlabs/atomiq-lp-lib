@@ -21,6 +21,7 @@ export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends F
     readonly createdHeight: number;
     readonly expiresAt: number;
     readonly recommendedFee: number;
+    readonly token: string;
     refundAddress: string;
     adjustedInput: BN;
     adjustedOutput: BN;
@@ -33,7 +34,7 @@ export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends F
     vout: number;
     burnTxId: string;
     refundTxId: string;
-    constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN, btcAddress: string, inputSats: BN, dstAddress: string, outputTokens: BN, createdHeight: number, expiresAt: number, recommendedFee: number, refundAddress: string);
+    constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN, btcAddress: string, inputSats: BN, dstAddress: string, outputTokens: BN, createdHeight: number, expiresAt: number, recommendedFee: number, refundAddress: string, token: string);
     constructor(obj: any);
     serialize(): any;
     getHash(): string;

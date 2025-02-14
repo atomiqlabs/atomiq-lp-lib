@@ -16,6 +16,8 @@ export type FromBtcTrustedRequestType = {
     address: string;
     amount: BN;
     exactOut?: boolean;
+    refundAddress?: string;
+    token?: string;
 };
 export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
     readonly type: SwapHandlerType;
