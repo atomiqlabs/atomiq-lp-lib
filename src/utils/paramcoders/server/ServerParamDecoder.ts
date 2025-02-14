@@ -38,7 +38,7 @@ export const serverParamDecoder = (timeoutMillis: number) => (req: Request, res:
         });
         req.on("end", () => {
             try {
-                const body = JSON.parse(Buffer.concat(dataBuffers).toString());
+                const body = dataBuffers.length===0 ? {} : JSON.parse(Buffer.concat(dataBuffers).toString());
                 const paramReader: IParamReader = {
                     getParams: <T extends RequestSchema>(schema: T) => {
                         return Promise.resolve(verifySchema(body, schema));
