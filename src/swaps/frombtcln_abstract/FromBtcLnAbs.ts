@@ -321,7 +321,8 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             false,
             true,
             invoiceData.securityDeposit,
-            new BN(0)
+            new BN(0),
+            invoiceData.depositToken
         );
         abortController.signal.throwIfAborted();
         if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcSwapCreated = Date.now();
@@ -668,7 +669,8 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
                 useToken,
                 totalInToken,
                 swapContract.getHashForHtlc(Buffer.from(parsedBody.paymentHash, "hex")).toString("hex"),
-                totalSecurityDeposit
+                totalSecurityDeposit,
+                depositToken
             );
             metadata.times.swapCreated = Date.now();
 

@@ -16,7 +16,7 @@ var FromBtcLnSwapState;
     FromBtcLnSwapState[FromBtcLnSwapState["SETTLED"] = 4] = "SETTLED";
 })(FromBtcLnSwapState = exports.FromBtcLnSwapState || (exports.FromBtcLnSwapState = {}));
 class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
-    constructor(chainIdOrObj, pr, lnPaymentHash, amountMtokens, swapFee, swapFeeInToken, claimer, token, totalTokens, claimHash, securityDeposit) {
+    constructor(chainIdOrObj, pr, lnPaymentHash, amountMtokens, swapFee, swapFeeInToken, claimer, token, totalTokens, claimHash, securityDeposit, depositToken) {
         if (typeof (chainIdOrObj) === "string") {
             super(chainIdOrObj, amountMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
             this.state = FromBtcLnSwapState.CREATED;
@@ -27,6 +27,7 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.totalTokens = totalTokens;
             this.claimHash = claimHash;
             this.securityDeposit = securityDeposit;
+            this.depositToken = depositToken;
         }
         else {
             super(chainIdOrObj);
@@ -38,6 +39,7 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.claimHash = chainIdOrObj.claimHash;
             this.securityDeposit = (0, Utils_1.deserializeBN)(chainIdOrObj.securityDeposit);
             this.secret = chainIdOrObj.secret;
+            this.depositToken = chainIdOrObj.depositToken;
             //Compatibility
             if (this.state === FromBtcLnSwapState.CREATED && this.data != null) {
                 this.claimer = this.data.getClaimer();
@@ -59,6 +61,7 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.totalTokens = (0, Utils_1.serializeBN)(this.totalTokens);
         partialSerialized.claimHash = this.claimHash;
         partialSerialized.securityDeposit = (0, Utils_1.serializeBN)(this.securityDeposit);
+        partialSerialized.depositToken = this.depositToken;
         return partialSerialized;
     }
     getIdentifierHash() {

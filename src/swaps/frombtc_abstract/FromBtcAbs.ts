@@ -376,7 +376,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 false,
                 true,
                 totalSecurityDeposit,
-                totalClaimerBounty
+                totalClaimerBounty,
+                depositToken
             );
             data.setExtraData(swapContract.getExtraData(
                 this.bitcoin.toOutputScript(receiveAddress),

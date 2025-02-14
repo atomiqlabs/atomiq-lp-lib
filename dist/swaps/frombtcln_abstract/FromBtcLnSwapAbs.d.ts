@@ -18,8 +18,9 @@ export declare class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends Fro
     readonly totalTokens: BN;
     readonly claimHash: string;
     readonly securityDeposit: BN;
+    readonly depositToken: string;
     secret: string;
-    constructor(chainIdentifier: string, pr: string, lnPaymentHash: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN, claimer: string, token: string, totalTokens: BN, claimHash: string, securityDeposit: BN);
+    constructor(chainIdentifier: string, pr: string, lnPaymentHash: string, amountMtokens: BN, swapFee: BN, swapFeeInToken: BN, claimer: string, token: string, totalTokens: BN, claimHash: string, securityDeposit: BN, depositToken: string);
     constructor(obj: any);
     serialize(): any;
     getIdentifierHash(): string;

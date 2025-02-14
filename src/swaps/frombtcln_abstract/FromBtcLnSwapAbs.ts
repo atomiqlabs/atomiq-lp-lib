@@ -24,6 +24,7 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
     readonly totalTokens: BN;
     readonly claimHash: string;
     readonly securityDeposit: BN;
+    readonly depositToken: string;
 
     secret: string;
 
@@ -38,7 +39,8 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         token: string,
         totalTokens: BN,
         claimHash: string,
-        securityDeposit: BN
+        securityDeposit: BN,
+        depositToken: string
     );
     constructor(obj: any);
 
@@ -53,7 +55,8 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         token?: string,
         totalTokens?: BN,
         claimHash?: string,
-        securityDeposit?: BN
+        securityDeposit?: BN,
+        depositToken?: string
     ) {
         if(typeof(chainIdOrObj)==="string") {
             super(chainIdOrObj, amountMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
@@ -65,6 +68,7 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
             this.totalTokens = totalTokens;
             this.claimHash = claimHash;
             this.securityDeposit = securityDeposit;
+            this.depositToken = depositToken;
         } else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
@@ -75,6 +79,7 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
             this.claimHash = chainIdOrObj.claimHash;
             this.securityDeposit = deserializeBN(chainIdOrObj.securityDeposit);
             this.secret = chainIdOrObj.secret;
+            this.depositToken = chainIdOrObj.depositToken;
 
             //Compatibility
             if(this.state===FromBtcLnSwapState.CREATED && this.data!=null) {
@@ -98,6 +103,7 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         partialSerialized.totalTokens = serializeBN(this.totalTokens);
         partialSerialized.claimHash = this.claimHash;
         partialSerialized.securityDeposit = serializeBN(this.securityDeposit);
+        partialSerialized.depositToken = this.depositToken;
         return partialSerialized;
     }
 

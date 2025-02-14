@@ -271,7 +271,7 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
             }
             const { swapContract, signer } = this.getChain(invoiceData.chainIdentifier);
             //Create real swap data
-            const payInvoiceObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.claimer, useToken, escrowAmount, invoiceData.claimHash, new BN(0), new BN(Math.floor(Date.now() / 1000)).add(expiryTimeout), false, true, invoiceData.securityDeposit, new BN(0));
+            const payInvoiceObject = yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.claimer, useToken, escrowAmount, invoiceData.claimHash, new BN(0), new BN(Math.floor(Date.now() / 1000)).add(expiryTimeout), false, true, invoiceData.securityDeposit, new BN(0), invoiceData.depositToken);
             abortController.signal.throwIfAborted();
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcSwapCreated = Date.now();
@@ -547,7 +547,7 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
             const expiryTimeout = this.config.minCltv.mul(this.config.bitcoinBlocktime.div(this.config.safetyFactor)).sub(this.config.gracePeriod);
             const totalSecurityDeposit = yield this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSDPromise, depositToken, depositTokenPricePrefetchPromise, abortController.signal, metadata);
             metadata.times.securityDepositCalculated = Date.now();
-            const createdSwap = new FromBtcLnSwapAbs_1.FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, parsedBody.paymentHash, hodlInvoice.mtokens, swapFee, swapFeeInToken, parsedBody.address, useToken, totalInToken, swapContract.getHashForHtlc(Buffer.from(parsedBody.paymentHash, "hex")).toString("hex"), totalSecurityDeposit);
+            const createdSwap = new FromBtcLnSwapAbs_1.FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, parsedBody.paymentHash, hodlInvoice.mtokens, swapFee, swapFeeInToken, parsedBody.address, useToken, totalInToken, swapContract.getHashForHtlc(Buffer.from(parsedBody.paymentHash, "hex")).toString("hex"), totalSecurityDeposit, depositToken);
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;
             //Save the desired fee rate for the signature

@@ -282,7 +282,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const totalClaimerBounty = yield this.getClaimerBounty(req, expiry, abortController.signal);
             metadata.times.claimerBountyCalculated = Date.now();
             //Create swap data
-            const data = yield swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), parsedBody.address, useToken, totalInToken, paymentHash.toString("hex"), parsedBody.sequence, expiry, false, true, totalSecurityDeposit, totalClaimerBounty);
+            const data = yield swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), parsedBody.address, useToken, totalInToken, paymentHash.toString("hex"), parsedBody.sequence, expiry, false, true, totalSecurityDeposit, totalClaimerBounty, depositToken);
             data.setExtraData(swapContract.getExtraData(this.bitcoin.toOutputScript(receiveAddress), amountBD, this.config.confirmations).toString("hex"));
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
