@@ -17,20 +17,25 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      *
      * @param chainIdentifier
      * @param useToken
+     * @param depositToken
      * @param abortController
      */
-    protected getFromBtcPricePrefetches(chainIdentifier: string, useToken: string, abortController: AbortController): {
+    protected getFromBtcPricePrefetches(chainIdentifier: string, useToken: string, depositToken: string, abortController: AbortController): {
         pricePrefetchPromise: Promise<BN>;
-        securityDepositPricePrefetchPromise: Promise<BN>;
+        gasTokenPricePrefetchPromise: Promise<BN>;
+        depositTokenPricePrefetchPromise: Promise<BN>;
     };
     /**
      * Starts a pre-fetch for base security deposit (transaction fee for refunding transaction on our side)
      *
      * @param chainIdentifier
      * @param dummySwapData
+     * @param depositToken
+     * @param gasTokenPricePrefetchPromise
+     * @param depositTokenPricePrefetchPromise
      * @param abortController
      */
-    protected getBaseSecurityDepositPrefetch(chainIdentifier: string, dummySwapData: SwapData, abortController: AbortController): Promise<BN>;
+    protected getBaseSecurityDepositPrefetch(chainIdentifier: string, dummySwapData: SwapData, depositToken: string, gasTokenPricePrefetchPromise: Promise<BN>, depositTokenPricePrefetchPromise: Promise<BN>, abortController: AbortController): Promise<BN>;
     /**
      * Starts a pre-fetch for vault balance
      *
@@ -48,6 +53,14 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
      */
     protected checkBalance(totalInToken: BN, balancePrefetch: Promise<BN>, signal: AbortSignal | null): Promise<void>;
+    /**
+     * Checks if the specified token is allowed as a deposit token
+     *
+     * @param chainIdentifier
+     * @param depositToken
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
+     */
+    protected checkAllowedDepositToken(chainIdentifier: string, depositToken: string): void;
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
@@ -87,19 +100,6 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
         totalInToken: BN;
     }>;
     /**
-     * Calculates the required security deposit
-     *
-     * @param chainIdentifier
-     * @param amountBD
-     * @param swapFee
-     * @param expiryTimeout
-     * @param baseSecurityDepositPromise
-     * @param securityDepositPricePrefetchPromise
-     * @param signal
-     * @param metadata
-     */
-    protected getSecurityDeposit(chainIdentifier: string, amountBD: BN, swapFee: BN, expiryTimeout: BN, baseSecurityDepositPromise: Promise<BN>, securityDepositPricePrefetchPromise: Promise<BN>, signal: AbortSignal, metadata: any): Promise<BN>;
-    /**
      * Signs the created swap
      *
      * @param chainIdentifier
@@ -116,4 +116,18 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
         signature: string;
         feeRate: string;
     }>;
+    /**
+     * Calculates the required security deposit
+     *
+     * @param chainIdentifier
+     * @param amountBD
+     * @param swapFee
+     * @param expiryTimeout
+     * @param baseSecurityDepositPromise
+     * @param depositToken
+     * @param depositTokenPricePrefetchPromise
+     * @param signal
+     * @param metadata
+     */
+    protected getSecurityDeposit(chainIdentifier: string, amountBD: BN, swapFee: BN, expiryTimeout: BN, baseSecurityDepositPromise: Promise<BN>, depositToken: string, depositTokenPricePrefetchPromise: Promise<BN>, signal: AbortSignal, metadata: any): Promise<BN>;
 }

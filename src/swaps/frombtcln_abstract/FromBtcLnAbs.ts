@@ -542,8 +542,11 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
 
             const chainIdentifier = req.query.chain as string ?? this.chains.default;
             const {swapContract, signer} = this.getChain(chainIdentifier);
+            const depositToken = req.query.depositToken as string ?? swapContract.getNativeCurrencyAddress();
+            this.checkAllowedDepositToken(chainIdentifier, depositToken);
 
             metadata.times.requestReceived = Date.now();
+
 
             /**
              * address: string              solana address of the recipient
@@ -596,13 +599,21 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             const abortController = this.getAbortController(responseStream);
 
             //Pre-fetch data
-            const {pricePrefetchPromise, securityDepositPricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, abortController);
+            const {
+                pricePrefetchPromise,
+                gasTokenPricePrefetchPromise,
+                depositTokenPricePrefetchPromise
+            } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, depositToken, abortController);
             const balancePrefetch: Promise<BN> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const channelsPrefetch: Promise<LightningNetworkChannel[]> = this.getChannelsPrefetch(abortController);
 
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address, parsedBody.paymentHash);
             abortController.signal.throwIfAborted();
-            const baseSDPromise: Promise<BN> = this.getBaseSecurityDepositPrefetch(chainIdentifier, dummySwapData, abortController);
+            const baseSDPromise: Promise<BN> = this.getBaseSecurityDepositPrefetch(
+                chainIdentifier, dummySwapData, depositToken,
+                gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise,
+                abortController
+            );
 
             //Asynchronously send the node's public key to the client
             this.sendPublicKeyAsync(responseStream);
@@ -641,7 +652,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             const expiryTimeout = this.config.minCltv.mul(this.config.bitcoinBlocktime.div(this.config.safetyFactor)).sub(this.config.gracePeriod);
             const totalSecurityDeposit = await this.getSecurityDeposit(
                 chainIdentifier, amountBD, swapFee, expiryTimeout,
-                baseSDPromise, securityDepositPricePrefetchPromise,
+                baseSDPromise, depositToken, depositTokenPricePrefetchPromise,
                 abortController.signal, metadata
             );
             metadata.times.securityDepositCalculated = Date.now();

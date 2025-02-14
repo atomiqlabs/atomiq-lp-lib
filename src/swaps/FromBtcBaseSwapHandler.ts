@@ -29,11 +29,13 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
      *
      * @param chainIdentifier
      * @param useToken
+     * @param depositToken
      * @param abortController
      */
-    protected getFromBtcPricePrefetches(chainIdentifier: string, useToken: string, abortController: AbortController): {
+    protected getFromBtcPricePrefetches(chainIdentifier: string, useToken: string, depositToken: string, abortController: AbortController): {
         pricePrefetchPromise: Promise<BN>,
-        securityDepositPricePrefetchPromise: Promise<BN>
+        gasTokenPricePrefetchPromise: Promise<BN>,
+        depositTokenPricePrefetchPromise: Promise<BN>
     } {
         const pricePrefetchPromise: Promise<BN> = this.swapPricing.preFetchPrice(useToken, chainIdentifier).catch(e => {
             this.logger.error("getFromBtcPricePrefetches(): pricePrefetch error: ", e);
@@ -41,15 +43,21 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             return null;
         });
         const {swapContract} = this.getChain(chainIdentifier);
-        const securityDepositPricePrefetchPromise: Promise<BN> = useToken.toString()===swapContract.getNativeCurrencyAddress().toString() ?
+        const gasTokenPricePrefetchPromise: Promise<BN> = useToken.toString()===swapContract.getNativeCurrencyAddress().toString() ?
             pricePrefetchPromise :
             this.swapPricing.preFetchPrice(swapContract.getNativeCurrencyAddress(), chainIdentifier).catch(e => {
-                this.logger.error("getFromBtcPricePrefetches(): securityDepositPricePrefetch error: ", e);
+                this.logger.error("getFromBtcPricePrefetches(): gasTokenPricePrefetchPromise error: ", e);
                 abortController.abort(e);
                 return null;
             });
-
-        return {pricePrefetchPromise, securityDepositPricePrefetchPromise};
+        const depositTokenPricePrefetchPromise: Promise<BN> = depositToken===swapContract.getNativeCurrencyAddress() ?
+            gasTokenPricePrefetchPromise :
+            this.swapPricing.preFetchPrice(depositToken, chainIdentifier).catch(e => {
+                this.logger.error("getFromBtcPricePrefetches(): depositTokenPricePrefetchPromise error: ", e);
+                abortController.abort(e);
+                return null;
+            });
+        return {pricePrefetchPromise, gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise};
     }
 
     /**
@@ -57,14 +65,23 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
      *
      * @param chainIdentifier
      * @param dummySwapData
+     * @param depositToken
+     * @param gasTokenPricePrefetchPromise
+     * @param depositTokenPricePrefetchPromise
      * @param abortController
      */
-    protected async getBaseSecurityDepositPrefetch(chainIdentifier: string, dummySwapData: SwapData, abortController: AbortController): Promise<BN> {
+    protected async getBaseSecurityDepositPrefetch(
+        chainIdentifier: string, dummySwapData: SwapData, depositToken: string,
+        gasTokenPricePrefetchPromise: Promise<BN>, depositTokenPricePrefetchPromise: Promise<BN>,
+        abortController: AbortController
+    ): Promise<BN> {
         //Solana workaround
         const {swapContract} = this.getChain(chainIdentifier);
+        let feeResult: BN;
+        const gasToken = swapContract.getNativeCurrencyAddress();
         if (swapContract.getRawRefundFee != null) {
             try {
-                return await swapContract.getRawRefundFee(dummySwapData);
+                feeResult = await swapContract.getRawRefundFee(dummySwapData);
             } catch (e) {
                 this.logger.error("getBaseSecurityDepositPrefetch(): pre-fetch error: ", e);
                 abortController.abort(e);
@@ -72,14 +89,17 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             }
         } else {
             try {
-                const result = await swapContract.getRefundFee(dummySwapData);
-                return result.mul(new BN(2));
+                feeResult = await swapContract.getRefundFee(dummySwapData);
             } catch (e1) {
                 this.logger.error("getBaseSecurityDepositPrefetch(): pre-fetch error: ", e1);
                 abortController.abort(e1);
                 return null;
             }
         }
+        feeResult = feeResult.mul(new BN(2));
+        if(gasToken===depositToken) return feeResult;
+        const btcValue = await this.swapPricing.getToBtcSwapAmount(feeResult, gasToken, chainIdentifier, true, gasTokenPricePrefetchPromise);
+        return await this.swapPricing.getFromBtcSwapAmount(btcValue, depositToken, chainIdentifier, true, depositTokenPricePrefetchPromise);
     }
 
     /**
@@ -116,6 +136,28 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             throw {
                 code: 20002,
                 msg: "Not enough liquidity"
+            };
+        }
+    }
+
+    /**
+     * Checks if the specified token is allowed as a deposit token
+     *
+     * @param chainIdentifier
+     * @param depositToken
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
+     */
+    protected checkAllowedDepositToken(chainIdentifier: string, depositToken: string): void {
+        const {swapContract, allowedDepositTokens} = this.getChain(chainIdentifier);
+        if(allowedDepositTokens==null) {
+            if(depositToken!==swapContract.getNativeCurrencyAddress()) throw {
+                code: 20190,
+                msg: "Unsupported deposit token"
+            };
+        } else {
+            if(!allowedDepositTokens.includes(depositToken)) throw {
+                code: 20190,
+                msg: "Unsupported deposit token"
             };
         }
     }
@@ -274,60 +316,6 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
     }
 
     /**
-     * Calculates the required security deposit
-     *
-     * @param chainIdentifier
-     * @param amountBD
-     * @param swapFee
-     * @param expiryTimeout
-     * @param baseSecurityDepositPromise
-     * @param securityDepositPricePrefetchPromise
-     * @param signal
-     * @param metadata
-     */
-    protected async getSecurityDeposit(
-        chainIdentifier: string,
-        amountBD: BN,
-        swapFee: BN,
-        expiryTimeout: BN,
-        baseSecurityDepositPromise: Promise<BN>,
-        securityDepositPricePrefetchPromise: Promise<BN>,
-        signal: AbortSignal,
-        metadata: any
-    ): Promise<BN> {
-        let baseSD: BN = await baseSecurityDepositPromise;
-
-        signal.throwIfAborted();
-
-        metadata.times.refundFeeFetched = Date.now();
-
-        const {swapContract} = this.getChain(chainIdentifier);
-
-        const swapValueInNativeCurrency = await this.swapPricing.getFromBtcSwapAmount(
-            amountBD.sub(swapFee),
-            swapContract.getNativeCurrencyAddress(),
-            chainIdentifier,
-            true,
-            securityDepositPricePrefetchPromise
-        );
-
-        signal.throwIfAborted();
-
-        const apyPPM = new BN(Math.floor(this.config.securityDepositAPY*1000000));
-        const variableSD = swapValueInNativeCurrency.mul(apyPPM).mul(expiryTimeout).div(new BN(1000000)).div(secondsInYear);
-
-        this.logger.debug(
-            "getSecurityDeposit(): base security deposit: "+baseSD.toString(10)+
-            " swap output in native: "+swapValueInNativeCurrency.toString(10)+
-            " apy ppm: "+apyPPM.toString(10)+
-            " expiry timeout: "+expiryTimeout.toString(10)+
-            " variable security deposit: "+variableSD.toString(10)
-        );
-
-        return baseSD.add(variableSD);
-    }
-
-    /**
      * Signs the created swap
      *
      * @param chainIdentifier
@@ -374,6 +362,61 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             ...sigData,
             feeRate
         };
+    }
+
+    /**
+     * Calculates the required security deposit
+     *
+     * @param chainIdentifier
+     * @param amountBD
+     * @param swapFee
+     * @param expiryTimeout
+     * @param baseSecurityDepositPromise
+     * @param depositToken
+     * @param depositTokenPricePrefetchPromise
+     * @param signal
+     * @param metadata
+     */
+    protected async getSecurityDeposit(
+        chainIdentifier: string,
+        amountBD: BN,
+        swapFee: BN,
+        expiryTimeout: BN,
+        baseSecurityDepositPromise: Promise<BN>,
+        depositToken: string,
+        depositTokenPricePrefetchPromise: Promise<BN>,
+        signal: AbortSignal,
+        metadata: any
+    ): Promise<BN> {
+        let baseSD: BN = await baseSecurityDepositPromise;
+
+        signal.throwIfAborted();
+
+        metadata.times.refundFeeFetched = Date.now();
+
+        const swapValueInDepositToken = await this.swapPricing.getFromBtcSwapAmount(
+            amountBD.sub(swapFee),
+            depositToken,
+            chainIdentifier,
+            true,
+            depositTokenPricePrefetchPromise
+        );
+
+        signal.throwIfAborted();
+
+        const apyPPM = new BN(Math.floor(this.config.securityDepositAPY*1000000));
+        const variableSD = swapValueInDepositToken.mul(apyPPM).mul(expiryTimeout).div(new BN(1000000)).div(secondsInYear);
+
+        this.logger.debug(
+            "getSecurityDeposit(): base security deposit: "+baseSD.toString(10)+
+            " deposit token: "+depositToken+
+            " swap output in deposit token: "+swapValueInDepositToken.toString(10)+
+            " apy ppm: "+apyPPM.toString(10)+
+            " expiry timeout: "+expiryTimeout.toString(10)+
+            " variable security deposit: "+variableSD.toString(10)
+        );
+
+        return baseSD.add(variableSD);
     }
 
 }

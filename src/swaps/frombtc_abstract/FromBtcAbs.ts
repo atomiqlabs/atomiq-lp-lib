@@ -256,6 +256,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
             const chainIdentifier = req.query.chain as string ?? this.chains.default;
             const {swapContract, signer} = this.getChain(chainIdentifier);
+            const depositToken = req.query.depositToken as string ?? swapContract.getNativeCurrencyAddress();
+            this.checkAllowedDepositToken(chainIdentifier, depositToken);
 
             metadata.times.requestReceived = Date.now();
             /**
@@ -310,13 +312,21 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const abortController = this.getAbortController(responseStream);
 
             //Pre-fetch data
-            const {pricePrefetchPromise, securityDepositPricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, abortController);
+            const {
+                pricePrefetchPromise,
+                gasTokenPricePrefetchPromise,
+                depositTokenPricePrefetchPromise
+            } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, depositToken, abortController);
             const balancePrefetch: Promise<BN> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const signDataPrefetchPromise: Promise<any> = this.getSignDataPrefetch(chainIdentifier, abortController, responseStream);
 
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address);
             abortController.signal.throwIfAborted();
-            const baseSDPromise: Promise<BN> = this.getBaseSecurityDepositPrefetch(chainIdentifier, dummySwapData, abortController);
+            const baseSDPromise: Promise<BN> = this.getBaseSecurityDepositPrefetch(
+                chainIdentifier, dummySwapData, depositToken,
+                gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise,
+                abortController
+            );
 
             //Check valid amount specified (min/max)
             const {
@@ -344,7 +354,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             //Calculate security deposit
             const totalSecurityDeposit = await this.getSecurityDeposit(
                 chainIdentifier, amountBD, swapFee, expiryTimeout,
-                baseSDPromise, securityDepositPricePrefetchPromise,
+                baseSDPromise, depositToken, depositTokenPricePrefetchPromise,
                 abortController.signal, metadata
             );
             metadata.times.securityDepositCalculated = Date.now();

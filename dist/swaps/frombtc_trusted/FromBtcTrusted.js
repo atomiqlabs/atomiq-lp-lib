@@ -401,7 +401,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const responseStream = res.responseStream;
             const abortController = this.getAbortController(responseStream);
             //Pre-fetch data
-            const { pricePrefetchPromise } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, abortController);
+            const { pricePrefetchPromise } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, swapContract.getNativeCurrencyAddress(), abortController);
             const balancePrefetch = swapContract.getBalance(signer.getAddress(), useToken, false).catch(e => {
                 this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
                 abortController.abort(e);

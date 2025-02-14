@@ -65,6 +65,7 @@ export type ChainData<T extends ChainType = ChainType> = {
     swapContract: T["Contract"],
     chainEvents: T["Events"],
     allowedTokens: string[],
+    allowedDepositTokens?: string[],
     btcRelay?: T["BtcRelay"]
 }
 
