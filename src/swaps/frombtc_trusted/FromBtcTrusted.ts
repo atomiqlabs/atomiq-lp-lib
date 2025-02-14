@@ -527,8 +527,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 }
             });
         });
-        restServer.use(this.path+"/getAddress", serverParamDecoder(10*1000));
-        restServer.post(this.path+"/getAddress", getAddress);
+        restServer.get(this.path+"/getAddress", getAddress);
 
         const getInvoiceStatus = expressHandlerWrapper(async (req, res) => {
             /**

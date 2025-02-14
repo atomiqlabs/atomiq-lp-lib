@@ -18,7 +18,6 @@ const Utils_1 = require("../../utils/Utils");
 const SchemaVerifier_1 = require("../../utils/paramcoders/SchemaVerifier");
 const PluginManager_1 = require("../../plugins/PluginManager");
 const FromBtcLnBaseSwapHandler_1 = require("../FromBtcLnBaseSwapHandler");
-const ServerParamDecoder_1 = require("../../utils/paramcoders/server/ServerParamDecoder");
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
@@ -418,8 +417,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
                 }
             });
         }));
-        restServer.use(this.path + "/createInvoice", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
-        restServer.post(this.path + "/createInvoice", createInvoice);
+        restServer.get(this.path + "/createInvoice", createInvoice);
         const getInvoiceStatus = (0, Utils_1.expressHandlerWrapper)((req, res) => __awaiter(this, void 0, void 0, function* () {
             /**
              * paymentHash: string          payment hash of the invoice
@@ -485,7 +483,6 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
                     }
                 };
         }));
-        restServer.post(this.path + "/getInvoiceStatus", getInvoiceStatus);
         restServer.get(this.path + "/getInvoiceStatus", getInvoiceStatus);
         this.logger.info("started at path: ", this.path);
     }

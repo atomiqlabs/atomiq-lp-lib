@@ -491,8 +491,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
         });
 
-        restServer.use(this.path+"/createInvoice", serverParamDecoder(10*1000));
-        restServer.post(this.path+"/createInvoice", createInvoice);
+        restServer.get(this.path+"/createInvoice", createInvoice);
 
         const getInvoiceStatus = expressHandlerWrapper(async (req, res) => {
             /**
@@ -562,7 +561,6 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                 }
             };
         });
-        restServer.post(this.path+"/getInvoiceStatus", getInvoiceStatus);
         restServer.get(this.path+"/getInvoiceStatus", getInvoiceStatus);
 
         this.logger.info("started at path: ", this.path);

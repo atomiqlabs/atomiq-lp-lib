@@ -17,7 +17,6 @@ const BN = require("bn.js");
 const PluginManager_1 = require("../../plugins/PluginManager");
 const Utils_1 = require("../../utils/Utils");
 const SchemaVerifier_1 = require("../../utils/paramcoders/SchemaVerifier");
-const ServerParamDecoder_1 = require("../../utils/paramcoders/server/ServerParamDecoder");
 class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     constructor(storageDirectory, path, chains, bitcoin, swapPricing, bitcoinRpc, config) {
         var _a;
@@ -451,8 +450,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 }
             });
         }));
-        restServer.use(this.path + "/getAddress", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
-        restServer.post(this.path + "/getAddress", getAddress);
+        restServer.get(this.path + "/getAddress", getAddress);
         const getInvoiceStatus = (0, Utils_1.expressHandlerWrapper)((req, res) => __awaiter(this, void 0, void 0, function* () {
             /**
              * paymentHash: string          payment hash of the invoice
