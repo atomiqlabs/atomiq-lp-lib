@@ -16,7 +16,7 @@ var FromBtcLnTrustedSwapState;
     FromBtcLnTrustedSwapState[FromBtcLnTrustedSwapState["SETTLED"] = 4] = "SETTLED";
 })(FromBtcLnTrustedSwapState = exports.FromBtcLnTrustedSwapState || (exports.FromBtcLnTrustedSwapState = {}));
 class FromBtcLnTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
-    constructor(chainIdOrObj, pr, inputMtokens, swapFee, swapFeeInToken, output, secret, dstAddress) {
+    constructor(chainIdOrObj, pr, inputMtokens, swapFee, swapFeeInToken, output, secret, dstAddress, token) {
         if (typeof (chainIdOrObj) === "string") {
             super(chainIdOrObj, inputMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
             this.state = FromBtcLnTrustedSwapState.CREATED;
@@ -24,6 +24,7 @@ class FromBtcLnTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.output = output;
             this.secret = secret;
             this.dstAddress = dstAddress;
+            this.token = token;
         }
         else {
             super(chainIdOrObj);
@@ -31,11 +32,12 @@ class FromBtcLnTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.output = (0, Utils_1.deserializeBN)(chainIdOrObj.output);
             this.secret = chainIdOrObj.secret;
             this.dstAddress = chainIdOrObj.dstAddress;
+            this.token = chainIdOrObj.token;
             this.scRawTx = chainIdOrObj.scRawTx;
         }
         this.type = null;
     }
-    getHash() {
+    getClaimHash() {
         return (0, crypto_1.createHash)("sha256").update(Buffer.from(this.secret, "hex")).digest().toString("hex");
     }
     getSequence() {
@@ -47,6 +49,7 @@ class FromBtcLnTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.output = (0, Utils_1.serializeBN)(this.output);
         partialSerialized.secret = this.secret;
         partialSerialized.dstAddress = this.dstAddress;
+        partialSerialized.token = this.token;
         partialSerialized.scRawTx = this.scRawTx;
         return partialSerialized;
     }

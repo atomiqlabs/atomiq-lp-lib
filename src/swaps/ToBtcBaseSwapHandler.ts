@@ -15,7 +15,8 @@ import {ToBtcRequestType} from "./tobtc_abstract/ToBtcAbs";
 import {Request} from "express";
 
 export type ToBtcBaseConfig = SwapBaseConfig & {
-    gracePeriod: BN
+    gracePeriod: BN,
+    refundAuthorizationTimeout: number
 };
 
 export abstract class ToBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData, S>, S> extends SwapHandler<V, S> {
@@ -298,7 +299,7 @@ export abstract class ToBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData, S
         const sigData = await swapContract.getInitSignature(
             signer,
             swapObject,
-            this.config.authorizationTimeout,
+            this.getInitAuthorizationTimeout(chainIdentifier),
             prefetchedSignData,
             feeRate
         );

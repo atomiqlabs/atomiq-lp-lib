@@ -15,10 +15,13 @@ export type FromBtcTrustedConfig = FromBtcBaseConfig & {
 export type FromBtcTrustedRequestType = {
     address: string;
     amount: BN;
-    exactOut?: boolean;
+    exactIn?: boolean;
+    refundAddress?: string;
+    token?: string;
 };
 export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
     readonly type: SwapHandlerType;
+    readonly swapType: any;
     readonly config: FromBtcTrustedConfig;
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
@@ -46,7 +49,7 @@ export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTruste
     startWatchdog(): Promise<void>;
     init(): Promise<void>;
     getInfoData(): any;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: RefundEvent<SwapData>): Promise<void>;
 }

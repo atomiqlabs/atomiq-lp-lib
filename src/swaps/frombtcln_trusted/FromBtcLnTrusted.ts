@@ -35,7 +35,8 @@ export type SwapForGasServerConfig = FromBtcBaseConfig & {
 export type FromBtcLnTrustedRequestType = {
     address: string,
     amount: BN,
-    exactOut?: boolean
+    exactIn?: boolean,
+    token?: string
 };
 
 /**
@@ -43,6 +44,7 @@ export type FromBtcLnTrustedRequestType = {
  */
 export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState> {
     readonly type: SwapHandlerType = SwapHandlerType.FROM_BTCLN_TRUSTED;
+    readonly swapType = null;
 
     activeSubscriptions: Map<string, AbortController> = new Map<string, AbortController>();
     processedTxIds: Map<string, string> = new Map<string, string>();
@@ -60,9 +62,6 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         super(storageDirectory, path, chains, lightning, swapPricing);
         this.config = config;
         this.config.invoiceTimeoutSeconds = this.config.invoiceTimeoutSeconds || 90;
-        for(let chainId in chains.chains) {
-            this.allowedTokens[chainId] = new Set<string>([chains.chains[chainId].swapContract.getNativeCurrencyAddress()]);
-        }
     }
 
     /**
@@ -85,7 +84,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
      * @param invoiceData
      */
     private subscribeToInvoice(invoiceData: FromBtcLnTrustedSwap) {
-        const hash = invoiceData.getHash();
+        const hash = invoiceData.getIdentifierHash();
 
         //Already subscribed
         if(this.activeSubscriptions.has(hash)) return;
@@ -140,7 +139,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         for(let swap of swaps) {
             //Cancel invoices
             try {
-                const paymentHash = swap.getHash();
+                const paymentHash = swap.getIdentifierHash();
                 await this.lightning.cancelHodlInvoice(paymentHash);
                 this.unsubscribeInvoice(paymentHash);
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
@@ -171,7 +170,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             }
         ]);
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             if(await this.processPastSwap(swap)) cancelInvoices.push(swap);
         }
 
@@ -181,7 +180,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
     private async cancelSwapAndInvoice(swap: FromBtcLnTrustedSwap): Promise<void> {
         if(swap.state!==FromBtcLnTrustedSwapState.RECEIVED) return;
         await swap.setState(FromBtcLnTrustedSwapState.CANCELED);
-        const paymentHash = swap.getHash();
+        const paymentHash = swap.getIdentifierHash();
         await this.lightning.cancelHodlInvoice(paymentHash);
         this.unsubscribeInvoice(paymentHash);
         await this.removeSwapData(swap);
@@ -206,7 +205,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         }
 
         if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
-            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), swapContract.getNativeCurrencyAddress(), false);
+            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), invoiceData.token, false);
             try {
                 await this.checkBalance(invoiceData.output, balance, null);
                 if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcBalanceChecked = Date.now();
@@ -217,7 +216,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             if(invoiceData.state!==FromBtcLnTrustedSwapState.RECEIVED) return;
 
-            const txns = await swapContract.txsTransfer(signer.getAddress(), swapContract.getNativeCurrencyAddress(), invoiceData.output, invoiceData.dstAddress);
+            const txns = await swapContract.txsTransfer(signer.getAddress(), invoiceData.token, invoiceData.output, invoiceData.dstAddress);
 
             let unlock = invoiceData.lock(Infinity);
             if(unlock==null) return;
@@ -289,7 +288,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcSettled = Date.now();
 
-            const paymentHash = invoiceData.getHash();
+            const paymentHash = invoiceData.getIdentifierHash();
             this.processedTxIds.set(paymentHash, invoiceData.txIds.init);
             await invoiceData.setState(FromBtcLnTrustedSwapState.SETTLED);
 
@@ -382,12 +381,18 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
              * amount: string               amount (in lamports/smart chain base units) of the invoice
              */
 
-            const parsedBody: FromBtcLnTrustedRequestType = await req.paramReader.getParams({
+            req.query.token ??= swapContract.getNativeCurrencyAddress();
+
+            const parsedBody: FromBtcLnTrustedRequestType = verifySchema(req.query,{
                 address: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     swapContract.isValidAddress(val) ? val : null,
+                token: (val: string) => val!=null &&
+                    typeof(val)==="string" &&
+                    this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: FieldTypeEnum.BN,
-                exactOut: FieldTypeEnum.BooleanOptional
+                exactIn: (val: string) => val==="true" ? true :
+                    (val==="false" || val===undefined) ? false : null
             });
             if(parsedBody==null) throw {
                 code: 20100,
@@ -395,14 +400,14 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             };
             metadata.request = parsedBody;
 
-            const requestedAmount = {input: !parsedBody.exactOut, amount: parsedBody.amount};
+            const requestedAmount = {input: parsedBody.exactIn, amount: parsedBody.amount};
             const request = {
                 chainIdentifier,
                 raw: req,
                 parsed: parsedBody,
                 metadata
             };
-            const useToken = swapContract.getNativeCurrencyAddress();
+            const useToken = parsedBody.token;
 
             //Check request params
             const fees = await this.preCheckAmounts(request, requestedAmount, useToken);
@@ -413,7 +418,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             const abortController = this.getAbortController(responseStream);
 
             //Pre-fetch data
-            const {pricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, abortController);
+            const {pricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, useToken, abortController);
             const balancePrefetch = swapContract.getBalance(signer.getAddress(), useToken, false).catch(e => {
                 this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
                 abortController.abort(e);
@@ -462,7 +467,8 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                 swapFeeInToken,
                 totalInToken,
                 secret.toString("hex"),
-                parsedBody.address
+                parsedBody.address,
+                useToken
             );
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;
@@ -473,21 +479,21 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             this.swapLogger.info(createdSwap, "REST: /createInvoice: Created swap invoice: "+hodlInvoice.request+" amount: "+amountBD.toString(10));
 
-            await responseStream.writeParamsAndEnd({
+            res.status(200).json({
                 msg: "Success",
                 code: 10000,
                 data: {
                     pr: hodlInvoice.request,
+                    amountSats: amountBD.toString(10),
+                    swapFeeSats: swapFee.toString(10),
                     swapFee: swapFeeInToken.toString(10),
                     total: totalInToken.toString(10),
                     intermediaryKey: signer.getAddress()
                 }
             });
-
         });
 
-        restServer.use(this.path+"/createInvoice", serverParamDecoder(10*1000));
-        restServer.post(this.path+"/createInvoice", createInvoice);
+        restServer.get(this.path+"/createInvoice", createInvoice);
 
         const getInvoiceStatus = expressHandlerWrapper(async (req, res) => {
             /**
@@ -557,7 +563,6 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                 }
             };
         });
-        restServer.post(this.path+"/getInvoiceStatus", getInvoiceStatus);
         restServer.get(this.path+"/getInvoiceStatus", getInvoiceStatus);
 
         this.logger.info("started at path: ", this.path);
@@ -566,7 +571,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
     async init() {
         await this.storageManager.loadData(FromBtcLnTrustedSwap);
         //Check if all swaps contain a valid amount
-        for(let swap of await this.storageManager.query([])) {
+        for(let {obj: swap} of await this.storageManager.query([])) {
             if(swap.amount==null) {
                 const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
                 swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
@@ -581,15 +586,15 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         }
     }
 
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void> {
+    protected processClaimEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: ClaimEvent<SwapData>): Promise<void> {
         return Promise.resolve();
     }
 
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void> {
+    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: InitializeEvent<SwapData>): Promise<void> {
         return Promise.resolve();
     }
 
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void> {
+    protected processRefundEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: RefundEvent<SwapData>): Promise<void> {
         return Promise.resolve();
     }
 

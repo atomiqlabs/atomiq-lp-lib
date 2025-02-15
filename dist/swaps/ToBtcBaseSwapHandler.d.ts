@@ -9,6 +9,7 @@ import { ToBtcRequestType } from "./tobtc_abstract/ToBtcAbs";
 import { Request } from "express";
 export type ToBtcBaseConfig = SwapBaseConfig & {
     gracePeriod: BN;
+    refundAuthorizationTimeout: number;
 };
 export declare abstract class ToBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData, S>, S> extends SwapHandler<V, S> {
     readonly pdaExistsForToken: {

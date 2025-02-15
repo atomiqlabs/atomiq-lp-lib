@@ -3,7 +3,7 @@ import { Express } from "express";
 import { FromBtcLnSwapAbs, FromBtcLnSwapState } from "./FromBtcLnSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
-import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
+import { ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { FromBtcBaseConfig } from "../FromBtcBaseSwapHandler";
 import { FromBtcLnBaseSwapHandler } from "../FromBtcLnBaseSwapHandler";
@@ -26,6 +26,7 @@ export type FromBtcLnRequestType = {
  */
 export declare class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN;
+    readonly swapType = ChainSwapType.HTLC;
     readonly config: FromBtcLnConfig;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcLnSwapAbs>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: FromBtcLnConfig);
     protected processPastSwap(swap: FromBtcLnSwapAbs): Promise<"REFUND" | "SETTLE" | "CANCEL" | null>;
@@ -36,9 +37,9 @@ export declare class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwap
      * Checks past swaps, refunds and deletes ones that are already expired.
      */
     protected processPastSwaps(): Promise<void>;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, savedSwap: FromBtcLnSwapAbs, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, savedSwap: FromBtcLnSwapAbs, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, savedSwap: FromBtcLnSwapAbs, event: RefundEvent<SwapData>): Promise<void>;
     /**
      * Called when lightning HTLC is received, also signs an init transaction on the smart chain side, expiry of the
      *  smart chain authorization starts ticking as soon as this HTLC is received
