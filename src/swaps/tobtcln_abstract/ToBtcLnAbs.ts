@@ -3,14 +3,7 @@ import {Express, Request, Response} from "express";
 import {ToBtcLnSwapAbs, ToBtcLnSwapState} from "./ToBtcLnSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import {ISwapPrice} from "../ISwapPrice";
-import {
-    ChainSwapType,
-    ClaimEvent,
-    InitializeEvent,
-    RefundEvent,
-    SwapCommitStatus,
-    SwapData
-} from "@atomiqlabs/base";
+import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {expressHandlerWrapper, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../storage/IIntermediaryStorage";
@@ -23,8 +16,10 @@ import {ToBtcBaseConfig, ToBtcBaseSwapHandler} from "../ToBtcBaseSwapHandler";
 import {
     ILightningWallet,
     OutgoingLightningNetworkPayment,
-    ParsedPaymentRequest, ProbeAndRouteInit,
-    ProbeAndRouteResponse, routesMatch
+    ParsedPaymentRequest,
+    ProbeAndRouteInit,
+    ProbeAndRouteResponse,
+    routesMatch
 } from "../../wallets/ILightningWallet";
 
 export type ToBtcLnConfig = ToBtcBaseConfig & {
@@ -328,9 +323,6 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         const maxFee = swap.quotedNetworkFee;
         const maxUsableCLTVdelta = expiryTimestamp.sub(currentTimestamp).sub(this.config.gracePeriod).div(this.config.bitcoinBlocktime.mul(this.config.safetyFactor));
 
-        await swap.setState(ToBtcLnSwapState.COMMITED);
-        await this.storageManager.saveData(decodedPR.id, swap.data.getSequence(), swap);
-
         //Initiate payment
         this.swapLogger.info(swap, "sendLightningPayment(): paying lightning network invoice,"+
             " cltvDelta: "+maxUsableCLTVdelta.toString(10)+
@@ -364,11 +356,28 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      */
     private async processInitialized(swap: ToBtcLnSwapAbs) {
         //Check if payment was already made
-        let lnPaymentStatus = await this.lightning.getPayment(swap.lnPaymentHash);
-        if(swap.metadata!=null) swap.metadata.times.payPaymentChecked = Date.now();
+        if(swap.state===ToBtcLnSwapState.COMMITED) {
+            if(swap.metadata!=null) swap.metadata.times.payPaymentChecked = Date.now();
+            let lnPaymentStatus = await this.lightning.getPayment(swap.getHash());
+            if(lnPaymentStatus!=null) {
+                if(lnPaymentStatus.status==="pending") {
+                    //Payment still ongoing, process the result
+                    this.subscribeToPayment(swap);
+                    return;
+                } else {
+                    //Payment has already concluded, process the result
+                    await this.processPaymentResult(swap, lnPaymentStatus);
+                    return;
+                }
+            } else {
+                //Payment not founds, try to process again
+                await swap.setState(ToBtcLnSwapState.SAVED);
+            }
+        }
 
-        const paymentExists = lnPaymentStatus!=null;
-        if(!paymentExists) {
+        if(swap.state===ToBtcLnSwapState.SAVED) {
+            await swap.setState(ToBtcLnSwapState.COMMITED);
+            await this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
             try {
                 await this.sendLightningPayment(swap);
             } catch (e) {
@@ -383,14 +392,6 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             this.subscribeToPayment(swap);
             return;
         }
-
-        if(lnPaymentStatus.status==="pending") {
-            this.subscribeToPayment(swap);
-            return;
-        }
-
-        //Payment has already concluded, process the result
-        await this.processPaymentResult(swap, lnPaymentStatus);
     }
 
     protected async processInitializeEvent(chainIdentifier: string, swap: ToBtcLnSwapAbs, event: InitializeEvent<SwapData>): Promise<void> {

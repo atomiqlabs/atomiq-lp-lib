@@ -240,8 +240,6 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             //Compute max cltv delta
             const maxFee = swap.quotedNetworkFee;
             const maxUsableCLTVdelta = expiryTimestamp.sub(currentTimestamp).sub(this.config.gracePeriod).div(this.config.bitcoinBlocktime.mul(this.config.safetyFactor));
-            yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
-            yield this.storageManager.saveData(decodedPR.id, swap.data.getSequence(), swap);
             //Initiate payment
             this.swapLogger.info(swap, "sendLightningPayment(): paying lightning network invoice," +
                 " cltvDelta: " + maxUsableCLTVdelta.toString(10) +
@@ -276,11 +274,30 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     processInitialized(swap) {
         return __awaiter(this, void 0, void 0, function* () {
             //Check if payment was already made
-            let lnPaymentStatus = yield this.lightning.getPayment(swap.lnPaymentHash);
-            if (swap.metadata != null)
-                swap.metadata.times.payPaymentChecked = Date.now();
-            const paymentExists = lnPaymentStatus != null;
-            if (!paymentExists) {
+            if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED) {
+                let lnPaymentStatus = yield this.lightning.getPayment(swap.getHash()););
+                if (swap.metadata != null)
+                    swap.metadata.times.payPaymentChecked = Date.now();
+                if (lnPaymentStatus != null) {
+                    if (lnPaymentStatus.status === "pending") {
+                        //Payment still ongoing, process the result
+                        this.subscribeToPayment(swap);
+                        return;
+                    }
+                    else {
+                        //Payment has already concluded, process the result
+                        yield this.processPaymentResult(swap, lnPaymentStatus);
+                        return;
+                    }
+                }
+                else {
+                    //Payment not founds, try to process again
+                    yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED);
+                }
+            }
+            if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED) {
+                yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
+                yield this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
                 try {
                     yield this.sendLightningPayment(swap);
                 }
@@ -299,12 +316,6 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 this.subscribeToPayment(swap);
                 return;
             }
-            if (lnPaymentStatus.status === "pending") {
-                this.subscribeToPayment(swap);
-                return;
-            }
-            //Payment has already concluded, process the result
-            yield this.processPaymentResult(swap, lnPaymentStatus);
         });
     }
     processInitializeEvent(chainIdentifier, swap, event) {
