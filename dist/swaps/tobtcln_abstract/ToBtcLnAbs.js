@@ -275,9 +275,9 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         return __awaiter(this, void 0, void 0, function* () {
             //Check if payment was already made
             if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED) {
-                let lnPaymentStatus = yield this.lightning.getPayment(swap.getHash()););
                 if (swap.metadata != null)
                     swap.metadata.times.payPaymentChecked = Date.now();
+                let lnPaymentStatus = yield this.lightning.getPayment(swap.lnPaymentHash);
                 if (lnPaymentStatus != null) {
                     if (lnPaymentStatus.status === "pending") {
                         //Payment still ongoing, process the result
@@ -297,7 +297,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             }
             if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED) {
                 yield swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
-                yield this.storageManager.saveData(swap.data.getHash(), swap.data.getSequence(), swap);
+                yield this.saveSwapData(swap);
                 try {
                     yield this.sendLightningPayment(swap);
                 }
