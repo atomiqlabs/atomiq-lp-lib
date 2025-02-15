@@ -37,7 +37,7 @@ export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends F
     constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN, btcAddress: string, inputSats: BN, dstAddress: string, outputTokens: BN, createdHeight: number, expiresAt: number, recommendedFee: number, refundAddress: string, token: string);
     constructor(obj: any);
     serialize(): any;
-    getHash(): string;
+    getClaimHash(): string;
     getSequence(): BN;
     getOutputAmount(): BN;
     getTotalInputAmount(): BN;

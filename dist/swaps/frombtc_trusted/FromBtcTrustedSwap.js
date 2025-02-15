@@ -82,7 +82,7 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.token = this.token;
         return partialSerialized;
     }
-    getHash() {
+    getClaimHash() {
         return (0, crypto_1.createHash)("sha256").update(this.btcAddress).digest().toString("hex");
     }
     getSequence() {

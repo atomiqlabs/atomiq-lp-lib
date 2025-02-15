@@ -84,7 +84,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
      * @param invoiceData
      */
     private subscribeToInvoice(invoiceData: FromBtcLnTrustedSwap) {
-        const hash = invoiceData.getHash();
+        const hash = invoiceData.getIdentifierHash();
 
         //Already subscribed
         if(this.activeSubscriptions.has(hash)) return;
@@ -139,7 +139,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         for(let swap of swaps) {
             //Cancel invoices
             try {
-                const paymentHash = swap.getHash();
+                const paymentHash = swap.getIdentifierHash();
                 await this.lightning.cancelHodlInvoice(paymentHash);
                 this.unsubscribeInvoice(paymentHash);
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
@@ -180,7 +180,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
     private async cancelSwapAndInvoice(swap: FromBtcLnTrustedSwap): Promise<void> {
         if(swap.state!==FromBtcLnTrustedSwapState.RECEIVED) return;
         await swap.setState(FromBtcLnTrustedSwapState.CANCELED);
-        const paymentHash = swap.getHash();
+        const paymentHash = swap.getIdentifierHash();
         await this.lightning.cancelHodlInvoice(paymentHash);
         this.unsubscribeInvoice(paymentHash);
         await this.removeSwapData(swap);
@@ -288,7 +288,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcSettled = Date.now();
 
-            const paymentHash = invoiceData.getHash();
+            const paymentHash = invoiceData.getIdentifierHash();
             this.processedTxIds.set(paymentHash, invoiceData.txIds.init);
             await invoiceData.setState(FromBtcLnTrustedSwapState.SETTLED);
 

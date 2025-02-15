@@ -51,7 +51,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
      * @param invoiceData
      */
     subscribeToInvoice(invoiceData) {
-        const hash = invoiceData.getHash();
+        const hash = invoiceData.getIdentifierHash();
         //Already subscribed
         if (this.activeSubscriptions.has(hash))
             return;
@@ -106,7 +106,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
             for (let swap of swaps) {
                 //Cancel invoices
                 try {
-                    const paymentHash = swap.getHash();
+                    const paymentHash = swap.getIdentifierHash();
                     yield this.lightning.cancelHodlInvoice(paymentHash);
                     this.unsubscribeInvoice(paymentHash);
                     this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
@@ -149,7 +149,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
             if (swap.state !== FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED)
                 return;
             yield swap.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CANCELED);
-            const paymentHash = swap.getHash();
+            const paymentHash = swap.getIdentifierHash();
             yield this.lightning.cancelHodlInvoice(paymentHash);
             this.unsubscribeInvoice(paymentHash);
             yield this.removeSwapData(swap);
@@ -252,7 +252,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
                 yield this.lightning.settleHodlInvoice(invoiceData.secret);
                 if (invoiceData.metadata != null)
                     invoiceData.metadata.times.htlcSettled = Date.now();
-                const paymentHash = invoiceData.getHash();
+                const paymentHash = invoiceData.getIdentifierHash();
                 this.processedTxIds.set(paymentHash, invoiceData.txIds.init);
                 yield invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.SETTLED);
                 this.unsubscribeInvoice(paymentHash);

@@ -68,7 +68,7 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
         this.type = null;
     }
 
-    getHash(): string {
+    getClaimHash(): string {
         return createHash("sha256").update(Buffer.from(this.secret, "hex")).digest().toString("hex");
     }
 

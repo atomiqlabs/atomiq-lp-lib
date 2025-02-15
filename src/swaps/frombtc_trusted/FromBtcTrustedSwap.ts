@@ -142,7 +142,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         return partialSerialized;
     }
 
-    getHash(): string {
+    getClaimHash(): string {
         return createHash("sha256").update(this.btcAddress).digest().toString("hex");
     }
 
