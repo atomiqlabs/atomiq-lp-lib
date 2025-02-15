@@ -15,13 +15,15 @@ export type SwapForGasServerConfig = FromBtcBaseConfig & {
 export type FromBtcLnTrustedRequestType = {
     address: string;
     amount: BN;
-    exactOut?: boolean;
+    exactIn?: boolean;
+    token?: string;
 };
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
 export declare class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState> {
     readonly type: SwapHandlerType;
+    readonly swapType: any;
     activeSubscriptions: Map<string, AbortController>;
     processedTxIds: Map<string, string>;
     readonly config: SwapForGasServerConfig;
@@ -71,7 +73,7 @@ export declare class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLn
     startRestServer(restServer: Express): void;
     init(): Promise<void>;
     getInfoData(): any;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: RefundEvent<SwapData>): Promise<void>;
 }

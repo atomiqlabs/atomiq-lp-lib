@@ -19,7 +19,7 @@ var FromBtcTrustedSwapState;
     FromBtcTrustedSwapState[FromBtcTrustedSwapState["FINISHED"] = 5] = "FINISHED";
 })(FromBtcTrustedSwapState = exports.FromBtcTrustedSwapState || (exports.FromBtcTrustedSwapState = {}));
 class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
-    constructor(objOrChainIdentifier, swapFee, swapFeeInToken, btcAddress, inputSats, dstAddress, outputTokens, createdHeight, expiresAt, recommendedFee, refundAddress) {
+    constructor(objOrChainIdentifier, swapFee, swapFeeInToken, btcAddress, inputSats, dstAddress, outputTokens, createdHeight, expiresAt, recommendedFee, refundAddress, token) {
         if (typeof (objOrChainIdentifier) === "string") {
             super(objOrChainIdentifier, inputSats, swapFee, swapFeeInToken);
             this.state = FromBtcTrustedSwapState.CREATED;
@@ -32,6 +32,7 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.expiresAt = expiresAt;
             this.recommendedFee = recommendedFee;
             this.refundAddress = refundAddress;
+            this.token = token;
         }
         else {
             super(objOrChainIdentifier);
@@ -54,6 +55,7 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.vout = objOrChainIdentifier.vout;
             this.burnTxId = objOrChainIdentifier.burnTxId;
             this.refundTxId = objOrChainIdentifier.refundTxId;
+            this.token = objOrChainIdentifier.token;
         }
     }
     serialize() {
@@ -77,9 +79,10 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.vout = this.vout;
         partialSerialized.burnTxId = this.burnTxId;
         partialSerialized.refundTxId = this.refundTxId;
+        partialSerialized.token = this.token;
         return partialSerialized;
     }
-    getHash() {
+    getClaimHash() {
         return (0, crypto_1.createHash)("sha256").update(this.btcAddress).digest().toString("hex");
     }
     getSequence() {

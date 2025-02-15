@@ -224,7 +224,7 @@ class ToBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
             const feeRate = (feeRateObj === null || feeRateObj === void 0 ? void 0 : feeRateObj.feeRate) != null && typeof (feeRateObj.feeRate) === "string" ? feeRateObj.feeRate : null;
             this.logger.debug("getToBtcSignatureData(): using fee rate from client: ", feeRate);
             const { swapContract, signer } = this.getChain(chainIdentifier);
-            const sigData = yield swapContract.getInitSignature(signer, swapObject, this.config.authorizationTimeout, prefetchedSignData, feeRate);
+            const sigData = yield swapContract.getInitSignature(signer, swapObject, this.getInitAuthorizationTimeout(chainIdentifier), prefetchedSignData, feeRate);
             abortSignal.throwIfAborted();
             return Object.assign(Object.assign({}, sigData), { feeRate });
         });
