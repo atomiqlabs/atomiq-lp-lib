@@ -253,6 +253,8 @@ class SwapHandler {
      */
     getAbortController(responseStream) {
         const abortController = new AbortController();
+        if (responseStream == null || responseStream.getAbortSignal == null)
+            return abortController;
         const responseStreamAbortController = responseStream.getAbortSignal();
         responseStreamAbortController.addEventListener("abort", () => abortController.abort(responseStreamAbortController.reason));
         return abortController;

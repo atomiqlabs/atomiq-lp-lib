@@ -356,6 +356,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      */
     protected getAbortController(responseStream: ServerParamEncoder): AbortController {
         const abortController = new AbortController();
+        if(responseStream==null || responseStream.getAbortSignal==null) return abortController;
         const responseStreamAbortController = responseStream.getAbortSignal();
         responseStreamAbortController.addEventListener("abort", () => abortController.abort(responseStreamAbortController.reason));
         return abortController;
