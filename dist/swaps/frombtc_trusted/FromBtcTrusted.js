@@ -434,9 +434,9 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             yield this.storageManager.saveData(createdSwap.getIdentifierHash(), createdSwap.getSequence(), createdSwap);
             this.subscriptions.set(outputScript, createdSwap);
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: " + createdSwap.btcAddress + " amount: " + amountBD.toString(10));
-            yield responseStream.writeParamsAndEnd({
-                msg: "Success",
+            res.status(200).json({
                 code: 10000,
+                msg: "Success",
                 data: {
                     paymentHash: createdSwap.getIdentifierHash(),
                     sequence: createdSwap.getSequence().toString(10),

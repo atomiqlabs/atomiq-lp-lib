@@ -511,9 +511,9 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
 
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: "+createdSwap.btcAddress+" amount: "+amountBD.toString(10));
 
-            await responseStream.writeParamsAndEnd({
-                msg: "Success",
+            res.status(200).json({
                 code: 10000,
+                msg: "Success",
                 data: {
                     paymentHash: createdSwap.getIdentifierHash(),
                     sequence: createdSwap.getSequence().toString(10),

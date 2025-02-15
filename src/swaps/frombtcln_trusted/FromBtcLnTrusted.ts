@@ -479,17 +479,18 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             this.swapLogger.info(createdSwap, "REST: /createInvoice: Created swap invoice: "+hodlInvoice.request+" amount: "+amountBD.toString(10));
 
-            await responseStream.writeParamsAndEnd({
+            res.status(200).json({
                 msg: "Success",
                 code: 10000,
                 data: {
                     pr: hodlInvoice.request,
+                    amountSats: amountBD.toString(10),
+                    swapFeeSats: swapFee.toString(10),
                     swapFee: swapFeeInToken.toString(10),
                     total: totalInToken.toString(10),
                     intermediaryKey: signer.getAddress()
                 }
             });
-
         });
 
         restServer.get(this.path+"/createInvoice", createInvoice);
