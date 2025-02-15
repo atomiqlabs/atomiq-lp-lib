@@ -764,6 +764,10 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             );
             createdSwap.data = payObject;
             createdSwap.metadata = metadata;
+            createdSwap.prefix = sigData.prefix;
+            createdSwap.timeout = sigData.timeout;
+            createdSwap.signature = sigData.signature
+            createdSwap.feeRate = sigData.feeRate;
 
             await PluginManager.swapCreate(createdSwap);
             await this.storageManager.saveData(parsedPR.id, sequence, createdSwap);
