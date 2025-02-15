@@ -35,7 +35,7 @@ export type SwapForGasServerConfig = FromBtcBaseConfig & {
 export type FromBtcLnTrustedRequestType = {
     address: string,
     amount: BN,
-    exactOut?: boolean,
+    exactIn?: boolean,
     token?: string
 };
 
@@ -391,7 +391,8 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                     typeof(val)==="string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: FieldTypeEnum.BN,
-                exactOut: FieldTypeEnum.BooleanOptional
+                exactIn: (val: string) => val==="true" ? true :
+                    val==="false" ? false : null
             });
             if(parsedBody==null) throw {
                 code: 20100,
@@ -399,7 +400,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             };
             metadata.request = parsedBody;
 
-            const requestedAmount = {input: !parsedBody.exactOut, amount: parsedBody.amount};
+            const requestedAmount = {input: parsedBody.exactIn, amount: parsedBody.amount};
             const request = {
                 chainIdentifier,
                 raw: req,

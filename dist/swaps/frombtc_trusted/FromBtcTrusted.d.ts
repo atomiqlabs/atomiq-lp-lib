@@ -15,7 +15,7 @@ export type FromBtcTrustedConfig = FromBtcBaseConfig & {
 export type FromBtcTrustedRequestType = {
     address: string;
     amount: BN;
-    exactOut?: boolean;
+    exactIn?: boolean;
     refundAddress?: string;
     token?: string;
 };

@@ -376,7 +376,8 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: SchemaVerifier_1.FieldTypeEnum.BN,
-                exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional
+                exactIn: (val) => val === "true" ? true :
+                    val === "false" ? false : null
             });
             if (parsedBody == null)
                 throw {
@@ -385,7 +386,7 @@ class FromBtcTrusted extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 };
             metadata.request = parsedBody;
             const refundAddress = parsedBody.refundAddress === "" ? null : parsedBody.refundAddress;
-            const requestedAmount = { input: !parsedBody.exactOut, amount: parsedBody.amount };
+            const requestedAmount = { input: parsedBody.exactIn, amount: parsedBody.amount };
             const request = {
                 chainIdentifier,
                 raw: req,

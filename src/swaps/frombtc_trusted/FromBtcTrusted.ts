@@ -32,7 +32,7 @@ export type FromBtcTrustedConfig = FromBtcBaseConfig & {
 export type FromBtcTrustedRequestType = {
     address: string,
     amount: BN,
-    exactOut?: boolean,
+    exactIn?: boolean,
     refundAddress?: string,
     token?: string
 };
@@ -424,7 +424,8 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                     typeof(val)==="string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: FieldTypeEnum.BN,
-                exactOut: FieldTypeEnum.BooleanOptional
+                exactIn: (val: string) => val==="true" ? true :
+                    val==="false" ? false : null
             });
             if(parsedBody==null) throw {
                 code: 20100,
@@ -434,7 +435,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
 
             const refundAddress = parsedBody.refundAddress==="" ? null : parsedBody.refundAddress;
 
-            const requestedAmount = {input: !parsedBody.exactOut, amount: parsedBody.amount};
+            const requestedAmount = {input: parsedBody.exactIn, amount: parsedBody.amount};
             const request = {
                 chainIdentifier,
                 raw: req,

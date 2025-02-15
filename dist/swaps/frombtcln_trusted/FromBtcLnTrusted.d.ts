@@ -15,7 +15,7 @@ export type SwapForGasServerConfig = FromBtcBaseConfig & {
 export type FromBtcLnTrustedRequestType = {
     address: string;
     amount: BN;
-    exactOut?: boolean;
+    exactIn?: boolean;
     token?: string;
 };
 /**
