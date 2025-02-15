@@ -348,7 +348,7 @@ class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandl
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: SchemaVerifier_1.FieldTypeEnum.BN,
                 exactIn: (val) => val === "true" ? true :
-                    val === "false" ? false : null
+                    (val === "false" || val === undefined) ? false : null
             });
             if (parsedBody == null)
                 throw {

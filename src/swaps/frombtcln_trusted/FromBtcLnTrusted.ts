@@ -392,7 +392,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 amount: FieldTypeEnum.BN,
                 exactIn: (val: string) => val==="true" ? true :
-                    val==="false" ? false : null
+                    (val==="false" || val===undefined) ? false : null
             });
             if(parsedBody==null) throw {
                 code: 20100,
