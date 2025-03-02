@@ -12,7 +12,6 @@ import {
 } from "@atomiqlabs/base";
 import {Express, Request, Response} from "express";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
-import * as BN from "bn.js";
 import {IIntermediaryStorage} from "../../storage/IIntermediaryStorage";
 import {ISwapPrice} from "../ISwapPrice";
 import {PluginManager} from "../../plugins/PluginManager";
@@ -20,7 +19,6 @@ import {expressHandlerWrapper, HEX_REGEX} from "../../utils/Utils";
 import {IParamReader} from "../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEncoder";
 import {FieldTypeEnum, verifySchema} from "../../utils/paramcoders/SchemaVerifier";
-import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDecoder";
 import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 
 export type FromBtcTrustedConfig = FromBtcBaseConfig & {
@@ -31,7 +29,7 @@ export type FromBtcTrustedConfig = FromBtcBaseConfig & {
 
 export type FromBtcTrustedRequestType = {
     address: string,
-    amount: BN,
+    amount: bigint,
     exactIn?: boolean,
     refundAddress?: string,
     token?: string
@@ -50,7 +48,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
 
     readonly refundedSwaps: Map<string, string> = new Map();
     readonly doubleSpentSwaps: Map<string, string> = new Map();
-    readonly processedTxIds: Map<string, { scTxId: string, txId: string, adjustedAmount: BN, adjustedTotal: BN }> = new Map();
+    readonly processedTxIds: Map<string, { scTxId: string, txId: string, adjustedAmount: bigint, adjustedTotal: bigint }> = new Map();
 
     constructor(
         storageDirectory: IIntermediaryStorage<FromBtcTrustedSwap>,
@@ -184,14 +182,14 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 }
                 return;
             }
-            const sentSats = new BN(foundVout.value);
-            if(sentSats.eq(swap.amount)) {
+            const sentSats = BigInt(foundVout.value);
+            if(sentSats === swap.amount) {
                 swap.adjustedInput = swap.amount;
                 swap.adjustedOutput = swap.outputTokens;
             } else {
                 //If lower than minimum then ignore
-                if(sentSats.lt(this.config.min)) return;
-                if(sentSats.gt(this.config.max)) {
+                if(sentSats < this.config.min) return;
+                if(sentSats > this.config.max) {
                     swap.adjustedInput = sentSats;
                     swap.btcTx = tx;
                     swap.txId = tx.txid;
@@ -202,7 +200,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 }
                 //Adjust the amount
                 swap.adjustedInput = sentSats;
-                swap.adjustedOutput = swap.outputTokens.mul(sentSats).div(swap.amount);
+                swap.adjustedOutput = swap.outputTokens * sentSats / swap.amount;
             }
             swap.btcTx = tx;
             swap.txId = tx.txid;
@@ -281,7 +279,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
 
         if(swap.state===FromBtcTrustedSwapState.BTC_CONFIRMED) {
             //Send gas token
-            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), swap.token, false);
+            const balance: Promise<bigint> = swapContract.getBalance(signer.getAddress(), swap.token, false);
             try {
                 await this.checkBalance(swap.adjustedOutput, balance, null);
                 if(swap.metadata!=null) swap.metadata.times.receivedBalanceChecked = Date.now();
@@ -423,7 +421,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                 token: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
-                amount: FieldTypeEnum.BN,
+                amount: FieldTypeEnum.BigInt,
                 exactIn: (val: string) => val==="true" ? true :
                     (val==="false" || val===undefined) ? false : null
             });
@@ -470,7 +468,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             metadata.times.priceCalculated = Date.now();
 
             //Make sure we have MORE THAN ENOUGH to honor the swap request
-            await this.checkBalance(totalInToken.mul(new BN(4)), balancePrefetch, abortController.signal)
+            await this.checkBalance(totalInToken * 4n, balancePrefetch, abortController.signal)
             metadata.times.balanceChecked = Date.now();
 
             const blockHeight = await this.bitcoin.getBlockheight();
@@ -540,7 +538,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                     typeof(val)==="string" &&
                     val.length===64 &&
                     HEX_REGEX.test(val) ? val: null,
-                sequence: FieldTypeEnum.BN,
+                sequence: FieldTypeEnum.BigInt,
             });
             if(parsedBody==null) throw {
                 code: 20100,
@@ -661,7 +659,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
                     typeof(val)==="string" &&
                     val.length===64 &&
                     HEX_REGEX.test(val) ? val: null,
-                sequence: FieldTypeEnum.BN,
+                sequence: FieldTypeEnum.BigInt,
                 refundAddress: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     this.isValidBitcoinAddress(val) ? val : null
@@ -672,7 +670,7 @@ export class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, F
             };
 
             const invoiceData: FromBtcTrustedSwap = await this.storageManager.getData(parsedBody.paymentHash, null);
-            if (invoiceData==null || !invoiceData.getSequence().eq(parsedBody.sequence)) throw {
+            if (invoiceData==null || invoiceData.getSequence()!==parsedBody.sequence) throw {
                 code: 10001,
                 msg: "Swap not found"
             };

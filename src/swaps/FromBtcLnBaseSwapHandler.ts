@@ -1,7 +1,6 @@
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {SwapData} from "@atomiqlabs/base";
 import {FromBtcBaseSwapHandler} from "./FromBtcBaseSwapHandler";
-import * as BN from "bn.js";
 import {ILightningWallet, LightningNetworkChannel} from "../wallets/ILightningWallet";
 import {IIntermediaryStorage} from "../storage/IIntermediaryStorage";
 import {MultichainData} from "./SwapHandler";
@@ -31,14 +30,14 @@ export abstract class FromBtcLnBaseSwapHandler<V extends SwapHandlerSwap<SwapDat
      * @param signal
      * @throws {DefinedRuntimeError} will throw an error if there isn't enough inbound liquidity to receive the LN payment
      */
-    protected async checkInboundLiquidity(amountBD: BN, channelsPrefetch: Promise<LightningNetworkChannel[]>, signal: AbortSignal) {
+    protected async checkInboundLiquidity(amountBD: bigint, channelsPrefetch: Promise<LightningNetworkChannel[]>, signal: AbortSignal) {
         const channelsResponse = await channelsPrefetch;
 
         signal.throwIfAborted();
 
         let hasEnoughInboundLiquidity = false;
         channelsResponse.forEach(channel => {
-            if(channel.remoteBalance.gte(amountBD)) hasEnoughInboundLiquidity = true;
+            if(channel.remoteBalance >= amountBD) hasEnoughInboundLiquidity = true;
         });
         if(!hasEnoughInboundLiquidity) {
             throw {

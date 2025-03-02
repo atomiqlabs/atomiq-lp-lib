@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {Express, Request, Response} from "express";
 import {createHash, randomBytes} from "crypto";
 import {
@@ -18,7 +17,6 @@ import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEnco
 import {FieldTypeEnum, verifySchema} from "../../utils/paramcoders/SchemaVerifier";
 import {PluginManager} from "../../plugins/PluginManager";
 import {FromBtcLnBaseSwapHandler} from "../FromBtcLnBaseSwapHandler";
-import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDecoder";
 import {
     HodlInvoiceInit,
     ILightningWallet,
@@ -27,14 +25,14 @@ import {
 } from "../../wallets/ILightningWallet";
 
 export type SwapForGasServerConfig = FromBtcBaseConfig & {
-    minCltv: BN,
+    minCltv: bigint,
 
     invoiceTimeoutSeconds?: number
 }
 
 export type FromBtcLnTrustedRequestType = {
     address: string,
-    amount: BN,
+    amount: bigint,
     exactIn?: boolean,
     token?: string
 };
@@ -205,7 +203,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         }
 
         if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
-            const balance: Promise<BN> = swapContract.getBalance(signer.getAddress(), invoiceData.token, false);
+            const balance: Promise<bigint> = swapContract.getBalance(signer.getAddress(), invoiceData.token, false);
             try {
                 await this.checkBalance(invoiceData.output, balance, null);
                 if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcBalanceChecked = Date.now();
@@ -390,7 +388,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
                 token: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
-                amount: FieldTypeEnum.BN,
+                amount: FieldTypeEnum.BigInt,
                 exactIn: (val: string) => val==="true" ? true :
                     (val==="false" || val===undefined) ? false : null
             });
@@ -445,10 +443,10 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             const hodlInvoiceObj: HodlInvoiceInit = {
                 description: chainIdentifier+"-GAS-"+parsedBody.address,
-                cltvDelta: this.config.minCltv.add(new BN(5)).toNumber(),
+                cltvDelta: Number(this.config.minCltv) + 5,
                 expiresAt: Date.now()+(this.config.invoiceTimeoutSeconds*1000),
                 id: hash.toString("hex"),
-                mtokens: amountBD.mul(new BN(1000))
+                mtokens: amountBD * 1000n
             };
             metadata.invoiceRequest = hodlInvoiceObj;
 
@@ -574,7 +572,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         for(let {obj: swap} of await this.storageManager.query([])) {
             if(swap.amount==null) {
                 const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
-                swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+                swap.amount = (parsedPR.mtokens + 999n) / 1000n;
             }
         }
         await PluginManager.serviceInitialize(this);
@@ -582,8 +580,8 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
     getInfoData(): any {
         return {
-            minCltv: this.config.minCltv.toNumber()
-        }
+            minCltv: Number(this.config.minCltv)
+        };
     }
 
     protected processClaimEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: ClaimEvent<SwapData>): Promise<void> {

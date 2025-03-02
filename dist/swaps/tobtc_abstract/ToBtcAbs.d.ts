@@ -1,5 +1,4 @@
 import { Express } from "express";
-import * as BN from "bn.js";
 import { ToBtcSwapAbs, ToBtcSwapState } from "./ToBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
@@ -9,8 +8,8 @@ import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { PromiseQueue } from "promise-queue-ts";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
 export type ToBtcConfig = ToBtcBaseConfig & {
-    sendSafetyFactor: BN;
-    minChainCltv: BN;
+    sendSafetyFactor: bigint;
+    minChainCltv: bigint;
     networkFeeMultiplier: number;
     minConfirmations: number;
     maxConfirmations: number;
@@ -20,10 +19,10 @@ export type ToBtcConfig = ToBtcBaseConfig & {
 };
 export type ToBtcRequestType = {
     address: string;
-    amount: BN;
+    amount: bigint;
     confirmationTarget: number;
     confirmations: number;
-    nonce: BN;
+    nonce: bigint;
     token: string;
     offerer: string;
     exactIn?: boolean;
@@ -93,7 +92,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @private
      * @throws DefinedRuntimeError will throw an error in case the actual fee is higher than quoted fee
      */
-    protected checkCalculatedTxFee(quotedSatsPerVbyte: BN, actualSatsPerVbyte: BN): void;
+    protected checkCalculatedTxFee(quotedSatsPerVbyte: bigint, actualSatsPerVbyte: bigint): void;
     /**
      * Sends a bitcoin transaction to payout BTC for a swap
      *
@@ -117,7 +116,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param confirmationTarget
      * @param confirmations
      */
-    protected getExpiryFromCLTV(confirmationTarget: number, confirmations: number): BN;
+    protected getExpiryFromCLTV(confirmationTarget: number, confirmations: number): bigint;
     /**
      * Checks if the requested nonce is valid
      *

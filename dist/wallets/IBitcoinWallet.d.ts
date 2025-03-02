@@ -1,5 +1,4 @@
 /// <reference types="node" />
-import BN from "bn.js";
 import { Psbt, Transaction } from "bitcoinjs-lib";
 import { BtcTx } from "@atomiqlabs/base";
 import { Command } from "@atomiqlabs/server-base";
@@ -50,7 +49,7 @@ export interface IBitcoinWallet {
     subscribeToWalletTransactions(callback: (tx: BtcTx) => void, abortSignal?: AbortSignal): void;
     signPsbt(psbt: Psbt): Promise<SignPsbtResponse>;
     sendRawTransaction(tx: string): Promise<void>;
-    getSignedTransaction(destination: string, amount: number, feeRate?: number, nonce?: BN, maxAllowedFeeRate?: number): Promise<SignPsbtResponse>;
+    getSignedTransaction(destination: string, amount: number, feeRate?: number, nonce?: bigint, maxAllowedFeeRate?: number): Promise<SignPsbtResponse>;
     estimateFee(destination: string, amount: number, feeRate?: number, feeRateMultiplier?: number): Promise<{
         satsPerVbyte: number;
         networkFee: number;

@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { Express } from "express";
 import { FromBtcSwapAbs, FromBtcSwapState } from "./FromBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
@@ -13,9 +12,9 @@ export type FromBtcConfig = FromBtcBaseConfig & {
 };
 export type FromBtcRequestType = {
     address: string;
-    amount: BN;
+    amount: bigint;
     token: string;
-    sequence: BN;
+    sequence: bigint;
     exactOut?: boolean;
 };
 /**
@@ -25,7 +24,7 @@ export declare class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, F
     readonly type = SwapHandlerType.FROM_BTC;
     readonly swapType = ChainSwapType.CHAIN;
     readonly config: FromBtcConfig & {
-        swapTsCsvDelta: BN;
+        swapTsCsvDelta: bigint;
     };
     readonly bitcoin: IBitcoinWallet;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcSwapAbs>, path: string, chains: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, config: FromBtcConfig);

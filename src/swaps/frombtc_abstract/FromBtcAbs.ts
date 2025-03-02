@@ -1,16 +1,16 @@
-import * as BN from "bn.js";
 import {Express, Request, Response} from "express";
 import {FromBtcSwapAbs, FromBtcSwapState} from "./FromBtcSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import {ISwapPrice} from "../ISwapPrice";
 import {
+    BigIntBufferUtils,
     ChainSwapType,
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
     SwapData
 } from "@atomiqlabs/base";
-import {createHash, randomBytes} from "crypto";
+import {randomBytes} from "crypto";
 import {expressHandlerWrapper} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../storage/IIntermediaryStorage";
@@ -28,9 +28,9 @@ export type FromBtcConfig = FromBtcBaseConfig & {
 
 export type FromBtcRequestType = {
     address: string,
-    amount: BN,
+    amount: bigint,
     token: string,
-    sequence: BN,
+    sequence: bigint,
     exactOut?: boolean
 };
 
@@ -41,7 +41,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
     readonly type = SwapHandlerType.FROM_BTC;
     readonly swapType = ChainSwapType.CHAIN;
 
-    readonly config: FromBtcConfig & {swapTsCsvDelta: BN};
+    readonly config: FromBtcConfig & {swapTsCsvDelta: bigint};
 
     readonly bitcoin: IBitcoinWallet;
 
@@ -57,7 +57,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         this.bitcoin = bitcoin;
         this.config = {
             ...config,
-            swapTsCsvDelta: new BN(config.swapCsvDelta).mul(config.bitcoinBlocktime.div(config.safetyFactor))
+            swapTsCsvDelta: BigInt(config.swapCsvDelta) * (config.bitcoinBlocktime / config.safetyFactor)
         };
     }
 
@@ -68,10 +68,10 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * @param address
      * @param amount
      */
-    private getHash(chainIdentifier: string, address: string, amount: BN): Buffer {
+    private getHash(chainIdentifier: string, address: string, amount: bigint): Buffer {
         const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const {swapContract} = this.getChain(chainIdentifier);
-        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations, new BN(0));
+        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations, 0n);
     }
 
     /**
@@ -195,14 +195,14 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * @throws {DefinedRuntimeError} will throw an error if the plugin cancelled the request
      * @returns {Promise<BN>} resulting claimer bounty to be used with the swap
      */
-    private async getClaimerBounty(req: Request & {paramReader: IParamReader}, expiry: BN, signal: AbortSignal): Promise<BN> {
+    private async getClaimerBounty(req: Request & {paramReader: IParamReader}, expiry: bigint, signal: AbortSignal): Promise<bigint> {
         const parsedClaimerBounty = await req.paramReader.getParams({
             claimerBounty: {
-                feePerBlock: FieldTypeEnum.BN,
-                safetyFactor: FieldTypeEnum.BN,
-                startTimestamp: FieldTypeEnum.BN,
-                addBlock: FieldTypeEnum.BN,
-                addFee: FieldTypeEnum.BN,
+                feePerBlock: FieldTypeEnum.BigInt,
+                safetyFactor: FieldTypeEnum.BigInt,
+                startTimestamp: FieldTypeEnum.BigInt,
+                addBlock: FieldTypeEnum.BigInt,
+                addFee: FieldTypeEnum.BigInt,
             },
         }).catch(e => null);
 
@@ -215,15 +215,15 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             };
         }
 
-        const tsDelta = expiry.sub(parsedClaimerBounty.claimerBounty.startTimestamp);
-        const blocksDelta = tsDelta.div(this.config.bitcoinBlocktime).mul(parsedClaimerBounty.claimerBounty.safetyFactor);
-        const totalBlock = blocksDelta.add(parsedClaimerBounty.claimerBounty.addBlock);
-        return parsedClaimerBounty.claimerBounty.addFee.add(totalBlock.mul(parsedClaimerBounty.claimerBounty.feePerBlock));
+        const tsDelta: bigint = expiry - parsedClaimerBounty.claimerBounty.startTimestamp;
+        const blocksDelta: bigint = tsDelta / this.config.bitcoinBlocktime * parsedClaimerBounty.claimerBounty.safetyFactor;
+        const totalBlock: bigint = blocksDelta + parsedClaimerBounty.claimerBounty.addBlock;
+        return parsedClaimerBounty.claimerBounty.addFee + (totalBlock * parsedClaimerBounty.claimerBounty.feePerBlock);
     }
 
     private getDummySwapData(chainIdentifier: string, useToken: string, address: string): Promise<SwapData> {
         const {swapContract, signer} = this.getChain(chainIdentifier);
-        const dummyAmount = new BN(randomBytes(3));
+        const dummyAmount = BigInt(Math.floor(Math.random() * 0x1000000));
         return swapContract.createSwapData(
             ChainSwapType.CHAIN,
             signer.getAddress(),
@@ -231,12 +231,12 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             useToken,
             dummyAmount,
             swapContract.getHashForOnchain(randomBytes(32), dummyAmount, 3, null).toString("hex"),
-            new BN(randomBytes(8)),
-            new BN(Math.floor(Date.now()/1000)).add(this.config.swapTsCsvDelta),
+            BigIntBufferUtils.fromBuffer(randomBytes(8)),
+            BigInt(Math.floor(Date.now()/1000)) + this.config.swapTsCsvDelta,
             false,
             true,
-            new BN(randomBytes(2)),
-            new BN(randomBytes(2))
+            BigInt(Math.floor(Math.random() * 0x10000)),
+            BigInt(Math.floor(Math.random() * 0x10000))
         );
     }
 
@@ -280,11 +280,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 address: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         swapContract.isValidAddress(val) ? val : null,
-                amount: FieldTypeEnum.BN,
+                amount: FieldTypeEnum.BigInt,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
-                sequence: FieldTypeEnum.BN,
+                sequence: FieldTypeEnum.BigInt,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
             if(parsedBody==null) throw {
@@ -317,12 +317,12 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 gasTokenPricePrefetchPromise,
                 depositTokenPricePrefetchPromise
             } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, depositToken, abortController);
-            const balancePrefetch: Promise<BN> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
+            const balancePrefetch: Promise<bigint> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const signDataPrefetchPromise: Promise<any> = this.getSignDataPrefetch(chainIdentifier, abortController, responseStream);
 
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address);
             abortController.signal.throwIfAborted();
-            const baseSDPromise: Promise<BN> = this.getBaseSecurityDepositPrefetch(
+            const baseSDPromise: Promise<bigint> = this.getBaseSecurityDepositPrefetch(
                 chainIdentifier, dummySwapData, depositToken,
                 gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise,
                 abortController
@@ -347,9 +347,9 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             metadata.times.addressCreated = Date.now();
 
             const paymentHash = this.getHash(chainIdentifier, receiveAddress, amountBD);
-            const currentTimestamp = new BN(Math.floor(Date.now()/1000));
+            const currentTimestamp = BigInt(Math.floor(Date.now()/1000));
             const expiryTimeout = this.config.swapTsCsvDelta;
-            const expiry = currentTimestamp.add(expiryTimeout);
+            const expiry = currentTimestamp + expiryTimeout;
 
             //Calculate security deposit
             const totalSecurityDeposit = await this.getSecurityDeposit(
@@ -440,7 +440,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             confirmations: this.config.confirmations,
 
             cltv: this.config.swapCsvDelta,
-            timestampCltv: this.config.swapTsCsvDelta.toNumber()
+            timestampCltv: Number(this.config.swapTsCsvDelta)
         };
     }
 

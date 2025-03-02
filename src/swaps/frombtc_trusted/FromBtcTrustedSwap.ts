@@ -1,6 +1,5 @@
-import {BtcTx, SwapData} from "@atomiqlabs/base";
+import {BigIntBufferUtils, BtcTx, SwapData} from "@atomiqlabs/base";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
-import * as BN from "bn.js";
 import {deserializeBN, serializeBN} from "../../utils/Utils";
 import {createHash, randomBytes} from "crypto";
 
@@ -20,11 +19,11 @@ export enum FromBtcTrustedSwapState {
 
 export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcTrustedSwapState> {
 
-    readonly sequence: BN;
+    readonly sequence: bigint;
     readonly btcAddress: string;
 
     readonly dstAddress: string;
-    readonly outputTokens: BN;
+    readonly outputTokens: bigint;
 
     readonly createdHeight: number;
     readonly expiresAt: number;
@@ -34,8 +33,8 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
 
     refundAddress: string;
 
-    adjustedInput: BN;
-    adjustedOutput: BN;
+    adjustedInput: bigint;
+    adjustedOutput: bigint;
 
     doubleSpent: boolean;
     scRawTx: string;
@@ -51,12 +50,12 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
 
     constructor(
         chainIdentifier: string,
-        swapFee: BN,
-        swapFeeInToken: BN,
+        swapFee: bigint,
+        swapFeeInToken: bigint,
         btcAddress: string,
-        inputSats: BN,
+        inputSats: bigint,
         dstAddress: string,
-        outputTokens: BN,
+        outputTokens: bigint,
         createdHeight: number,
         expiresAt: number,
         recommendedFee: number,
@@ -67,12 +66,12 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
 
     constructor(
         objOrChainIdentifier: any | string,
-        swapFee?: BN,
-        swapFeeInToken?: BN,
+        swapFee?: bigint,
+        swapFeeInToken?: bigint,
         btcAddress?: string,
-        inputSats?: BN,
+        inputSats?: bigint,
         dstAddress?: string,
-        outputTokens?: BN,
+        outputTokens?: bigint,
         createdHeight?: number,
         expiresAt?: number,
         recommendedFee?: number,
@@ -83,7 +82,7 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
             super(objOrChainIdentifier, inputSats, swapFee, swapFeeInToken);
             this.state = FromBtcTrustedSwapState.CREATED;
             this.doubleSpent = false;
-            this.sequence = new BN(randomBytes(8));
+            this.sequence = BigIntBufferUtils.fromBuffer(randomBytes(8));
             this.btcAddress = btcAddress;
             this.dstAddress = dstAddress;
             this.outputTokens = outputTokens;
@@ -146,15 +145,15 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         return createHash("sha256").update(this.btcAddress).digest().toString("hex");
     }
 
-    getSequence(): BN {
+    getSequence(): bigint {
         return this.sequence;
     }
 
-    getOutputAmount(): BN {
+    getOutputAmount(): bigint {
         return this.adjustedOutput || this.outputTokens;
     }
 
-    getTotalInputAmount(): BN {
+    getTotalInputAmount(): bigint {
         return this.adjustedInput || this.amount;
     }
 

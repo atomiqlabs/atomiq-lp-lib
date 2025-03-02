@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBtcTrustedSwap = exports.FromBtcTrustedSwapState = void 0;
+const base_1 = require("@atomiqlabs/base");
 const FromBtcBaseSwap_1 = require("../FromBtcBaseSwap");
-const BN = require("bn.js");
 const Utils_1 = require("../../utils/Utils");
 const crypto_1 = require("crypto");
 var FromBtcTrustedSwapState;
@@ -24,7 +24,7 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             super(objOrChainIdentifier, inputSats, swapFee, swapFeeInToken);
             this.state = FromBtcTrustedSwapState.CREATED;
             this.doubleSpent = false;
-            this.sequence = new BN((0, crypto_1.randomBytes)(8));
+            this.sequence = base_1.BigIntBufferUtils.fromBuffer((0, crypto_1.randomBytes)(8));
             this.btcAddress = btcAddress;
             this.dstAddress = dstAddress;
             this.outputTokens = outputTokens;

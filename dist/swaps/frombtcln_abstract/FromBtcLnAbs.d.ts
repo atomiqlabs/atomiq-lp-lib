@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { Express } from "express";
 import { FromBtcLnSwapAbs, FromBtcLnSwapState } from "./FromBtcLnSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
@@ -10,13 +9,13 @@ import { FromBtcLnBaseSwapHandler } from "../FromBtcLnBaseSwapHandler";
 import { ILightningWallet } from "../../wallets/ILightningWallet";
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number;
-    minCltv: BN;
-    gracePeriod: BN;
+    minCltv: bigint;
+    gracePeriod: bigint;
 };
 export type FromBtcLnRequestType = {
     address: string;
     paymentHash: string;
-    amount: BN;
+    amount: bigint;
     token: string;
     descriptionHash?: string;
     exactOut?: boolean;

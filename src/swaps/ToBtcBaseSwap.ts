@@ -1,23 +1,25 @@
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {SwapData} from "@atomiqlabs/base";
-import * as BN from "bn.js";
 import {deserializeBN, serializeBN} from "../utils/Utils";
 
 
 export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> extends SwapHandlerSwap<T, S> {
 
-    amount: BN;
+    amount: bigint;
 
-    quotedNetworkFee: BN;
-    readonly quotedNetworkFeeInToken: BN;
-    realNetworkFee: BN;
-    realNetworkFeeInToken: BN;
+    quotedNetworkFee: bigint;
+    readonly quotedNetworkFeeInToken: bigint;
+    realNetworkFee: bigint;
+    realNetworkFeeInToken: bigint;
 
-    protected constructor(chainIdentifier: string, amount: BN, swapFee: BN, swapFeeInToken: BN, quotedNetworkFee: BN, quotedNetworkFeeInToken: BN);
+    protected constructor(chainIdentifier: string, amount: bigint, swapFee: bigint, swapFeeInToken: bigint, quotedNetworkFee: bigint, quotedNetworkFeeInToken: bigint);
     protected constructor(obj: any);
 
-    protected constructor(obj?: any | string, amount?: BN, swapFee?: BN, swapFeeInToken?: BN, quotedNetworkFee?: BN, quotedNetworkFeeInToken?: BN) {
-        if(typeof(obj)==="string" && BN.isBN(amount) && BN.isBN(swapFee) && BN.isBN(swapFeeInToken) && BN.isBN(quotedNetworkFee) && BN.isBN(quotedNetworkFeeInToken)) {
+    protected constructor(obj?: any | string, amount?: bigint, swapFee?: bigint, swapFeeInToken?: bigint, quotedNetworkFee?: bigint, quotedNetworkFeeInToken?: bigint) {
+        if(
+            typeof(obj)==="string" && typeof(amount)==="bigint" && typeof(swapFee)==="bigint" && typeof(swapFeeInToken)==="bigint" &&
+            typeof(quotedNetworkFee)==="bigint" && typeof(quotedNetworkFeeInToken)==="bigint"
+        ) {
             super(obj, swapFee, swapFeeInToken);
             this.amount = amount;
             this.quotedNetworkFee = quotedNetworkFee;
@@ -43,22 +45,22 @@ export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> exte
         return obj;
     }
 
-    setRealNetworkFee(networkFeeInBtc: BN) {
+    setRealNetworkFee(networkFeeInBtc: bigint) {
         this.realNetworkFee = networkFeeInBtc;
         if(this.quotedNetworkFee!=null && this.quotedNetworkFeeInToken!=null) {
-            this.realNetworkFeeInToken = this.realNetworkFee.mul(this.quotedNetworkFeeInToken).div(this.quotedNetworkFee);
+            this.realNetworkFeeInToken = this.realNetworkFee * this.quotedNetworkFeeInToken / this.quotedNetworkFee;
         }
     }
 
-    getInputAmount(): BN {
-        return this.data.getAmount().sub(this.getSwapFee().inInputToken).sub(this.getQuotedNetworkFee().inInputToken);
+    getInputAmount(): bigint {
+        return this.data.getAmount() - this.getSwapFee().inInputToken - this.getQuotedNetworkFee().inInputToken;
     }
 
-    getTotalInputAmount(): BN {
+    getTotalInputAmount(): bigint {
         return this.data.getAmount();
     }
 
-    getSwapFee(): { inInputToken: BN; inOutputToken: BN } {
+    getSwapFee(): { inInputToken: bigint; inOutputToken: bigint } {
         return {inInputToken: this.swapFeeInToken, inOutputToken: this.swapFee};
     }
 
@@ -66,7 +68,7 @@ export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> exte
      * Returns quoted (expected) network fee, denominated in input & output tokens (the fee is paid only once, it is
      *  just represented here in both denomination for ease of use)
      */
-    getQuotedNetworkFee(): { inInputToken: BN; inOutputToken: BN } {
+    getQuotedNetworkFee(): { inInputToken: bigint; inOutputToken: bigint } {
         return {inInputToken: this.quotedNetworkFeeInToken, inOutputToken: this.quotedNetworkFee};
     }
 
@@ -74,11 +76,11 @@ export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> exte
      * Returns real network fee paid for the swap, denominated in input & output tokens (the fee is paid only once, it is
      *  just represented here in both denomination for ease of use)
      */
-    getRealNetworkFee(): { inInputToken: BN; inOutputToken: BN } {
+    getRealNetworkFee(): { inInputToken: bigint; inOutputToken: bigint } {
         return {inInputToken: this.realNetworkFeeInToken, inOutputToken: this.realNetworkFee};
     }
 
-    getOutputAmount(): BN {
+    getOutputAmount(): bigint {
         return this.amount;
     }
 

@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InfoHandler = void 0;
 const express = require("express");
@@ -28,7 +19,7 @@ class InfoHandler {
      */
     startRestServer(restServer) {
         restServer.use(this.path + "/info", express.json());
-        restServer.post(this.path + "/info", (req, res) => __awaiter(this, void 0, void 0, function* () {
+        restServer.post(this.path + "/info", async (req, res) => {
             if (req.body == null ||
                 req.body.nonce == null ||
                 typeof (req.body.nonce) !== "string" ||
@@ -53,7 +44,7 @@ class InfoHandler {
                 const singleChain = this.chainData.chains[chainIdentifier];
                 chains[chainIdentifier] = {
                     address: singleChain.signer.getAddress(),
-                    signature: yield singleChain.swapContract.getDataSignature(singleChain.signer, envelopeBuffer)
+                    signature: await singleChain.swapContract.getDataSignature(singleChain.signer, envelopeBuffer)
                 };
             }
             const defaults = chains[this.chainData.default];
@@ -64,7 +55,7 @@ class InfoHandler {
                 chains
             };
             res.status(200).json(response);
-        }));
+        });
     }
 }
 exports.InfoHandler = InfoHandler;

@@ -2,11 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToBtcBaseSwap = void 0;
 const SwapHandlerSwap_1 = require("./SwapHandlerSwap");
-const BN = require("bn.js");
 const Utils_1 = require("../utils/Utils");
 class ToBtcBaseSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     constructor(obj, amount, swapFee, swapFeeInToken, quotedNetworkFee, quotedNetworkFeeInToken) {
-        if (typeof (obj) === "string" && BN.isBN(amount) && BN.isBN(swapFee) && BN.isBN(swapFeeInToken) && BN.isBN(quotedNetworkFee) && BN.isBN(quotedNetworkFeeInToken)) {
+        if (typeof (obj) === "string" && typeof (amount) === "bigint" && typeof (swapFee) === "bigint" && typeof (swapFeeInToken) === "bigint" &&
+            typeof (quotedNetworkFee) === "bigint" && typeof (quotedNetworkFeeInToken) === "bigint") {
             super(obj, swapFee, swapFeeInToken);
             this.amount = amount;
             this.quotedNetworkFee = quotedNetworkFee;
@@ -34,11 +34,11 @@ class ToBtcBaseSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     setRealNetworkFee(networkFeeInBtc) {
         this.realNetworkFee = networkFeeInBtc;
         if (this.quotedNetworkFee != null && this.quotedNetworkFeeInToken != null) {
-            this.realNetworkFeeInToken = this.realNetworkFee.mul(this.quotedNetworkFeeInToken).div(this.quotedNetworkFee);
+            this.realNetworkFeeInToken = this.realNetworkFee * this.quotedNetworkFeeInToken / this.quotedNetworkFee;
         }
     }
     getInputAmount() {
-        return this.data.getAmount().sub(this.getSwapFee().inInputToken).sub(this.getQuotedNetworkFee().inInputToken);
+        return this.data.getAmount() - this.getSwapFee().inInputToken - this.getQuotedNetworkFee().inInputToken;
     }
     getTotalInputAmount() {
         return this.data.getAmount();

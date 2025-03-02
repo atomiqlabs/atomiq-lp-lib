@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { ServerParamEncoder } from "./paramcoders/server/ServerParamEncoder";
-import * as BN from "bn.js";
 export type DefinedRuntimeError = {
     code: number;
     msg?: string;
@@ -18,5 +17,5 @@ export declare function getLogger(prefix: string): {
     error: (msg: any, ...args: any[]) => void;
 };
 export declare const HEX_REGEX: RegExp;
-export declare function serializeBN(bn: BN | null): string | null;
-export declare function deserializeBN(str: string | null): BN | null;
+export declare function serializeBN(bn: bigint | null): string | null;
+export declare function deserializeBN(str: string | null): bigint | null;

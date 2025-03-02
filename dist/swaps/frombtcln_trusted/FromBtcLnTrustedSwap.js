@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBtcLnTrustedSwap = exports.FromBtcLnTrustedSwapState = void 0;
-const BN = require("bn.js");
 const crypto_1 = require("crypto");
 const FromBtcBaseSwap_1 = require("../FromBtcBaseSwap");
 const Utils_1 = require("../../utils/Utils");
@@ -18,7 +17,7 @@ var FromBtcLnTrustedSwapState;
 class FromBtcLnTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     constructor(chainIdOrObj, pr, inputMtokens, swapFee, swapFeeInToken, output, secret, dstAddress, token) {
         if (typeof (chainIdOrObj) === "string") {
-            super(chainIdOrObj, inputMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
+            super(chainIdOrObj, (inputMtokens + 999n) / 1000n, swapFee, swapFeeInToken);
             this.state = FromBtcLnTrustedSwapState.CREATED;
             this.pr = pr;
             this.output = output;
@@ -41,7 +40,7 @@ class FromBtcLnTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         return (0, crypto_1.createHash)("sha256").update(Buffer.from(this.secret, "hex")).digest().toString("hex");
     }
     getSequence() {
-        return new BN(0);
+        return 0n;
     }
     serialize() {
         const partialSerialized = super.serialize();

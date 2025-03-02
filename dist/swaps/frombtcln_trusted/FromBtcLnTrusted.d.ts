@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { Express } from "express";
 import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState } from "./FromBtcLnTrustedSwap";
@@ -9,12 +8,12 @@ import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { FromBtcLnBaseSwapHandler } from "../FromBtcLnBaseSwapHandler";
 import { ILightningWallet } from "../../wallets/ILightningWallet";
 export type SwapForGasServerConfig = FromBtcBaseConfig & {
-    minCltv: BN;
+    minCltv: bigint;
     invoiceTimeoutSeconds?: number;
 };
 export type FromBtcLnTrustedRequestType = {
     address: string;
-    amount: BN;
+    amount: bigint;
     exactIn?: boolean;
     token?: string;
 };

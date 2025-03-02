@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { ISwapPrice } from "../swaps/ISwapPrice";
 export type CoinGeckoPriceData = {
     [coinId: string]: {
@@ -15,7 +14,7 @@ export declare class CoinGeckoSwapPrice extends ISwapPrice<{
     url: string;
     cache: {
         [coinId: string]: {
-            price: BN;
+            price: bigint;
             expiry: number;
         };
     };
@@ -27,5 +26,5 @@ export declare class CoinGeckoSwapPrice extends ISwapPrice<{
      */
     getPrice(coin: {
         coinId: string;
-    }): Promise<BN>;
+    }): Promise<bigint>;
 }

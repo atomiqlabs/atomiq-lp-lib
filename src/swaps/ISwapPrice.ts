@@ -1,5 +1,3 @@
-import * as BN from "bn.js";
-
 export type ISwapPriceCoinsMap<T extends {decimals: number}> = {
     [chainId: string]: {
         [address: string]: T
@@ -19,7 +17,7 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
      *
      * @param tokenData
      */
-    protected abstract getPrice(tokenData: T): Promise<BN>;
+    protected abstract getPrice(tokenData: T): Promise<bigint>;
 
     getTokenData(tokenAddress: string, chainId: string): T {
         const chainTokens = this.coinsMap[chainId];
@@ -32,7 +30,7 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
         return coin;
     }
 
-    preFetchPrice(token: string, chainId: string): Promise<BN> {
+    preFetchPrice(token: string, chainId: string): Promise<bigint> {
         const coin = this.getTokenData(token, chainId);
         return this.getPrice(coin);
     }
@@ -47,21 +45,17 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
      * @param preFetch Price pre-fetch promise returned from preFetchPrice()
      */
     async getToBtcSwapAmount(
-        fromAmount:BN,
+        fromAmount:bigint,
         fromToken: string,
         tokenChainIdentification: string,
         roundUp?: boolean,
-        preFetch?: Promise<BN>
-    ): Promise<BN> {
+        preFetch?: Promise<bigint>
+    ): Promise<bigint> {
         const coin = this.getTokenData(fromToken, tokenChainIdentification);
 
         const price = (preFetch==null ? null : await preFetch) || await this.getPrice(coin);
 
-        return fromAmount
-            .mul(price)
-            .div(new BN(10).pow(new BN(coin.decimals)))
-            .add(roundUp ? new BN(999999) : new BN(0))
-            .div(new BN(1000000));
+        return ((fromAmount * price * (10n ** BigInt(coin.decimals))) + (roundUp ? 999999n : 0n)) / 1000000n;
     }
 
     /**
@@ -74,21 +68,17 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
      * @param preFetch Price pre-fetch promise returned from preFetchPrice()
      */
     async getFromBtcSwapAmount(
-        fromAmount:BN,
+        fromAmount: bigint,
         toToken: string,
         tokenChainIdentification: string,
         roundUp?: boolean,
-        preFetch?: Promise<BN>
-    ): Promise<BN> {
+        preFetch?: Promise<bigint>
+    ): Promise<bigint> {
         const coin = this.getTokenData(toToken, tokenChainIdentification);
 
         const price = (preFetch==null ? null : await preFetch) || await this.getPrice(coin);
 
-        return fromAmount
-            .mul(new BN(10).pow(new BN(coin.decimals)))
-            .mul(new BN(1000000)) //To usat
-            .add(roundUp ? price.sub(new BN(1)) : new BN(0))
-            .div(price)
+        return ((fromAmount * (10n ** BigInt(coin.decimals)) * 1000000n) + (roundUp ? price - 1n : 0n)) / price;
     }
 
 }

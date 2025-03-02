@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {createHash} from "crypto";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
@@ -17,7 +16,7 @@ export enum FromBtcLnTrustedSwapState {
 export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcLnTrustedSwapState> {
 
     readonly pr: string;
-    readonly output: BN;
+    readonly output: bigint;
     readonly dstAddress: string;
     readonly secret: string;
     readonly token: string;
@@ -27,10 +26,10 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
     constructor(
         chainIdentifier: string,
         pr: string,
-        inputMtokens: BN,
-        swapFee: BN,
-        swapFeeInToken: BN,
-        output: BN,
+        inputMtokens: bigint,
+        swapFee: bigint,
+        swapFeeInToken: bigint,
+        output: bigint,
         secret: string,
         dstAddress: string,
         token: string
@@ -40,16 +39,16 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
     constructor(
         chainIdOrObj: string | any,
         pr?: string,
-        inputMtokens?: BN,
-        swapFee?: BN,
-        swapFeeInToken?: BN,
-        output?: BN,
+        inputMtokens?: bigint,
+        swapFee?: bigint,
+        swapFeeInToken?: bigint,
+        output?: bigint,
         secret?: string,
         dstAddress?: string,
         token?: string
     ) {
         if(typeof(chainIdOrObj)==="string") {
-            super(chainIdOrObj, inputMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
+            super(chainIdOrObj, (inputMtokens + 999n) / 1000n, swapFee, swapFeeInToken);
             this.state = FromBtcLnTrustedSwapState.CREATED;
             this.pr = pr;
             this.output = output;
@@ -72,8 +71,8 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
         return createHash("sha256").update(Buffer.from(this.secret, "hex")).digest().toString("hex");
     }
 
-    getSequence(): BN {
-        return new BN(0);
+    getSequence(): bigint {
+        return 0n;
     }
 
     serialize(): any {

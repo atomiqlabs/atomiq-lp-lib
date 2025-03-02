@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
 import {ToBtcBaseSwap} from "../ToBtcBaseSwap";
@@ -18,8 +17,8 @@ export enum ToBtcSwapState {
 export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
 
     readonly address: string;
-    readonly satsPerVbyte: BN;
-    readonly nonce: BN;
+    readonly satsPerVbyte: bigint;
+    readonly nonce: bigint;
     readonly requiredConfirmations: number;
     readonly preferedConfirmationTarget: number;
 
@@ -28,13 +27,13 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
     constructor(
         chainIdentifier: string,
         address: string,
-        amount: BN,
-        swapFee: BN,
-        swapFeeInToken: BN,
-        networkFee: BN,
-        networkFeeInToken: BN,
-        satsPerVbyte: BN,
-        nonce: BN,
+        amount: bigint,
+        swapFee: bigint,
+        swapFeeInToken: bigint,
+        networkFee: bigint,
+        networkFeeInToken: bigint,
+        satsPerVbyte: bigint,
+        nonce: bigint,
         requiredConfirmations: number,
         preferedConfirmationTarget: number
     );
@@ -43,13 +42,13 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
     constructor(
         chainIdOrObj: string | any,
         address?: string,
-        amount?: BN,
-        swapFee?: BN,
-        swapFeeInToken?: BN,
-        networkFee?: BN,
-        networkFeeInToken?: BN,
-        satsPerVbyte?: BN,
-        nonce?: BN,
+        amount?: bigint,
+        swapFee?: bigint,
+        swapFeeInToken?: bigint,
+        networkFee?: bigint,
+        networkFeeInToken?: bigint,
+        satsPerVbyte?: bigint,
+        nonce?: bigint,
         requiredConfirmations?: number,
         preferedConfirmationTarget?: number
     ) {
@@ -64,8 +63,8 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         } else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
-            this.nonce = new BN(chainIdOrObj.nonce);
+            this.satsPerVbyte = BigInt(chainIdOrObj.satsPerVbyte);
+            this.nonce = BigInt(chainIdOrObj.nonce);
             this.requiredConfirmations = chainIdOrObj.requiredConfirmations;
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
 

@@ -3,7 +3,6 @@ import { ISwapPrice } from "./ISwapPrice";
 import { ChainSwapType, ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, SwapEvent } from "@atomiqlabs/base";
 import { SwapHandlerSwap } from "./SwapHandlerSwap";
 import { IIntermediaryStorage } from "../storage/IIntermediaryStorage";
-import * as BN from "bn.js";
 import { ServerParamEncoder } from "../utils/paramcoders/server/ServerParamEncoder";
 import { IParamReader } from "../utils/paramcoders/IParamReader";
 export declare enum SwapHandlerType {
@@ -30,12 +29,12 @@ export type SwapBaseConfig = {
     initAuthorizationTimeouts?: {
         [chainId: string]: number;
     };
-    bitcoinBlocktime: BN;
-    baseFee: BN;
-    feePPM: BN;
-    max: BN;
-    min: BN;
-    safetyFactor: BN;
+    bitcoinBlocktime: bigint;
+    baseFee: bigint;
+    feePPM: bigint;
+    max: bigint;
+    min: bigint;
+    safetyFactor: bigint;
     swapCheckInterval: number;
 };
 export type MultichainData = {
@@ -130,7 +129,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * @param hash
      * @param sequence
      */
-    protected removeSwapData(hash: string, sequence: BN): Promise<void>;
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
     /**
      * Remove swap data
      *
@@ -149,7 +148,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    protected checkBtcAmountInBounds(amount: BN): void;
+    protected checkBtcAmountInBounds(amount: bigint): void;
     /**
      * Handles and throws plugin errors
      *
@@ -181,7 +180,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * @param sequence
      * @throws {DefinedRuntimeError} will throw an error if sequence number is out of bounds
      */
-    protected checkSequence(sequence: BN): void;
+    protected checkSequence(sequence: bigint): void;
     /**
      * Checks whether a given token is supported on a specified chain
      *

@@ -1,29 +1,17 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IntermediaryStorageManager = void 0;
 const fs = require("fs/promises");
-const BN = require("bn.js");
 class IntermediaryStorageManager {
     constructor(directory) {
         this.data = {};
         this.directory = directory;
     }
-    init() {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                yield fs.mkdir(this.directory);
-            }
-            catch (e) { }
-        });
+    async init() {
+        try {
+            await fs.mkdir(this.directory);
+        }
+        catch (e) { }
     }
     query(params) {
         return Promise.resolve(Object.keys(this.data).filter((key) => {
@@ -62,7 +50,7 @@ class IntermediaryStorageManager {
             return true;
         }).map(key => {
             const [hash, sequenceStr] = key.split("_");
-            const sequence = new BN(sequenceStr, "hex");
+            const sequence = BigInt("0x" + sequenceStr);
             return {
                 obj: this.data[key],
                 hash,
@@ -71,52 +59,46 @@ class IntermediaryStorageManager {
         }));
     }
     getData(paymentHash, sequence) {
-        return Promise.resolve(this.data[paymentHash + "_" + (sequence || new BN(0)).toString("hex", 8)]);
+        return Promise.resolve(this.data[paymentHash + "_" + (sequence || 0n).toString(16).padStart(16, "0")]);
     }
-    saveData(hash, sequence, object) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const _sequence = (sequence || new BN(0)).toString("hex", 8);
-            try {
-                yield fs.mkdir(this.directory);
-            }
-            catch (e) { }
-            this.data[hash + "_" + _sequence] = object;
-            const cpy = object.serialize();
-            yield fs.writeFile(this.directory + "/" + hash + "_" + _sequence + ".json", JSON.stringify(cpy));
-        });
+    async saveData(hash, sequence, object) {
+        const _sequence = (sequence || 0n).toString(16).padStart(16, "0");
+        try {
+            await fs.mkdir(this.directory);
+        }
+        catch (e) { }
+        this.data[hash + "_" + _sequence] = object;
+        const cpy = object.serialize();
+        await fs.writeFile(this.directory + "/" + hash + "_" + _sequence + ".json", JSON.stringify(cpy));
     }
-    removeData(hash, sequence) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const identifier = hash + "_" + (sequence || new BN(0)).toString("hex", 8);
-            try {
-                if (this.data[identifier] != null)
-                    delete this.data[identifier];
-                yield fs.rm(this.directory + "/" + identifier + ".json");
-            }
-            catch (e) {
-                console.error(e);
-            }
-        });
+    async removeData(hash, sequence) {
+        const identifier = hash + "_" + (sequence || 0n).toString(16).padStart(16, "0");
+        try {
+            if (this.data[identifier] != null)
+                delete this.data[identifier];
+            await fs.rm(this.directory + "/" + identifier + ".json");
+        }
+        catch (e) {
+            console.error(e);
+        }
     }
-    loadData(type) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.type = type;
-            let files;
-            try {
-                files = yield fs.readdir(this.directory);
-            }
-            catch (e) {
-                console.error(e);
-                return;
-            }
-            for (let file of files) {
-                const indentifier = file.split(".")[0];
-                const result = yield fs.readFile(this.directory + "/" + file);
-                const obj = JSON.parse(result.toString());
-                const parsed = new type(obj);
-                this.data[indentifier] = parsed;
-            }
-        });
+    async loadData(type) {
+        this.type = type;
+        let files;
+        try {
+            files = await fs.readdir(this.directory);
+        }
+        catch (e) {
+            console.error(e);
+            return;
+        }
+        for (let file of files) {
+            const indentifier = file.split(".")[0];
+            const result = await fs.readFile(this.directory + "/" + file);
+            const obj = JSON.parse(result.toString());
+            const parsed = new type(obj);
+            this.data[indentifier] = parsed;
+        }
     }
 }
 exports.IntermediaryStorageManager = IntermediaryStorageManager;

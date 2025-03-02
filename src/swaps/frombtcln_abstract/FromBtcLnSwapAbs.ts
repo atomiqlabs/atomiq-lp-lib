@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../..";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
@@ -21,9 +20,9 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
 
     readonly claimer: string;
     readonly token: string;
-    readonly totalTokens: BN;
+    readonly totalTokens: bigint;
     readonly claimHash: string;
-    readonly securityDeposit: BN;
+    readonly securityDeposit: bigint;
     readonly depositToken: string;
 
     secret: string;
@@ -32,14 +31,14 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         chainIdentifier: string,
         pr: string,
         lnPaymentHash: string,
-        amountMtokens: BN,
-        swapFee: BN,
-        swapFeeInToken: BN,
+        amountMtokens: bigint,
+        swapFee: bigint,
+        swapFeeInToken: bigint,
         claimer: string,
         token: string,
-        totalTokens: BN,
+        totalTokens: bigint,
         claimHash: string,
-        securityDeposit: BN,
+        securityDeposit: bigint,
         depositToken: string
     );
     constructor(obj: any);
@@ -48,18 +47,18 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         chainIdOrObj: string | any,
         pr?: string,
         lnPaymentHash?: string,
-        amountMtokens?: BN,
-        swapFee?: BN,
-        swapFeeInToken?: BN,
+        amountMtokens?: bigint,
+        swapFee?: bigint,
+        swapFeeInToken?: bigint,
         claimer?: string,
         token?: string,
-        totalTokens?: BN,
+        totalTokens?: bigint,
         claimHash?: string,
-        securityDeposit?: BN,
+        securityDeposit?: bigint,
         depositToken?: string
     ) {
         if(typeof(chainIdOrObj)==="string") {
-            super(chainIdOrObj, amountMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
+            super(chainIdOrObj, (amountMtokens + 999n) / 1000n, swapFee, swapFeeInToken);
             this.state = FromBtcLnSwapState.CREATED;
             this.pr = pr;
             this.lnPaymentHash = lnPaymentHash;
@@ -111,8 +110,8 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         return this.lnPaymentHash;
     }
 
-    getSequence(): BN {
-        return new BN(0);
+    getSequence(): bigint {
+        return 0n;
     }
 
     isInitiated(): boolean {

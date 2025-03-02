@@ -3,7 +3,6 @@ import { FromBtcTrustedSwap, FromBtcTrustedSwapState } from "./FromBtcTrustedSwa
 import { BitcoinRpc, BtcBlock, BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { Express } from "express";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
-import * as BN from "bn.js";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { ISwapPrice } from "../ISwapPrice";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
@@ -14,7 +13,7 @@ export type FromBtcTrustedConfig = FromBtcBaseConfig & {
 };
 export type FromBtcTrustedRequestType = {
     address: string;
-    amount: BN;
+    amount: bigint;
     exactIn?: boolean;
     refundAddress?: string;
     token?: string;
@@ -32,8 +31,8 @@ export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTruste
     readonly processedTxIds: Map<string, {
         scTxId: string;
         txId: string;
-        adjustedAmount: BN;
-        adjustedTotal: BN;
+        adjustedAmount: bigint;
+        adjustedTotal: bigint;
     }>;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcTrustedSwap>, path: string, chains: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, bitcoinRpc: BitcoinRpc<BtcBlock>, config: FromBtcTrustedConfig);
     private getAllAncestors;

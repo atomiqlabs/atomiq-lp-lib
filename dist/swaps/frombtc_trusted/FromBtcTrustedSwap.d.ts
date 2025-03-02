@@ -1,6 +1,5 @@
 import { BtcTx, SwapData } from "@atomiqlabs/base";
 import { FromBtcBaseSwap } from "../FromBtcBaseSwap";
-import * as BN from "bn.js";
 export declare enum FromBtcTrustedSwapState {
     DOUBLE_SPENT = -4,
     REFUNDED = -3,
@@ -14,17 +13,17 @@ export declare enum FromBtcTrustedSwapState {
     FINISHED = 5
 }
 export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBaseSwap<T, FromBtcTrustedSwapState> {
-    readonly sequence: BN;
+    readonly sequence: bigint;
     readonly btcAddress: string;
     readonly dstAddress: string;
-    readonly outputTokens: BN;
+    readonly outputTokens: bigint;
     readonly createdHeight: number;
     readonly expiresAt: number;
     readonly recommendedFee: number;
     readonly token: string;
     refundAddress: string;
-    adjustedInput: BN;
-    adjustedOutput: BN;
+    adjustedInput: bigint;
+    adjustedOutput: bigint;
     doubleSpent: boolean;
     scRawTx: string;
     btcTx: BtcTx;
@@ -34,13 +33,13 @@ export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends F
     vout: number;
     burnTxId: string;
     refundTxId: string;
-    constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN, btcAddress: string, inputSats: BN, dstAddress: string, outputTokens: BN, createdHeight: number, expiresAt: number, recommendedFee: number, refundAddress: string, token: string);
+    constructor(chainIdentifier: string, swapFee: bigint, swapFeeInToken: bigint, btcAddress: string, inputSats: bigint, dstAddress: string, outputTokens: bigint, createdHeight: number, expiresAt: number, recommendedFee: number, refundAddress: string, token: string);
     constructor(obj: any);
     serialize(): any;
     getClaimHash(): string;
-    getSequence(): BN;
-    getOutputAmount(): BN;
-    getTotalInputAmount(): BN;
+    getSequence(): bigint;
+    getOutputAmount(): bigint;
+    getTotalInputAmount(): bigint;
     isFailed(): boolean;
     isInitiated(): boolean;
     isSuccess(): boolean;

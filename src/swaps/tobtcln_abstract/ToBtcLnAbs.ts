@@ -1,9 +1,16 @@
-import * as BN from "bn.js";
 import {Express, Request, Response} from "express";
 import {ToBtcLnSwapAbs, ToBtcLnSwapState} from "./ToBtcLnSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import {ISwapPrice} from "../ISwapPrice";
-import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
+import {
+    BigIntBufferUtils,
+    ChainSwapType,
+    ClaimEvent,
+    InitializeEvent,
+    RefundEvent,
+    SwapCommitStatus,
+    SwapData
+} from "@atomiqlabs/base";
 import {expressHandlerWrapper, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../storage/IIntermediaryStorage";
@@ -23,15 +30,15 @@ import {
 } from "../../wallets/ILightningWallet";
 
 export type ToBtcLnConfig = ToBtcBaseConfig & {
-    routingFeeMultiplier: BN,
+    routingFeeMultiplier: bigint,
 
-    minSendCltv: BN,
+    minSendCltv: bigint,
 
     allowProbeFailedSwaps: boolean,
     allowShortExpiry: boolean,
 
-    minLnRoutingFeePPM?: BN,
-    minLnBaseFee?: BN,
+    minLnRoutingFeePPM?: bigint,
+    minLnBaseFee?: bigint,
 
     exactInExpiry?: number
 };
@@ -41,18 +48,18 @@ type ExactInAuthorization = {
     reqId: string,
     expiry: number,
 
-    amount: BN,
+    amount: bigint,
     initialInvoice: ParsedPaymentRequest,
 
-    quotedNetworkFeeInToken: BN,
-    swapFeeInToken: BN,
-    total: BN,
+    quotedNetworkFeeInToken: bigint,
+    swapFeeInToken: bigint,
+    total: bigint,
     confidence: number,
-    quotedNetworkFee: BN,
-    swapFee: BN,
+    quotedNetworkFee: bigint,
+    swapFee: bigint,
 
     token: string,
-    swapExpiry: BN,
+    swapExpiry: bigint,
     offerer: string,
 
     preFetchSignData: any,
@@ -67,12 +74,12 @@ type ExactInAuthorization = {
 
 export type ToBtcLnRequestType = {
     pr: string,
-    maxFee: BN,
-    expiryTimestamp: BN,
+    maxFee: bigint,
+    expiryTimestamp: bigint,
     token: string,
     offerer: string,
     exactIn?: boolean,
-    amount?: BN
+    amount?: bigint
 };
 
 /**
@@ -83,14 +90,14 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
     activeSubscriptions: Set<string> = new Set<string>();
     lightningLiquidityCache: {
-        liquidity: BN,
+        liquidity: bigint,
         timestamp: number
     };
 
     readonly type = SwapHandlerType.TO_BTCLN;
     readonly swapType = ChainSwapType.HTLC;
 
-    readonly config: ToBtcLnConfig & {minTsSendCltv: BN};
+    readonly config: ToBtcLnConfig & {minTsSendCltv: bigint};
 
     readonly exactInAuths: {
         [reqId: string]: ExactInAuthorization
@@ -109,10 +116,10 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         super(storageDirectory, path, chainData, swapPricing);
         this.lightning = lightning;
         const anyConfig = config as any;
-        anyConfig.minTsSendCltv = config.gracePeriod.add(config.bitcoinBlocktime.mul(config.minSendCltv).mul(config.safetyFactor));
+        anyConfig.minTsSendCltv = config.gracePeriod + (config.bitcoinBlocktime * config.minSendCltv * config.safetyFactor);
         this.config = anyConfig;
-        this.config.minLnRoutingFeePPM = this.config.minLnRoutingFeePPM || new BN(1000);
-        this.config.minLnBaseFee = this.config.minLnBaseFee || new BN(5);
+        this.config.minLnRoutingFeePPM = this.config.minLnRoutingFeePPM || 1000n;
+        this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10*1000;
     }
 
@@ -249,7 +256,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 const {swapContract, signer} = this.getChain(swap.chainIdentifier);
 
                 swap.secret = lnPaymentStatus.secret;
-                swap.setRealNetworkFee(lnPaymentStatus.feeMtokens.div(new BN(1000)));
+                swap.setRealNetworkFee(lnPaymentStatus.feeMtokens / 1000n);
                 this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: "+swap.secret+" realRoutingFee: "+swap.realNetworkFee.toString(10)+" invoice: "+swap.pr);
                 await swap.setState(ToBtcLnSwapState.PAID);
                 await this.saveSwapData(swap);
@@ -303,11 +310,11 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
     private async sendLightningPayment(swap: ToBtcLnSwapAbs): Promise<void> {
         const decodedPR = await this.lightning.parsePaymentRequest(swap.pr);
-        const expiryTimestamp: BN = swap.data.getExpiry();
-        const currentTimestamp: BN = new BN(Math.floor(Date.now()/1000));
+        const expiryTimestamp: bigint = swap.data.getExpiry();
+        const currentTimestamp: bigint = BigInt(Math.floor(Date.now()/1000));
 
         //Run checks
-        const hasEnoughTimeToPay = expiryTimestamp.sub(currentTimestamp).gte(this.config.minTsSendCltv);
+        const hasEnoughTimeToPay = (expiryTimestamp - currentTimestamp) >= this.config.minTsSendCltv;
         if(!hasEnoughTimeToPay) throw {
             code: 90005,
             msg: "Not enough time to reliably pay the invoice"
@@ -321,7 +328,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
         //Compute max cltv delta
         const maxFee = swap.quotedNetworkFee;
-        const maxUsableCLTVdelta = expiryTimestamp.sub(currentTimestamp).sub(this.config.gracePeriod).div(this.config.bitcoinBlocktime.mul(this.config.safetyFactor));
+        const maxUsableCLTVdelta = (expiryTimestamp - currentTimestamp - this.config.gracePeriod)
+            / (this.config.bitcoinBlocktime * this.config.safetyFactor);
 
         //Initiate payment
         this.swapLogger.info(swap, "sendLightningPayment(): paying lightning network invoice,"+
@@ -334,8 +342,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         try {
             await this.lightning.pay({
                 request: swap.pr,
-                maxFeeMtokens: maxFee.mul(new BN(1000)),
-                maxTimeoutHeight: blockHeight+maxUsableCLTVdelta.toNumber()
+                maxFeeMtokens: maxFee * 1000n,
+                maxTimeoutHeight: blockHeight+Number(maxUsableCLTVdelta)
             })
         } catch (e) {
             throw {
@@ -421,7 +429,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      * @param exactIn
      * @throws {DefinedRuntimeError} will throw an error if the swap was exactIn, but amount not specified
      */
-    private checkAmount(amount: BN, exactIn: boolean): void {
+    private checkAmount(amount: bigint, exactIn: boolean): void {
         if(exactIn) {
             if(amount==null) {
                 throw {
@@ -438,8 +446,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      * @param maxFee
      * @throws {DefinedRuntimeError} will throw an error if the maxFee is zero or negative
      */
-    private checkMaxFee(maxFee: BN): void {
-        if(maxFee.isNeg() || maxFee.isZero()) {
+    private checkMaxFee(maxFee: bigint): void {
+        if(maxFee <= 0) {
             throw {
                 code: 20030,
                 msg: "Invalid request body (maxFee too low)!"
@@ -500,8 +508,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      * @param currentTimestamp
      * @throws {DefinedRuntimeError} will throw an error if the expiry time is too short
      */
-    private checkExpiry(expiryTimestamp: BN, currentTimestamp: BN): void {
-        const expiresTooSoon = expiryTimestamp.sub(currentTimestamp).lt(this.config.minTsSendCltv);
+    private checkExpiry(expiryTimestamp: bigint, currentTimestamp: bigint): void {
+        const expiresTooSoon = (expiryTimestamp - currentTimestamp) < this.config.minTsSendCltv;
         if(expiresTooSoon) {
             throw {
                 code: 20001,
@@ -534,7 +542,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      * @param useCached Whether to use cached liquidity values
      * @throws {DefinedRuntimeError} will throw an error if there isn't enough liquidity
      */
-    private async checkLiquidity(amount: BN, abortSignal: AbortSignal, useCached: boolean = false): Promise<void> {
+    private async checkLiquidity(amount: bigint, abortSignal: AbortSignal, useCached: boolean = false): Promise<void> {
         if(!useCached || this.lightningLiquidityCache==null || this.lightningLiquidityCache.timestamp<Date.now()-this.LIGHTNING_LIQUIDITY_CACHE_TIMEOUT) {
             const channelBalances = await this.lightning.getLightningBalance();
             this.lightningLiquidityCache = {
@@ -542,7 +550,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 timestamp: Date.now()
             }
         }
-        if(amount.gt(this.lightningLiquidityCache.liquidity)) {
+        if(amount > this.lightningLiquidityCache.liquidity) {
             throw {
                 code: 20002,
                 msg: "Not enough liquidity"
@@ -564,23 +572,23 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      * @param abortSignal
      * @throws {DefinedRuntimeError} will throw an error if the destination is unreachable
      */
-    private async checkAndGetNetworkFee(amountBD: BN, maxFee: BN, expiryTimestamp: BN, currentTimestamp: BN, pr: string, metadata: any, abortSignal: AbortSignal): Promise<{
+    private async checkAndGetNetworkFee(amountBD: bigint, maxFee: bigint, expiryTimestamp: bigint, currentTimestamp: bigint, pr: string, metadata: any, abortSignal: AbortSignal): Promise<{
         confidence: number,
-        networkFee: BN
+        networkFee: bigint
     }> {
-        const maxUsableCLTV: BN = expiryTimestamp.sub(currentTimestamp).sub(this.config.gracePeriod).div(this.config.bitcoinBlocktime.mul(this.config.safetyFactor));
+        const maxUsableCLTV: bigint = (expiryTimestamp - currentTimestamp - this.config.gracePeriod) / (this.config.bitcoinBlocktime * this.config.safetyFactor);
 
         const blockHeight = await this.lightning.getBlockheight();
         abortSignal.throwIfAborted();
         metadata.times.blockheightFetched = Date.now();
 
-        const maxTimeoutBlockheight = new BN(blockHeight).add(maxUsableCLTV);
+        const maxTimeoutBlockheight = BigInt(blockHeight) + maxUsableCLTV;
 
         const req: ProbeAndRouteInit = {
             request: pr,
-            amountMtokens: amountBD.mul(new BN(1000)),
-            maxFeeMtokens: maxFee.mul(new BN(1000)),
-            maxTimeoutHeight: maxTimeoutBlockheight.toNumber()
+            amountMtokens: amountBD * 1000n,
+            maxFeeMtokens: maxFee * 1000n,
+            maxTimeoutHeight: Number(maxTimeoutBlockheight)
         };
 
         let probeOrRouteResp: ProbeAndRouteResponse = await this.lightning.probe(req);
@@ -617,19 +625,19 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 " fee mtokens: "+probeOrRouteResp.feeMtokens.toString(10));
         }
 
-        const safeFeeTokens = probeOrRouteResp.feeMtokens.add(new BN(999)).div(new BN(1000));
+        const safeFeeTokens = (probeOrRouteResp.feeMtokens + 999n) / 1000n;
 
-        let actualRoutingFee: BN = safeFeeTokens.mul(this.config.routingFeeMultiplier);
+        let actualRoutingFee: bigint = safeFeeTokens * this.config.routingFeeMultiplier;
 
-        const minRoutingFee: BN = amountBD.mul(this.config.minLnRoutingFeePPM).div(new BN(1000000)).add(this.config.minLnBaseFee);
-        if(actualRoutingFee.lt(minRoutingFee)) {
+        const minRoutingFee: bigint = (amountBD * this.config.minLnRoutingFeePPM / 1000000n)  + this.config.minLnBaseFee;
+        if(actualRoutingFee < minRoutingFee) {
             actualRoutingFee = minRoutingFee;
-            if(actualRoutingFee.gt(maxFee)) {
+            if(actualRoutingFee > maxFee) {
                 probeOrRouteResp.confidence = 0;
             }
         }
 
-        if(actualRoutingFee.gt(maxFee)) {
+        if(actualRoutingFee > maxFee) {
             actualRoutingFee = maxFee;
         }
 
@@ -677,7 +685,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         if(
             parsedRequest.destination!==parsedAuth.initialInvoice.destination ||
             parsedRequest.cltvDelta!==parsedAuth.initialInvoice.cltvDelta ||
-            !parsedRequest.mtokens.eq(parsedAuth.amount.mul(new BN(1000)))
+            parsedRequest.mtokens!==parsedAuth.amount * 1000n
         ) {
             throw {
                 code: 20102,
@@ -724,7 +732,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
             const metadata = parsedAuth.metadata;
 
-            const sequence = new BN(randomBytes(8));
+            const sequence = BigIntBufferUtils.fromBuffer(randomBytes(8));
 
             const {swapContract, signer} = this.getChain(parsedAuth.chainIdentifier);
             const claimHash = swapContract.getHashForHtlc(Buffer.from(parsedPR.id, "hex"))
@@ -741,8 +749,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 parsedAuth.swapExpiry,
                 true,
                 false,
-                new BN(0),
-                new BN(0)
+                0n,
+                0n
             );
             metadata.times.swapCreated = Date.now();
 
@@ -828,8 +836,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
              */
             const parsedBody: ToBtcLnRequestType = await req.paramReader.getParams({
                 pr: FieldTypeEnum.String,
-                maxFee: FieldTypeEnum.BN,
-                expiryTimestamp: FieldTypeEnum.BN,
+                maxFee: FieldTypeEnum.BigInt,
+                expiryTimestamp: FieldTypeEnum.BigInt,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -837,7 +845,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                         typeof(val)==="string" &&
                         swapContract.isValidAddress(val) ? val : null,
                 exactIn: FieldTypeEnum.BooleanOptional,
-                amount: FieldTypeEnum.BNOptional
+                amount: FieldTypeEnum.BigIntOptional
             });
             if (parsedBody==null) {
                 throw {
@@ -857,7 +865,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
             const responseStream = res.responseStream;
 
-            const currentTimestamp: BN = new BN(Math.floor(Date.now()/1000));
+            const currentTimestamp: bigint = BigInt(Math.floor(Date.now()/1000));
 
             //Check request params
             this.checkAmount(parsedBody.amount, parsedBody.exactIn);
@@ -867,7 +875,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             const {parsedPR, halfConfidence} = await this.checkPaymentRequest(chainIdentifier, parsedBody.pr);
             const requestedAmount = {
                 input: !!parsedBody.exactIn,
-                amount: !!parsedBody.exactIn ? parsedBody.amount : parsedPR.mtokens.add(new BN(999)).div(new BN(1000))
+                amount: !!parsedBody.exactIn ? parsedBody.amount : (parsedPR.mtokens + 999n) / 1000n
             };
             const fees = await this.preCheckAmounts(request, requestedAmount, useToken);
             metadata.times.requestChecked = Date.now();
@@ -890,7 +898,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 swapFee,
                 swapFeeInToken,
                 networkFeeInToken
-            } = await this.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amountBD: BN) => {
+            } = await this.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amountBD: bigint) => {
                 //Check if we have enough liquidity to process the swap
                 await this.checkLiquidity(amountBD, abortController.signal, true);
                 metadata.times.liquidityChecked = Date.now();
@@ -945,7 +953,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 return;
             }
 
-            const sequence = new BN(randomBytes(8));
+            const sequence = BigIntBufferUtils.fromBuffer(randomBytes(8));
             const claimHash = swapContract.getHashForHtlc(Buffer.from(parsedPR.id, "hex"));
 
             //Create swap data
@@ -960,8 +968,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 parsedBody.expiryTimestamp,
                 true,
                 false,
-                new BN(0),
-                new BN(0)
+                0n,
+                0n
             );
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
@@ -1026,7 +1034,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                     typeof(val)==="string" &&
                     val.length===64 &&
                     HEX_REGEX.test(val) ? val: null,
-                sequence: FieldTypeEnum.BN
+                sequence: FieldTypeEnum.BigInt
             });
             if (parsedBody==null) throw {
                 code: 20100,
@@ -1117,7 +1125,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         for(let {obj: swap} of await this.storageManager.query([])) {
             if(swap.amount==null || swap.lnPaymentHash==null) {
                 const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
-                swap.amount = parsedPR.mtokens.add(new BN(999)).div(new BN(1000));
+                swap.amount = (parsedPR.mtokens + 999n) / 1000n;
                 swap.lnPaymentHash = parsedPR.id;
             }
         }
@@ -1127,8 +1135,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
     getInfoData(): any {
         return {
-            minCltv: this.config.minSendCltv.toNumber(),
-            minTimestampCltv: this.config.minTsSendCltv.toNumber()
+            minCltv: Number(this.config.minSendCltv),
+            minTimestampCltv: Number(this.config.minTsSendCltv)
         };
     }
 

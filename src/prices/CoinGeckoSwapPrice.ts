@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {ISwapPrice} from "../swaps/ISwapPrice";
 
 const CACHE_DURATION = 15000;
@@ -17,7 +16,7 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
     url: string;
     cache: {
         [coinId: string]: {
-            price: BN,
+            price: bigint,
             expiry: number
         }
     } = {};
@@ -44,11 +43,11 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
      *
      * @param coin
      */
-    async getPrice(coin: {coinId: string}): Promise<BN> {
+    async getPrice(coin: {coinId: string}): Promise<bigint> {
         const coinId = coin.coinId;
         if(coinId.startsWith("$fixed-")) {
             const amt: number = parseFloat(coinId.substring(7));
-            return new BN(Math.floor(amt*1000));
+            return BigInt(Math.floor(amt*1000));
         }
 
         const cachedValue = this.cache[coinId];
@@ -75,7 +74,7 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
 
         const amt: number = jsonBody[coinId].sats;
 
-        const result = new BN(amt*1000);
+        const result = BigInt(Math.floor(amt*1000));
 
         this.cache[coinId] = {
             price: result,

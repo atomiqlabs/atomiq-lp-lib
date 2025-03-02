@@ -16,7 +16,6 @@ import {
     ToBtcRequestType
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
-import * as BN from "bn.js";
 import * as fs from "fs";
 import {getLogger} from "../utils/Utils";
 import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
@@ -31,15 +30,15 @@ export type FailSwapResponse = {
 
 export type FeeSwapResponse = {
     type: "fee",
-    baseFee: BN,
-    feePPM: BN
+    baseFee: bigint,
+    feePPM: bigint
 };
 
 export type AmountAndFeeSwapResponse = {
     type: "amountAndFee",
-    baseFee?: BN,
-    feePPM?: BN,
-    amount: BN
+    baseFee?: bigint,
+    feePPM?: bigint,
+    amount: bigint
 };
 
 export type SwapResponse = FailSwapResponse | FeeSwapResponse | AmountAndFeeSwapResponse;
@@ -168,12 +167,12 @@ export class PluginManager {
 
     static async onHandlePostFromBtcQuote(
         request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN},
-        pricePrefetchPromise?: Promise<BN> | null
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint},
+        pricePrefetchPromise?: Promise<bigint> | null
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
@@ -199,11 +198,11 @@ export class PluginManager {
 
     static async onHandlePreFromBtcQuote(
         request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN}
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
@@ -223,14 +222,14 @@ export class PluginManager {
         return null;
     }
 
-    static async onHandlePostToBtcQuote<T extends {networkFee: BN}>(
+    static async onHandlePostToBtcQuote<T extends {networkFee: bigint}>(
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN, networkFeeGetter: (amount: BN) => Promise<T>},
-        pricePrefetchPromise?: Promise<BN> | null
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint, networkFeeGetter: (amount: bigint) => Promise<T>},
+        pricePrefetchPromise?: Promise<bigint> | null
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | (ToBtcPluginQuote & {networkFeeData: T})> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
@@ -239,7 +238,7 @@ export class PluginManager {
                     const result = await plugin.onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, {
                         baseFeeInBtc: fees.baseFeeInBtc,
                         feePPM: fees.feePPM,
-                        networkFeeGetter: async (amount: BN) => {
+                        networkFeeGetter: async (amount: bigint) => {
                             networkFeeData = await fees.networkFeeGetter(amount);
                             return networkFeeData.networkFee;
                         }
@@ -267,11 +266,11 @@ export class PluginManager {
 
     static async onHandlePreToBtcQuote(
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN}
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh> {
         for(let plugin of PluginManager.plugins.values()) {
             try {

@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "../SwapHandler";
 import {FromBtcBaseSwap} from "../FromBtcBaseSwap";
@@ -17,10 +16,10 @@ export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSw
     readonly confirmations: number;
     txId: string;
 
-    constructor(chainIdentifier: string, address: string, confirmations: number, amount: BN, swapFee: BN, swapFeeInToken: BN);
+    constructor(chainIdentifier: string, address: string, confirmations: number, amount: bigint, swapFee: bigint, swapFeeInToken: bigint);
     constructor(obj: any);
 
-    constructor(prOrObj: string | any, address?: string, confirmations?: number, amount?: BN, swapFee?: BN, swapFeeInToken?: BN) {
+    constructor(prOrObj: string | any, address?: string, confirmations?: number, amount?: bigint, swapFee?: bigint, swapFeeInToken?: bigint) {
         if(typeof(prOrObj)==="string") {
             super(prOrObj, amount, swapFee, swapFeeInToken);
             this.state = FromBtcSwapState.CREATED;
@@ -55,7 +54,7 @@ export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSw
         return this.state===FromBtcSwapState.CLAIMED;
     }
 
-    getTotalInputAmount(): BN {
+    getTotalInputAmount(): bigint {
         return this.amount;
     }
 

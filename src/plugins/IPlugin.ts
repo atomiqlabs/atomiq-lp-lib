@@ -8,7 +8,6 @@ import {
     ToBtcRequestType
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
-import * as BN from "bn.js";
 import {Command} from "@atomiqlabs/server-base";
 import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
 import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
@@ -25,52 +24,52 @@ export function isQuoteThrow(obj: any): obj is QuoteThrow {
 
 export type QuoteSetFees = {
     type: "fees"
-    baseFee?: BN,
-    feePPM?: BN
+    baseFee?: bigint,
+    feePPM?: bigint
 };
 
 export function isQuoteSetFees(obj: any): obj is QuoteSetFees {
     return obj.type==="fees" &&
-        (obj.baseFee==null || BN.isBN(obj.baseFee)) &&
-        (obj.feePPM==null || BN.isBN(obj.feePPM));
+        (obj.baseFee==null || typeof(obj.baseFee) === "bigint") &&
+        (obj.feePPM==null || typeof(obj.feePPM) === "bigint");
 }
 
 export type QuoteAmountTooLow = {
     type: "low",
-    data: { min: BN, max: BN }
+    data: { min: bigint, max: bigint }
 }
 
 export function isQuoteAmountTooLow(obj: any): obj is QuoteAmountTooLow {
-    return obj.type==="low" && typeof(obj.data)==="object" && BN.isBN(obj.data.min) && BN.isBN(obj.data.max);
+    return obj.type==="low" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type QuoteAmountTooHigh = {
     type: "high",
-    data: { min: BN, max: BN }
+    data: { min: bigint, max: bigint }
 }
 
 export function isQuoteAmountTooHigh(obj: any): obj is QuoteAmountTooHigh {
-    return obj.type==="high" && typeof(obj.data)==="object" && BN.isBN(obj.data.min) && BN.isBN(obj.data.max);
+    return obj.type==="high" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type PluginQuote = {
     type: "success",
-    amount: {input: boolean, amount: BN},
-    swapFee: { inInputTokens: BN, inOutputTokens: BN }
+    amount: {input: boolean, amount: bigint},
+    swapFee: { inInputTokens: bigint, inOutputTokens: bigint }
 };
 
 export function isPluginQuote(obj: any): obj is PluginQuote {
     return obj.type==="success" &&
-        typeof(obj.amount)==="object" && typeof(obj.amount.input)==="boolean" && BN.isBN(obj.amount.amount) &&
-        typeof(obj.swapFee)==="object" && BN.isBN(obj.swapFee.inInputTokens) && BN.isBN(obj.swapFee.inOutputTokens);
+        typeof(obj.amount)==="object" && typeof(obj.amount.input)==="boolean" && typeof(obj.amount.amount)==="bigint" &&
+        typeof(obj.swapFee)==="object" && typeof(obj.swapFee.inInputTokens)==="bigint" && typeof(obj.swapFee.inOutputTokens)==="bigint";
 }
 
 export type ToBtcPluginQuote = PluginQuote & {
-    networkFee: { inInputTokens: BN, inOutputTokens: BN }
+    networkFee: { inInputTokens: bigint, inOutputTokens: bigint }
 }
 
 export function isToBtcPluginQuote(obj: any): obj is ToBtcPluginQuote {
-    return typeof(obj.networkFee)==="object" && BN.isBN(obj.networkFee.inInputTokens) && BN.isBN(obj.networkFee.inOutputTokens) &&
+    return typeof(obj.networkFee)==="object" && typeof(obj.networkFee.inInputTokens)==="bigint" && typeof(obj.networkFee.inOutputTokens)==="bigint" &&
         isPluginQuote(obj);
 }
 
@@ -113,38 +112,38 @@ export interface IPlugin {
 
     onHandlePreFromBtcQuote?(
         request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN}
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostFromBtcQuote?(
         request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN},
-        pricePrefetchPromise?: Promise<BN> | null
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint},
+        pricePrefetchPromise?: Promise<bigint> | null
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
 
     onHandlePreToBtcQuote?(
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN}
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostToBtcQuote?(
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: BN},
+        requestedAmount: {input: boolean, amount: bigint},
         chainIdentifier: string,
         token: string,
-        constraints: {minInBtc: BN, maxInBtc: BN},
-        fees: {baseFeeInBtc: BN, feePPM: BN, networkFeeGetter: (amount: BN) => Promise<BN>},
-        pricePrefetchPromise?: Promise<BN> | null
+        constraints: {minInBtc: bigint, maxInBtc: bigint},
+        fees: {baseFeeInBtc: bigint, feePPM: bigint, networkFeeGetter: (amount: bigint) => Promise<bigint>},
+        pricePrefetchPromise?: Promise<bigint> | null
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
 
     /**

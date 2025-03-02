@@ -3,13 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapHandlerSwap = void 0;
 const base_1 = require("@atomiqlabs/base");
 const PluginManager_1 = require("../plugins/PluginManager");
-const BN = require("bn.js");
 const Utils_1 = require("../utils/Utils");
 class SwapHandlerSwap extends base_1.Lockable {
     constructor(obj, swapFee, swapFeeInToken) {
         super();
         this.txIds = {};
-        if (typeof (obj) === "string" && BN.isBN(swapFee) && BN.isBN(swapFeeInToken)) {
+        if (typeof (obj) === "string" && typeof (swapFee) === "bigint" && typeof (swapFeeInToken) === "bigint") {
             this.chainIdentifier = obj;
             this.swapFee = swapFee;
             this.swapFeeInToken = swapFeeInToken;
@@ -74,8 +73,7 @@ class SwapHandlerSwap extends base_1.Lockable {
         return this.getClaimHash();
     }
     getSequence() {
-        var _a;
-        return ((_a = this.data) === null || _a === void 0 ? void 0 : _a.getSequence) == null ? null : this.data.getSequence();
+        return this.data?.getSequence == null ? null : this.data.getSequence();
     }
     /**
      * Returns unique identifier of the swap in the form <hash>_<sequence> or just <hash> if the swap type doesn't

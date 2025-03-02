@@ -1,5 +1,4 @@
 import {Express, Request, Response} from "express";
-import * as BN from "bn.js";
 import {ToBtcSwapAbs, ToBtcSwapState} from "./ToBtcSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import {ISwapPrice} from "../ISwapPrice";
@@ -11,8 +10,8 @@ import {
     RefundEvent,
     SwapCommitStatus,
     SwapData,
-    BitcoinRpc, 
-    BtcBlock
+    BitcoinRpc,
+    BtcBlock, BigIntBufferUtils
 } from "@atomiqlabs/base";
 import {expressHandlerWrapper, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
@@ -29,9 +28,9 @@ import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
 
 export type ToBtcConfig = ToBtcBaseConfig & {
-    sendSafetyFactor: BN,
+    sendSafetyFactor: bigint,
 
-    minChainCltv: BN,
+    minChainCltv: bigint,
 
     networkFeeMultiplier: number,
     minConfirmations: number,
@@ -44,10 +43,10 @@ export type ToBtcConfig = ToBtcBaseConfig & {
 
 export type ToBtcRequestType = {
     address: string,
-    amount: BN,
+    amount: bigint,
     confirmationTarget: number,
     confirmations: number,
-    nonce: BN,
+    nonce: bigint,
     token: string,
     offerer: string,
     exactIn?: boolean
@@ -91,7 +90,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param nonce
      * @param amount
      */
-    private getHash(chainIdentifier: string, address: string, confirmations: number, nonce: BN, amount: BN): Buffer {
+    private getHash(chainIdentifier: string, address: string, confirmations: number, nonce: bigint, amount: bigint): Buffer {
         const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const {swapContract} = this.getChain(chainIdentifier);
         return swapContract.getHashForOnchain(parsedOutputScript, amount, confirmations, nonce);
@@ -224,7 +223,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
         //Search for required transaction output (vout)
         const outputScript = this.bitcoin.toOutputScript(swap.address);
-        const vout = tx.outs.find(e => new BN(e.value).eq(swap.amount) && Buffer.from(e.scriptPubKey.hex, "hex").equals(outputScript));
+        const vout = tx.outs.find(e => BigInt(e.value)===swap.amount && Buffer.from(e.scriptPubKey.hex, "hex").equals(outputScript));
         if(vout==null) {
             this.swapLogger.warn(swap, "processBtcTx(): cannot find correct vout,"+
                 " required output script: "+outputScript.toString("hex")+
@@ -294,10 +293,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @throws DefinedRuntimeError will throw an error in case there isn't enough time for us to send a BTC payout tx
      */
     protected checkExpiresTooSoon(swap: ToBtcSwapAbs): void {
-        const currentTimestamp = new BN(Math.floor(Date.now()/1000));
-        const tsDelta = swap.data.getExpiry().sub(currentTimestamp);
+        const currentTimestamp = BigInt(Math.floor(Date.now()/1000));
+        const tsDelta = swap.data.getExpiry() - currentTimestamp;
         const minRequiredCLTV = this.getExpiryFromCLTV(swap.preferedConfirmationTarget, swap.requiredConfirmations);
-        const hasRequiredCLTVDelta = tsDelta.gte(minRequiredCLTV);
+        const hasRequiredCLTVDelta = tsDelta >= minRequiredCLTV;
         if(!hasRequiredCLTVDelta) throw {
             code: 90001,
             msg: "TS delta too low",
@@ -316,8 +315,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @private
      * @throws DefinedRuntimeError will throw an error in case the actual fee is higher than quoted fee
      */
-    protected checkCalculatedTxFee(quotedSatsPerVbyte: BN, actualSatsPerVbyte: BN): void {
-        const swapPaysEnoughNetworkFee = quotedSatsPerVbyte.gte(actualSatsPerVbyte);
+    protected checkCalculatedTxFee(quotedSatsPerVbyte: bigint, actualSatsPerVbyte: bigint): void {
+        const swapPaysEnoughNetworkFee = quotedSatsPerVbyte >= actualSatsPerVbyte;
         if(!swapPaysEnoughNetworkFee) throw {
             code: 90003,
             msg: "Fee changed too much!",
@@ -344,15 +343,15 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             if(swap.metadata!=null) swap.metadata.times.payCLTVChecked = Date.now();
 
             const satsPerVbyte = await this.bitcoin.getFeeRate();
-            this.checkCalculatedTxFee(swap.satsPerVbyte, new BN(satsPerVbyte));
+            this.checkCalculatedTxFee(swap.satsPerVbyte, BigInt(satsPerVbyte));
             if(swap.metadata!=null) swap.metadata.times.payChainFee = Date.now();
 
             const signResult = await this.bitcoin.getSignedTransaction(
                 swap.address,
-                swap.amount.toNumber(),
+                Number(swap.amount),
                 satsPerVbyte,
                 swap.nonce,
-                swap.satsPerVbyte.toNumber()
+                Number(swap.satsPerVbyte)
             );
             if(signResult==null) throw {
                 code: 90002,
@@ -362,7 +361,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
             this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: "+signResult.raw);
             swap.txId = signResult.tx.getId();
-            swap.setRealNetworkFee(new BN(signResult.networkFee));
+            swap.setRealNetworkFee(BigInt(signResult.networkFee));
             await swap.setState(ToBtcSwapState.BTC_SENDING);
             await this.saveSwapData(swap);
 
@@ -460,14 +459,14 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param confirmationTarget
      * @param confirmations
      */
-    protected getExpiryFromCLTV(confirmationTarget: number, confirmations: number): BN {
+    protected getExpiryFromCLTV(confirmationTarget: number, confirmations: number): bigint {
         //Blocks = 10 + (confirmations + confirmationTarget)*2
         //Time = 3600 + (600*blocks*2)
-        const cltv = this.config.minChainCltv.add(
-            new BN(confirmations).add(new BN(confirmationTarget)).mul(this.config.sendSafetyFactor)
+        const cltv = this.config.minChainCltv + (
+            BigInt(confirmations + confirmationTarget) * this.config.sendSafetyFactor
         );
 
-        return this.config.gracePeriod.add(this.config.bitcoinBlocktime.mul(cltv).mul(this.config.safetyFactor));
+        return this.config.gracePeriod + (this.config.bitcoinBlocktime * cltv * this.config.safetyFactor);
     }
 
     /**
@@ -476,17 +475,16 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param nonce
      * @throws {DefinedRuntimeError} will throw an error if the nonce is invalid
      */
-    private checkNonceValid(nonce: BN): void {
-        if(nonce.isNeg() || nonce.gte(new BN(2).pow(new BN(64)))) throw {
+    private checkNonceValid(nonce: bigint): void {
+        if(nonce < 0 || nonce >= (2n ** 64n)) throw {
             code: 20021,
             msg: "Invalid request body (nonce - cannot be parsed)"
         };
 
-        const nonceBuffer = Buffer.from(nonce.toArray("be", 8));
-        const firstPart = new BN(nonceBuffer.slice(0, 5), "be");
+        const firstPart = nonce >> 24n;
 
-        const maxAllowedValue = new BN(Math.floor(Date.now()/1000)-600000000);
-        if(firstPart.gt(maxAllowedValue)) throw {
+        const maxAllowedValue = BigInt(Math.floor(Date.now()/1000)-600000000);
+        if(firstPart > maxAllowedValue) throw {
             code: 20022,
             msg: "Invalid request body (nonce - too high)"
         };
@@ -573,8 +571,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param amount
      * @throws {DefinedRuntimeError} will throw an error if there are not enough BTC funds
      */
-    private async checkAndGetNetworkFee(address: string, amount: BN): Promise<{ networkFee: BN, satsPerVbyte: BN }> {
-        let chainFeeResp = await this.bitcoin.estimateFee(address, amount.toNumber(), null, this.config.networkFeeMultiplier);
+    private async checkAndGetNetworkFee(address: string, amount: bigint): Promise<{ networkFee: bigint, satsPerVbyte: bigint }> {
+        let chainFeeResp = await this.bitcoin.estimateFee(address, Number(amount), null, this.config.networkFeeMultiplier);
 
         const hasEnoughFunds = chainFeeResp!=null;
         if(!hasEnoughFunds) throw {
@@ -583,8 +581,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         };
 
         return {
-            networkFee: new BN(chainFeeResp.networkFee),
-            satsPerVbyte: new BN(chainFeeResp.satsPerVbyte)
+            networkFee: BigInt(chainFeeResp.networkFee),
+            satsPerVbyte: BigInt(chainFeeResp.satsPerVbyte)
         };
     }
 
@@ -616,10 +614,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
              */
             const parsedBody: ToBtcRequestType = await req.paramReader.getParams({
                 address: FieldTypeEnum.String,
-                amount: FieldTypeEnum.BN,
+                amount: FieldTypeEnum.BigInt,
                 confirmationTarget: FieldTypeEnum.Number,
                 confirmations: FieldTypeEnum.Number,
-                nonce: FieldTypeEnum.BN,
+                nonce: FieldTypeEnum.BigInt,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -666,7 +664,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 swapFee,
                 swapFeeInToken,
                 networkFeeInToken
-            } = await this.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amount: BN) => {
+            } = await this.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amount: bigint) => {
                 metadata.times.amountsChecked = Date.now();
                 const resp = await this.checkAndGetNetworkFee(parsedBody.address, amount);
                 metadata.times.chainFeeCalculated = Date.now();
@@ -677,11 +675,11 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             const paymentHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.confirmations, parsedBody.nonce, amountBD).toString("hex");
 
             //Add grace period another time, so the user has 1 hour to commit
-            const expirySeconds = this.getExpiryFromCLTV(parsedBody.confirmationTarget, parsedBody.confirmations).add(new BN(this.config.gracePeriod));
-            const currentTimestamp = new BN(Math.floor(Date.now()/1000));
-            const minRequiredExpiry = currentTimestamp.add(expirySeconds);
+            const expirySeconds = this.getExpiryFromCLTV(parsedBody.confirmationTarget, parsedBody.confirmations) + this.config.gracePeriod;
+            const currentTimestamp = BigInt(Math.floor(Date.now()/1000));
+            const minRequiredExpiry = currentTimestamp + expirySeconds;
 
-            const sequence = new BN(randomBytes(8));
+            const sequence = BigIntBufferUtils.fromBuffer(randomBytes(8));
             const payObject: SwapData = await swapContract.createSwapData(
                 ChainSwapType.CHAIN_NONCED,
                 parsedBody.offerer,
@@ -693,8 +691,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 minRequiredExpiry,
                 true,
                 false,
-                new BN(0),
-                new BN(0)
+                0n,
+                0n
             );
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
@@ -736,7 +734,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     satsPervByte: networkFeeData.satsPerVbyte.toString(10),
                     networkFee: networkFeeInToken.toString(10),
                     swapFee: swapFeeInToken.toString(10),
-                    totalFee: swapFeeInToken.add(networkFeeInToken).toString(10),
+                    totalFee: (swapFeeInToken + networkFeeInToken).toString(10),
                     total: totalInToken.toString(10),
                     minRequiredExpiry: minRequiredExpiry.toString(10),
 
@@ -759,7 +757,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 paymentHash: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     HEX_REGEX.test(val) ? val: null,
-                sequence: FieldTypeEnum.BN
+                sequence: FieldTypeEnum.BigInt
             });
             if (parsedBody==null) throw {
                 code: 20100,
@@ -862,7 +860,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
     getInfoData(): any {
         return {
-            minCltv: this.config.minChainCltv.toNumber(),
+            minCltv: Number(this.config.minChainCltv),
 
             minConfirmations: this.config.minConfirmations,
             maxConfirmations: this.config.maxConfirmations,

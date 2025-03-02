@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBtcLnSwapAbs = exports.FromBtcLnSwapState = void 0;
-const BN = require("bn.js");
 const __1 = require("../..");
 const FromBtcBaseSwap_1 = require("../FromBtcBaseSwap");
 const Utils_1 = require("../../utils/Utils");
@@ -18,7 +17,7 @@ var FromBtcLnSwapState;
 class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     constructor(chainIdOrObj, pr, lnPaymentHash, amountMtokens, swapFee, swapFeeInToken, claimer, token, totalTokens, claimHash, securityDeposit, depositToken) {
         if (typeof (chainIdOrObj) === "string") {
-            super(chainIdOrObj, amountMtokens.add(new BN(999)).div(new BN(1000)), swapFee, swapFeeInToken);
+            super(chainIdOrObj, (amountMtokens + 999n) / 1000n, swapFee, swapFeeInToken);
             this.state = FromBtcLnSwapState.CREATED;
             this.pr = pr;
             this.lnPaymentHash = lnPaymentHash;
@@ -68,7 +67,7 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         return this.lnPaymentHash;
     }
     getSequence() {
-        return new BN(0);
+        return 0n;
     }
     isInitiated() {
         return this.state !== FromBtcLnSwapState.CREATED;

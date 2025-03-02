@@ -11,7 +11,6 @@ import {
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {PluginManager} from "../plugins/PluginManager";
 import {IIntermediaryStorage} from "../storage/IIntermediaryStorage";
-import * as BN from "bn.js";
 import {ServerParamEncoder} from "../utils/paramcoders/server/ServerParamEncoder";
 import {
     isQuoteAmountTooHigh,
@@ -44,12 +43,12 @@ export type SwapBaseConfig = {
     initAuthorizationTimeouts?: {
         [chainId: string]: number
     },
-    bitcoinBlocktime: BN,
-    baseFee: BN,
-    feePPM: BN,
-    max: BN,
-    min: BN,
-    safetyFactor: BN,
+    bitcoinBlocktime: bigint,
+    baseFee: bigint,
+    feePPM: bigint,
+    max: bigint,
+    min: bigint,
+    safetyFactor: bigint,
     swapCheckInterval: number
 };
 
@@ -216,10 +215,10 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
         await this.storageManager.loadData(ctor);
         //Check if all swaps contain a valid amount
         for(let {obj: swap, hash, sequence} of await this.storageManager.query([])) {
-            if(hash!==swap.getIdentifierHash() || !sequence.eq(swap.getSequence() ?? new BN(0))) {
+            if(hash!==swap.getIdentifierHash() || sequence !== (swap.getSequence() ?? 0n)) {
                 this.swapLogger.info(swap, "loadData(): Swap storage key or sequence mismatch, fixing,"+
                     " old hash: "+hash+" new hash: "+swap.getIdentifierHash()+
-                    " old seq: "+sequence.toString(10)+" new seq: "+(swap.getSequence() ?? new BN(0)).toString(10));
+                    " old seq: "+sequence.toString(10)+" new seq: "+(swap.getSequence() ?? 0n).toString(10));
 
                 await this.storageManager.removeData(hash, sequence);
                 await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
@@ -246,7 +245,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @param hash
      * @param sequence
      */
-    protected removeSwapData(hash: string, sequence: BN): Promise<void>;
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
 
     /**
      * Remove swap data
@@ -256,14 +255,14 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      */
     protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
 
-    protected async removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: BN | S) {
+    protected async removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: bigint | S) {
         let swap: V;
         if(typeof(hashOrSwap)==="string") {
-            if(!BN.isBN(sequenceOrUltimateState)) throw new Error("Sequence must be a BN instance!");
+            if(typeof(sequenceOrUltimateState)!=="bigint") throw new Error("Sequence must be a BN instance!");
             swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
         } else {
             swap = hashOrSwap;
-            if(sequenceOrUltimateState!=null && !BN.isBN(sequenceOrUltimateState)) await swap.setState(sequenceOrUltimateState);
+            if(sequenceOrUltimateState!=null && typeof(sequenceOrUltimateState)!=="bigint") await swap.setState(sequenceOrUltimateState);
         }
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
@@ -295,8 +294,8 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    protected checkBtcAmountInBounds(amount: BN): void {
-        if (amount.lt(this.config.min)) {
+    protected checkBtcAmountInBounds(amount: bigint): void {
+        if (amount < this.config.min) {
             throw {
                 code: 20003,
                 msg: "Amount too low!",
@@ -307,7 +306,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
             };
         }
 
-        if(amount.gt(this.config.max)) {
+        if(amount > this.config.max) {
             throw {
                 code: 20004,
                 msg: "Amount too high!",
@@ -419,8 +418,8 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @param sequence
      * @throws {DefinedRuntimeError} will throw an error if sequence number is out of bounds
      */
-    protected checkSequence(sequence: BN) {
-        if(sequence.isNeg() || sequence.gte(new BN(2).pow(new BN(64)))) {
+    protected checkSequence(sequence: bigint) {
+        if(sequence < 0n || sequence >= 2n ** 64n) {
             throw {
                 code: 20060,
                 msg: "Invalid sequence"
@@ -447,10 +446,10 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
             chainTokens[chainId] = Array.from<string>(this.allowedTokens[chainId]);
         }
         return {
-            swapFeePPM: this.config.feePPM.toNumber(),
-            swapBaseFee: this.config.baseFee.toNumber(),
-            min: this.config.min.toNumber(),
-            max: this.config.max.toNumber(),
+            swapFeePPM: Number(this.config.feePPM),
+            swapBaseFee: Number(this.config.baseFee),
+            min: Number(this.config.min),
+            max: Number(this.config.max),
             data: this.getInfoData(),
             tokens: Array.from<string>(this.allowedTokens[this.chains.default]),
             chainTokens

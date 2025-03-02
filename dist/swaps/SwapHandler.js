@@ -1,19 +1,9 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapHandler = exports.SwapHandlerType = void 0;
 const base_1 = require("@atomiqlabs/base");
 const SwapHandlerSwap_1 = require("./SwapHandlerSwap");
 const PluginManager_1 = require("../plugins/PluginManager");
-const BN = require("bn.js");
 const IPlugin_1 = require("../plugins/IPlugin");
 var SwapHandlerType;
 (function (SwapHandlerType) {
@@ -67,15 +57,13 @@ class SwapHandler {
     /**
      * Starts the watchdog checking past swaps for expiry or claim eligibility.
      */
-    startWatchdog() {
-        return __awaiter(this, void 0, void 0, function* () {
-            let rerun;
-            rerun = () => __awaiter(this, void 0, void 0, function* () {
-                yield this.processPastSwaps().catch(e => console.error(e));
-                setTimeout(rerun, this.config.swapCheckInterval);
-            });
-            yield rerun();
-        });
+    async startWatchdog() {
+        let rerun;
+        rerun = async () => {
+            await this.processPastSwaps().catch(e => console.error(e));
+            setTimeout(rerun, this.config.swapCheckInterval);
+        };
+        await rerun();
     }
     /**
      * Chain event processor
@@ -83,44 +71,41 @@ class SwapHandler {
      * @param chainIdentifier
      * @param eventData
      */
-    processEvent(chainIdentifier, eventData) {
-        var _a, _b, _c;
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.swapType == null)
-                return true;
-            for (let event of eventData) {
-                if (event instanceof base_1.InitializeEvent) {
-                    if (event.swapType !== this.swapType)
-                        continue;
-                    const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
-                    if (swap == null)
-                        continue;
-                    swap.txIds.init = (_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId;
-                    if (swap.metadata != null)
-                        swap.metadata.times.initTxReceived = Date.now();
-                    yield this.processInitializeEvent(chainIdentifier, swap, event);
-                }
-                else if (event instanceof base_1.ClaimEvent) {
-                    const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
-                    if (swap == null)
-                        continue;
-                    swap.txIds.claim = (_b = event.meta) === null || _b === void 0 ? void 0 : _b.txId;
-                    if (swap.metadata != null)
-                        swap.metadata.times.claimTxReceived = Date.now();
-                    yield this.processClaimEvent(chainIdentifier, swap, event);
-                }
-                else if (event instanceof base_1.RefundEvent) {
-                    const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
-                    if (swap == null)
-                        continue;
-                    swap.txIds.refund = (_c = event.meta) === null || _c === void 0 ? void 0 : _c.txId;
-                    if (swap.metadata != null)
-                        swap.metadata.times.refundTxReceived = Date.now();
-                    yield this.processRefundEvent(chainIdentifier, swap, event);
-                }
-            }
+    async processEvent(chainIdentifier, eventData) {
+        if (this.swapType == null)
             return true;
-        });
+        for (let event of eventData) {
+            if (event instanceof base_1.InitializeEvent) {
+                if (event.swapType !== this.swapType)
+                    continue;
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if (swap == null)
+                    continue;
+                swap.txIds.init = event.meta?.txId;
+                if (swap.metadata != null)
+                    swap.metadata.times.initTxReceived = Date.now();
+                await this.processInitializeEvent(chainIdentifier, swap, event);
+            }
+            else if (event instanceof base_1.ClaimEvent) {
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if (swap == null)
+                    continue;
+                swap.txIds.claim = event.meta?.txId;
+                if (swap.metadata != null)
+                    swap.metadata.times.claimTxReceived = Date.now();
+                await this.processClaimEvent(chainIdentifier, swap, event);
+            }
+            else if (event instanceof base_1.RefundEvent) {
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if (swap == null)
+                    continue;
+                swap.txIds.refund = event.meta?.txId;
+                if (swap.metadata != null)
+                    swap.metadata.times.refundTxReceived = Date.now();
+                await this.processRefundEvent(chainIdentifier, swap, event);
+            }
+        }
+        return true;
     }
     /**
      * Initializes chain events subscription
@@ -131,48 +116,41 @@ class SwapHandler {
         }
         this.logger.info("SC: Events: subscribed to smartchain events");
     }
-    loadData(ctor) {
-        var _a, _b;
-        return __awaiter(this, void 0, void 0, function* () {
-            yield this.storageManager.loadData(ctor);
-            //Check if all swaps contain a valid amount
-            for (let { obj: swap, hash, sequence } of yield this.storageManager.query([])) {
-                if (hash !== swap.getIdentifierHash() || !sequence.eq((_a = swap.getSequence()) !== null && _a !== void 0 ? _a : new BN(0))) {
-                    this.swapLogger.info(swap, "loadData(): Swap storage key or sequence mismatch, fixing," +
-                        " old hash: " + hash + " new hash: " + swap.getIdentifierHash() +
-                        " old seq: " + sequence.toString(10) + " new seq: " + ((_b = swap.getSequence()) !== null && _b !== void 0 ? _b : new BN(0)).toString(10));
-                    yield this.storageManager.removeData(hash, sequence);
-                    yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
-                }
-                this.saveSwapToEscrowHashMap(swap);
+    async loadData(ctor) {
+        await this.storageManager.loadData(ctor);
+        //Check if all swaps contain a valid amount
+        for (let { obj: swap, hash, sequence } of await this.storageManager.query([])) {
+            if (hash !== swap.getIdentifierHash() || sequence !== (swap.getSequence() ?? 0n)) {
+                this.swapLogger.info(swap, "loadData(): Swap storage key or sequence mismatch, fixing," +
+                    " old hash: " + hash + " new hash: " + swap.getIdentifierHash() +
+                    " old seq: " + sequence.toString(10) + " new seq: " + (swap.getSequence() ?? 0n).toString(10));
+                await this.storageManager.removeData(hash, sequence);
+                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
             }
-        });
-    }
-    removeSwapData(hashOrSwap, sequenceOrUltimateState) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let swap;
-            if (typeof (hashOrSwap) === "string") {
-                if (!BN.isBN(sequenceOrUltimateState))
-                    throw new Error("Sequence must be a BN instance!");
-                swap = yield this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
-            }
-            else {
-                swap = hashOrSwap;
-                if (sequenceOrUltimateState != null && !BN.isBN(sequenceOrUltimateState))
-                    yield swap.setState(sequenceOrUltimateState);
-            }
-            if (swap != null)
-                yield PluginManager_1.PluginManager.swapRemove(swap);
-            this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
-            this.removeSwapFromEscrowHashMap(swap);
-            yield this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
-        });
-    }
-    saveSwapData(swap) {
-        return __awaiter(this, void 0, void 0, function* () {
             this.saveSwapToEscrowHashMap(swap);
-            yield this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
-        });
+        }
+    }
+    async removeSwapData(hashOrSwap, sequenceOrUltimateState) {
+        let swap;
+        if (typeof (hashOrSwap) === "string") {
+            if (typeof (sequenceOrUltimateState) !== "bigint")
+                throw new Error("Sequence must be a BN instance!");
+            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
+        }
+        else {
+            swap = hashOrSwap;
+            if (sequenceOrUltimateState != null && typeof (sequenceOrUltimateState) !== "bigint")
+                await swap.setState(sequenceOrUltimateState);
+        }
+        if (swap != null)
+            await PluginManager_1.PluginManager.swapRemove(swap);
+        this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
+        this.removeSwapFromEscrowHashMap(swap);
+        await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
+    }
+    async saveSwapData(swap) {
+        this.saveSwapToEscrowHashMap(swap);
+        await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
     }
     saveSwapToEscrowHashMap(swap) {
         if (swap.data != null)
@@ -193,7 +171,7 @@ class SwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     checkBtcAmountInBounds(amount) {
-        if (amount.lt(this.config.min)) {
+        if (amount < this.config.min) {
             throw {
                 code: 20003,
                 msg: "Amount too low!",
@@ -203,7 +181,7 @@ class SwapHandler {
                 }
             };
         }
-        if (amount.gt(this.config.max)) {
+        if (amount > this.config.max) {
             throw {
                 code: 20004,
                 msg: "Amount too high!",
@@ -312,7 +290,7 @@ class SwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if sequence number is out of bounds
      */
     checkSequence(sequence) {
-        if (sequence.isNeg() || sequence.gte(new BN(2).pow(new BN(64)))) {
+        if (sequence < 0n || sequence >= 2n ** 64n) {
             throw {
                 code: 20060,
                 msg: "Invalid sequence"
@@ -338,18 +316,17 @@ class SwapHandler {
             chainTokens[chainId] = Array.from(this.allowedTokens[chainId]);
         }
         return {
-            swapFeePPM: this.config.feePPM.toNumber(),
-            swapBaseFee: this.config.baseFee.toNumber(),
-            min: this.config.min.toNumber(),
-            max: this.config.max.toNumber(),
+            swapFeePPM: Number(this.config.feePPM),
+            swapBaseFee: Number(this.config.baseFee),
+            min: Number(this.config.min),
+            max: Number(this.config.max),
             data: this.getInfoData(),
             tokens: Array.from(this.allowedTokens[this.chains.default]),
             chainTokens
         };
     }
     getInitAuthorizationTimeout(chainIdentifier) {
-        var _a, _b;
-        return (_b = (_a = this.config.initAuthorizationTimeouts) === null || _a === void 0 ? void 0 : _a[chainIdentifier]) !== null && _b !== void 0 ? _b : this.config.initAuthorizationTimeout;
+        return this.config.initAuthorizationTimeouts?.[chainIdentifier] ?? this.config.initAuthorizationTimeout;
     }
 }
 exports.SwapHandler = SwapHandler;

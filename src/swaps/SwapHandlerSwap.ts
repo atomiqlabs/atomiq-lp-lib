@@ -1,7 +1,6 @@
 import {Lockable, StorageObject, SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "./SwapHandler";
 import {PluginManager} from "../plugins/PluginManager";
-import * as BN from "bn.js";
 import {deserializeBN, serializeBN} from "../utils/Utils";
 
 export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> extends Lockable implements StorageObject {
@@ -21,20 +20,20 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
         claim?: string,
         refund?: string
     } = {};
-    readonly swapFee: BN;
-    readonly swapFeeInToken: BN;
+    readonly swapFee: bigint;
+    readonly swapFeeInToken: bigint;
 
     prefix: string;
     timeout: string;
     signature: string;
     feeRate: string;
 
-    protected constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN);
+    protected constructor(chainIdentifier: string, swapFee: bigint, swapFeeInToken: bigint);
     protected constructor(obj: any);
 
-    protected constructor(obj?: any | string, swapFee?: BN, swapFeeInToken?: BN) {
+    protected constructor(obj?: any | string, swapFee?: bigint, swapFeeInToken?: bigint) {
         super();
-        if(typeof(obj)==="string" && BN.isBN(swapFee) && BN.isBN(swapFeeInToken)) {
+        if(typeof(obj)==="string" && typeof(swapFee)==="bigint" && typeof(swapFeeInToken)==="bigint") {
             this.chainIdentifier = obj;
             this.swapFee = swapFee;
             this.swapFeeInToken = swapFeeInToken;
@@ -103,7 +102,7 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
         return this.getClaimHash();
     }
 
-    getSequence(): BN | null {
+    getSequence(): bigint | null {
         return this.data?.getSequence==null ? null : this.data.getSequence();
     }
 
@@ -143,22 +142,22 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
     /**
      * Returns the input amount paid by the user (excluding fees)
      */
-    abstract getInputAmount(): BN;
+    abstract getInputAmount(): bigint;
 
     /**
      * Returns the total input amount paid by the user (including all fees)
      */
-    abstract getTotalInputAmount(): BN;
+    abstract getTotalInputAmount(): bigint;
 
     /**
      * Returns the actual output amount paid out to the user
      */
-    abstract getOutputAmount(): BN;
+    abstract getOutputAmount(): bigint;
 
     /**
      * Returns swap fee, denominated in input & output tokens (the fee is paid only once, it is just represented here in
      *  both denomination for ease of use)
      */
-    abstract getSwapFee(): {inInputToken: BN, inOutputToken: BN};
+    abstract getSwapFee(): {inInputToken: bigint, inOutputToken: bigint};
 
 }
