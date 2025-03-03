@@ -12,7 +12,7 @@ export type BitcoinUtxo = {
     vout: number;
 };
 export type SignPsbtResponse = {
-    transaction: Transaction;
+    psbt: Transaction;
     tx: Transaction;
     raw: string;
     txId: string;
