@@ -4,6 +4,15 @@ exports.SwapHandlerSwap = void 0;
 const base_1 = require("@atomiqlabs/base");
 const PluginManager_1 = require("../plugins/PluginManager");
 const Utils_1 = require("../utils/Utils");
+function objectBigIntsToString(obj) {
+    for (let key in obj) {
+        if (typeof obj[key] === "bigint")
+            obj[key] = obj[key].toString(10);
+        if (typeof obj[key] === "object")
+            objectBigIntsToString(obj);
+    }
+    return obj;
+}
 class SwapHandlerSwap extends base_1.Lockable {
     constructor(obj, swapFee, swapFeeInToken) {
         super();
@@ -33,7 +42,7 @@ class SwapHandlerSwap extends base_1.Lockable {
             state: this.state,
             data: this.data == null ? null : this.data.serialize(),
             chainIdentifier: this.chainIdentifier,
-            metadata: this.metadata,
+            metadata: objectBigIntsToString(this.metadata),
             txIds: this.txIds,
             swapFee: (0, Utils_1.serializeBN)(this.swapFee),
             swapFeeInToken: (0, Utils_1.serializeBN)(this.swapFeeInToken),

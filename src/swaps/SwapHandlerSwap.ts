@@ -3,6 +3,14 @@ import {SwapHandlerType} from "./SwapHandler";
 import {PluginManager} from "../plugins/PluginManager";
 import {deserializeBN, serializeBN} from "../utils/Utils";
 
+function objectBigIntsToString(obj: Object) {
+    for(let key in obj) {
+        if(typeof obj[key] === "bigint") obj[key] = obj[key].toString(10);
+        if(typeof obj[key] === "object") objectBigIntsToString(obj);
+    }
+    return obj;
+}
+
 export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> extends Lockable implements StorageObject {
 
     chainIdentifier: string;
@@ -58,7 +66,7 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
             state: this.state,
             data: this.data==null ? null : this.data.serialize(),
             chainIdentifier: this.chainIdentifier,
-            metadata: this.metadata,
+            metadata: objectBigIntsToString(this.metadata),
             txIds: this.txIds,
             swapFee: serializeBN(this.swapFee),
             swapFeeInToken: serializeBN(this.swapFeeInToken),
