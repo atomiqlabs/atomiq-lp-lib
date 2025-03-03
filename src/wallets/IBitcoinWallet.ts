@@ -13,6 +13,7 @@ export type BitcoinUtxo = {
 };
 
 export type SignPsbtResponse = {
+    transaction: Transaction,
     tx: Transaction,
     raw: string,
     txId: string,
