@@ -273,14 +273,14 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             if (swap.metadata != null)
                 swap.metadata.times.paySignPSBT = Date.now();
             this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: " + signResult.raw);
-            swap.txId = signResult.tx.getId();
+            swap.txId = signResult.tx.id;
             swap.setRealNetworkFee(BigInt(signResult.networkFee));
             await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENDING);
             await this.saveSwapData(swap);
             await this.bitcoin.sendRawTransaction(signResult.raw);
             if (swap.metadata != null)
                 swap.metadata.times.payTxSent = Date.now();
-            this.swapLogger.info(swap, "sendBitcoinPayment(): btc transaction generated, signed & broadcasted, txId: " + signResult.tx.getId() + " address: " + swap.address);
+            this.swapLogger.info(swap, "sendBitcoinPayment(): btc transaction generated, signed & broadcasted, txId: " + swap.txId + " address: " + swap.address);
             await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENT);
             await this.saveSwapData(swap);
         });

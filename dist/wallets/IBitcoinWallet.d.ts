@@ -1,7 +1,7 @@
 /// <reference types="node" />
-import { Psbt, Transaction } from "bitcoinjs-lib";
 import { BtcTx } from "@atomiqlabs/base";
 import { Command } from "@atomiqlabs/server-base";
+import { Transaction } from "@scure/btc-signer";
 export type BitcoinUtxo = {
     address: string;
     type: "p2wpkh" | "p2sh-p2wpkh" | "p2tr";
@@ -12,7 +12,6 @@ export type BitcoinUtxo = {
     vout: number;
 };
 export type SignPsbtResponse = {
-    psbt: Psbt;
     tx: Transaction;
     raw: string;
     txId: string;
@@ -47,7 +46,7 @@ export interface IBitcoinWallet {
     getWalletTransactions(startHeight?: number): Promise<BtcTx[]>;
     getWalletTransaction(txId: string): Promise<BtcTx | null>;
     subscribeToWalletTransactions(callback: (tx: BtcTx) => void, abortSignal?: AbortSignal): void;
-    signPsbt(psbt: Psbt): Promise<SignPsbtResponse>;
+    signPsbt(psbt: Transaction): Promise<SignPsbtResponse>;
     sendRawTransaction(tx: string): Promise<void>;
     getSignedTransaction(destination: string, amount: number, feeRate?: number, nonce?: bigint, maxAllowedFeeRate?: number): Promise<SignPsbtResponse>;
     estimateFee(destination: string, amount: number, feeRate?: number, feeRateMultiplier?: number): Promise<{
