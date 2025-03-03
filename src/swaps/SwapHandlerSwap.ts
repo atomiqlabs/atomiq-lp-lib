@@ -6,7 +6,7 @@ import {deserializeBN, serializeBN} from "../utils/Utils";
 function objectBigIntsToString(obj: Object) {
     for(let key in obj) {
         if(typeof obj[key] === "bigint") obj[key] = obj[key].toString(10);
-        if(typeof obj[key] === "object") objectBigIntsToString(obj);
+        if(typeof obj[key] === "object") objectBigIntsToString(obj[key]);
     }
     return obj;
 }

@@ -9,7 +9,7 @@ function objectBigIntsToString(obj) {
         if (typeof obj[key] === "bigint")
             obj[key] = obj[key].toString(10);
         if (typeof obj[key] === "object")
-            objectBigIntsToString(obj);
+            objectBigIntsToString(obj[key]);
     }
     return obj;
 }
