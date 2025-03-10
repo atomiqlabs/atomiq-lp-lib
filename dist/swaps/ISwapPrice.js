@@ -31,7 +31,7 @@ class ISwapPrice {
     async getToBtcSwapAmount(fromAmount, fromToken, tokenChainIdentification, roundUp, preFetch) {
         const coin = this.getTokenData(fromToken, tokenChainIdentification);
         const price = (preFetch == null ? null : await preFetch) || await this.getPrice(coin);
-        return ((fromAmount * price * (10n ** BigInt(coin.decimals))) + (roundUp ? 999999n : 0n)) / 1000000n;
+        return ((fromAmount * price / (10n ** BigInt(coin.decimals))) + (roundUp ? 999999n : 0n)) / 1000000n;
     }
     /**
      * Returns amount of {toToken} that are equivalent to {fromAmount} satoshis

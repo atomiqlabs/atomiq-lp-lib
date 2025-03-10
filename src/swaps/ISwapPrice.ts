@@ -55,7 +55,7 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
 
         const price = (preFetch==null ? null : await preFetch) || await this.getPrice(coin);
 
-        return ((fromAmount * price * (10n ** BigInt(coin.decimals))) + (roundUp ? 999999n : 0n)) / 1000000n;
+        return ((fromAmount * price / (10n ** BigInt(coin.decimals))) + (roundUp ? 999999n : 0n)) / 1000000n;
     }
 
     /**
