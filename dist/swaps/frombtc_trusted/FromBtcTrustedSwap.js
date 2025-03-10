@@ -88,6 +88,9 @@ class FromBtcTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     getSequence() {
         return this.sequence;
     }
+    getToken() {
+        return this.token;
+    }
     getOutputAmount() {
         return this.adjustedOutput || this.outputTokens;
     }

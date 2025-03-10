@@ -95,6 +95,12 @@ class SwapHandlerSwap extends base_1.Lockable {
         return this.chainIdentifier + "_" + this.getIdentifierHash();
     }
     /**
+     * Returns the smart chain token used for the swap
+     */
+    getToken() {
+        return this.data?.getToken();
+    }
+    /**
      * Checks whether the swap is finished, such that it is final and either successful or failed
      */
     isFinished() {

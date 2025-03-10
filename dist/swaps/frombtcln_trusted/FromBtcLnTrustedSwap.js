@@ -36,6 +36,12 @@ class FromBtcLnTrustedSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         }
         this.type = null;
     }
+    getToken() {
+        return this.token;
+    }
+    getOutputAmount() {
+        return this.output;
+    }
     getClaimHash() {
         return (0, crypto_1.createHash)("sha256").update(Buffer.from(this.secret, "hex")).digest().toString("hex");
     }

@@ -18,6 +18,8 @@ export declare class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends
     scRawTx: string;
     constructor(chainIdentifier: string, pr: string, inputMtokens: bigint, swapFee: bigint, swapFeeInToken: bigint, output: bigint, secret: string, dstAddress: string, token: string);
     constructor(obj: any);
+    getToken(): string;
+    getOutputAmount(): bigint;
     getClaimHash(): string;
     getSequence(): bigint;
     serialize(): any;

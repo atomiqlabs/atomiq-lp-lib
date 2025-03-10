@@ -106,6 +106,14 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         return partialSerialized;
     }
 
+    getToken(): string {
+        return this.token;
+    }
+
+    getOutputAmount(): bigint {
+        return this.totalTokens;
+    }
+
     getIdentifierHash(): string {
         return this.lnPaymentHash;
     }

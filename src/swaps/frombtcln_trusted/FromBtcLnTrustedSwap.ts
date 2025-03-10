@@ -67,6 +67,14 @@ export class FromBtcLnTrustedSwap<T extends SwapData = SwapData> extends FromBtc
         this.type = null;
     }
 
+    getToken(): string {
+        return this.token;
+    }
+
+    getOutputAmount(): bigint {
+        return this.output;
+    }
+
     getClaimHash(): string {
         return createHash("sha256").update(Buffer.from(this.secret, "hex")).digest().toString("hex");
     }

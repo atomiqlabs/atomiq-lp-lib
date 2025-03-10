@@ -149,6 +149,10 @@ export class FromBtcTrustedSwap<T extends SwapData = SwapData> extends FromBtcBa
         return this.sequence;
     }
 
+    getToken(): string {
+        return this.token;
+    }
+
     getOutputAmount(): bigint {
         return this.adjustedOutput || this.outputTokens;
     }

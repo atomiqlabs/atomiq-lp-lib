@@ -126,6 +126,13 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
     }
 
     /**
+     * Returns the smart chain token used for the swap
+     */
+    getToken(): string {
+        return this.data?.getToken();
+    }
+
+    /**
      * Checks whether the swap is finished, such that it is final and either successful or failed
      */
     isFinished(): boolean {

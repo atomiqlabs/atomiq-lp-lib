@@ -52,6 +52,10 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
      */
     getIdentifier(): string;
     /**
+     * Returns the smart chain token used for the swap
+     */
+    getToken(): string;
+    /**
      * Checks whether the swap is finished, such that it is final and either successful or failed
      */
     isFinished(): boolean;

@@ -38,6 +38,7 @@ export declare class FromBtcTrustedSwap<T extends SwapData = SwapData> extends F
     serialize(): any;
     getClaimHash(): string;
     getSequence(): bigint;
+    getToken(): string;
     getOutputAmount(): bigint;
     getTotalInputAmount(): bigint;
     isFailed(): boolean;

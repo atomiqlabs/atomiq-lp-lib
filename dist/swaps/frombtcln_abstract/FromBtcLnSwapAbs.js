@@ -63,6 +63,12 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.depositToken = this.depositToken;
         return partialSerialized;
     }
+    getToken() {
+        return this.token;
+    }
+    getOutputAmount() {
+        return this.totalTokens;
+    }
     getIdentifierHash() {
         return this.lnPaymentHash;
     }
