@@ -364,7 +364,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         //Check if payment was already made
         if(swap.state===ToBtcLnSwapState.PAID) {
             const success = await this.tryClaimSwap(swap);
-            if(success) this.swapLogger.info(swap, "processPaymentResult(): swap claimed successfully, invoice: "+swap.pr);
+            if(success) this.swapLogger.info(swap, "processInitialized(): swap claimed successfully, invoice: "+swap.pr);
             return;
         }
 
