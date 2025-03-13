@@ -216,6 +216,24 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
         const {swapContract, signer} = this.getChain(swap.chainIdentifier);
 
+        //Check if escrow state exists
+        const isCommited = await swapContract.isCommited(swap.data);
+        if(!isCommited) {
+            const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            if(status===SwapCommitStatus.PAID) {
+                //This is alright, we got the money
+                await this.removeSwapData(swap, ToBtcLnSwapState.CLAIMED);
+                return true;
+            } else if(status===SwapCommitStatus.EXPIRED) {
+                //This means the user was able to refund before we were able to claim, no good
+                await this.removeSwapData(swap, ToBtcLnSwapState.REFUNDED);
+            }
+            this.swapLogger.warn(swap, "processPaymentResult(): tried to claim but escrow doesn't exist anymore,"+
+                " status: "+status+
+                " invoice: "+swap.pr);
+            return false;
+        }
+
         //Set flag that we are sending the transaction already, so we don't end up with race condition
         const unlock: () => boolean = swap.lock(swapContract.claimWithSecretTimeout);
         if(unlock==null) return false;
@@ -253,31 +271,11 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 return;
 
             case "confirmed":
-                const {swapContract, signer} = this.getChain(swap.chainIdentifier);
-
                 swap.secret = lnPaymentStatus.secret;
                 swap.setRealNetworkFee(lnPaymentStatus.feeMtokens / 1000n);
                 this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: "+swap.secret+" realRoutingFee: "+swap.realNetworkFee.toString(10)+" invoice: "+swap.pr);
                 await swap.setState(ToBtcLnSwapState.PAID);
                 await this.saveSwapData(swap);
-
-                //Check if escrow state exists
-                const isCommited = await swapContract.isCommited(swap.data);
-                if(!isCommited) {
-                    const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
-                    if(status===SwapCommitStatus.PAID) {
-                        //This is alright, we got the money
-                        await this.removeSwapData(swap, ToBtcLnSwapState.CLAIMED);
-                        return;
-                    } else if(status===SwapCommitStatus.EXPIRED) {
-                        //This means the user was able to refund before we were able to claim, no good
-                        await this.removeSwapData(swap, ToBtcLnSwapState.REFUNDED);
-                    }
-                    this.swapLogger.warn(swap, "processPaymentResult(): tried to claim but escrow doesn't exist anymore,"+
-                        " status: "+status+
-                        " invoice: "+swap.pr);
-                    return;
-                }
 
                 const success = await this.tryClaimSwap(swap);
                 if(success) this.swapLogger.info(swap, "processPaymentResult(): swap claimed successfully, invoice: "+swap.pr);
@@ -364,6 +362,12 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      */
     private async processInitialized(swap: ToBtcLnSwapAbs) {
         //Check if payment was already made
+        if(swap.state===ToBtcLnSwapState.PAID) {
+            const success = await this.tryClaimSwap(swap);
+            if(success) this.swapLogger.info(swap, "processPaymentResult(): swap claimed successfully, invoice: "+swap.pr);
+            return;
+        }
+
         if(swap.state===ToBtcLnSwapState.COMMITED) {
             if(swap.metadata!=null) swap.metadata.times.payPaymentChecked = Date.now();
             let lnPaymentStatus = await this.lightning.getPayment(swap.lnPaymentHash);
