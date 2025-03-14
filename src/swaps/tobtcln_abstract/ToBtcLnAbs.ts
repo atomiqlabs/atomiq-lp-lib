@@ -822,7 +822,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             } = {request: {}, times: {}};
 
             const chainIdentifier = req.query.chain as string ?? this.chains.default;
-            const {swapContract, signer} = this.getChain(chainIdentifier);
+            const {swapContract, signer, chainInterface} = this.getChain(chainIdentifier);
 
             metadata.times.requestReceived = Date.now();
             /**
@@ -847,7 +847,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
                 offerer: (val: string) => val!=null &&
                         typeof(val)==="string" &&
-                        swapContract.isValidAddress(val) ? val : null,
+                        chainInterface.isValidAddress(val) ? val : null,
                 exactIn: FieldTypeEnum.BooleanOptional,
                 amount: FieldTypeEnum.BigIntOptional
             });

@@ -41,15 +41,15 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             abortController.abort(e);
             return null;
         });
-        const {swapContract} = this.getChain(chainIdentifier);
-        const gasTokenPricePrefetchPromise: Promise<bigint> = useToken.toString()===swapContract.getNativeCurrencyAddress().toString() ?
+        const {chainInterface} = this.getChain(chainIdentifier);
+        const gasTokenPricePrefetchPromise: Promise<bigint> = useToken.toString()===chainInterface.getNativeCurrencyAddress().toString() ?
             pricePrefetchPromise :
-            this.swapPricing.preFetchPrice(swapContract.getNativeCurrencyAddress(), chainIdentifier).catch(e => {
+            this.swapPricing.preFetchPrice(chainInterface.getNativeCurrencyAddress(), chainIdentifier).catch(e => {
                 this.logger.error("getFromBtcPricePrefetches(): gasTokenPricePrefetchPromise error: ", e);
                 abortController.abort(e);
                 return null;
             });
-        const depositTokenPricePrefetchPromise: Promise<bigint> = depositToken===swapContract.getNativeCurrencyAddress() ?
+        const depositTokenPricePrefetchPromise: Promise<bigint> = depositToken===chainInterface.getNativeCurrencyAddress() ?
             gasTokenPricePrefetchPromise :
             this.swapPricing.preFetchPrice(depositToken, chainIdentifier).catch(e => {
                 this.logger.error("getFromBtcPricePrefetches(): depositTokenPricePrefetchPromise error: ", e);
@@ -75,9 +75,9 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
         abortController: AbortController
     ): Promise<bigint> {
         //Solana workaround
-        const {swapContract} = this.getChain(chainIdentifier);
+        const {swapContract, chainInterface} = this.getChain(chainIdentifier);
         let feeResult: bigint;
-        const gasToken = swapContract.getNativeCurrencyAddress();
+        const gasToken = chainInterface.getNativeCurrencyAddress();
         if (swapContract.getRawRefundFee != null) {
             try {
                 feeResult = await swapContract.getRawRefundFee(dummySwapData);
@@ -147,9 +147,9 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
      * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
      */
     protected checkAllowedDepositToken(chainIdentifier: string, depositToken: string): void {
-        const {swapContract, allowedDepositTokens} = this.getChain(chainIdentifier);
+        const {chainInterface, allowedDepositTokens} = this.getChain(chainIdentifier);
         if(allowedDepositTokens==null) {
-            if(depositToken!==swapContract.getNativeCurrencyAddress()) throw {
+            if(depositToken!==chainInterface.getNativeCurrencyAddress()) throw {
                 code: 20190,
                 msg: "Unsupported deposit token"
             };
