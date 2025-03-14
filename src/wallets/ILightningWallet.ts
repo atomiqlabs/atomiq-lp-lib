@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {Command} from "@atomiqlabs/server-base";
 
 export type IncomingLightningNetworkPayment = {
@@ -10,7 +9,7 @@ export type IncomingLightningNetworkPayment = {
 
     status: "held" | "canceled" | "confirmed"
 
-    mtokens: BN
+    mtokens: bigint
 }
 
 export type LightningNetworkInvoice = {
@@ -19,7 +18,7 @@ export type LightningNetworkInvoice = {
     secret?: string,
 
     cltvDelta: number,
-    mtokens: BN,
+    mtokens: bigint,
 
     createdAt: number,
     expiresAt: number,
@@ -36,25 +35,25 @@ export type OutgoingLightningNetworkPayment = {
     failedReason?: "insufficient_balance" | "invalid_payment" | "pathfinding_timeout" | "route_not_found",
     status: "confirmed" | "failed" | "pending",
     secret?: string,
-    feeMtokens?: BN
+    feeMtokens?: bigint
 };
 
 export type LightningNetworkChannel = {
     id: string,
-    capacity: BN,
+    capacity: bigint,
     isActive: boolean,
 
-    localBalance: BN,
-    localReserve: BN,
-    remoteBalance: BN,
-    remoteReserve: BN,
-    unsettledBalance: BN,
+    localBalance: bigint,
+    localReserve: bigint,
+    remoteBalance: bigint,
+    remoteReserve: bigint,
+    unsettledBalance: bigint,
     transactionId: string,
     transactionVout: number
 };
 
 export type InvoiceInit = {
-    mtokens: BN,
+    mtokens: bigint,
     descriptionHash?: string
     description?: string,
     cltvDelta?: number,
@@ -66,7 +65,7 @@ export type HodlInvoiceInit = {
     cltvDelta: number,
     expiresAt: number,
     id: string,
-    mtokens: BN,
+    mtokens: bigint,
     descriptionHash?: string
 };
 
@@ -75,12 +74,12 @@ export type LNRoutes = {
     feeRate?: number,
     cltvDelta?: number,
     channel?: string,
-    baseFeeMtokens?: BN
+    baseFeeMtokens?: bigint
 }[][];
 
 export type ParsedPaymentRequest = {
     id: string,
-    mtokens: BN,
+    mtokens: bigint,
     expiryEpochMillis: number,
     destination: string,
     cltvDelta: number,
@@ -90,26 +89,26 @@ export type ParsedPaymentRequest = {
 
 export type LightningPaymentInit = {
     request: string,
-    maxFeeMtokens?: BN,
+    maxFeeMtokens?: bigint,
     maxTimeoutHeight?: number
 };
 
 export type LightningBalanceResponse = {
-    localBalance: BN,
-    remoteBalance: BN,
-    unsettledBalance: BN
+    localBalance: bigint,
+    remoteBalance: bigint,
+    unsettledBalance: bigint
 };
 
 export type ProbeAndRouteInit = {
     request: string,
-    amountMtokens: BN,
-    maxFeeMtokens: BN,
+    amountMtokens: bigint,
+    maxFeeMtokens: bigint,
     maxTimeoutHeight: number
 }
 
 export type ProbeAndRouteResponse = {
     confidence: number,
-    feeMtokens: BN,
+    feeMtokens: bigint,
     destination: string,
     privateRoutes: LNRoutes
 }
@@ -133,7 +132,7 @@ export function routesMatch(routesA: LNRoutes, routesB: LNRoutes) {
             }
             if(
                 routesA[i][e].publicKey!==routesB[i][e].publicKey ||
-                !routesA[i][e].baseFeeMtokens.eq(routesB[i][e].baseFeeMtokens) ||
+                routesA[i][e].baseFeeMtokens!==routesB[i][e].baseFeeMtokens ||
                 routesA[i][e].channel!==routesB[i][e].channel ||
                 routesA[i][e].cltvDelta!==routesB[i][e].cltvDelta ||
                 routesA[i][e].feeRate!==routesB[i][e].feeRate

@@ -1,7 +1,6 @@
 import {StorageObject} from "@atomiqlabs/base";
 import * as fs from "fs/promises";
 import {IIntermediaryStorage, StorageQueryParam} from "../storage/IIntermediaryStorage";
-import * as BN from "bn.js";
 
 export class IntermediaryStorageManager<T extends StorageObject> implements IIntermediaryStorage<T> {
 
@@ -21,8 +20,9 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
         } catch (e) {}
     }
 
-    query(params: StorageQueryParam[]): Promise<T[]> {
-        return Promise.resolve(Object.keys(this.data).map((val) => this.data[val]).filter((val) => {
+    query(params: StorageQueryParam[]): Promise<{hash: string, sequence: bigint, obj: T}[]> {
+        return Promise.resolve(Object.keys(this.data).filter((key) => {
+            const val = this.data[key];
             for(let param of params) {
                 if(param.value!=null) {
                     if(typeof param.value === "object") {
@@ -45,16 +45,24 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
                 }
             }
             return true;
+        }).map(key => {
+            const [hash, sequenceStr] = key.split("_");
+            const sequence = BigInt("0x"+sequenceStr);
+            return {
+                obj: this.data[key],
+                hash,
+                sequence
+            }
         }));
     }
 
-    getData(paymentHash: string, sequence: BN | null): Promise<T> {
-        return Promise.resolve(this.data[paymentHash+"_"+(sequence || new BN(0)).toString("hex", 8)]);
+    getData(paymentHash: string, sequence: bigint | null): Promise<T> {
+        return Promise.resolve(this.data[paymentHash+"_"+(sequence || 0n).toString(16).padStart(16, "0")]);
     }
 
-    async saveData(hash: string, sequence: BN | null, object: T): Promise<void> {
+    async saveData(hash: string, sequence: bigint | null, object: T): Promise<void> {
 
-        const _sequence = (sequence || new BN(0)).toString("hex", 8);
+        const _sequence = (sequence || 0n).toString(16).padStart(16, "0");
 
         try {
             await fs.mkdir(this.directory)
@@ -68,8 +76,8 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
 
     }
 
-    async removeData(hash: string, sequence: BN | null): Promise<void> {
-        const identifier = hash+"_"+(sequence || new BN(0)).toString("hex", 8);
+    async removeData(hash: string, sequence: bigint | null): Promise<void> {
+        const identifier = hash+"_"+(sequence || 0n).toString(16).padStart(16, "0");
         try {
             if(this.data[identifier]!=null) delete this.data[identifier];
             await fs.rm(this.directory+"/"+identifier+".json");

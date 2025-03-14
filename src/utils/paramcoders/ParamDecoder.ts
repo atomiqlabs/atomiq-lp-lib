@@ -1,4 +1,4 @@
-import {FieldTypeEnum, parseBN, RequestSchema, RequestSchemaResult, verifySchema} from "./SchemaVerifier";
+import {FieldTypeEnum, parseBigInt, RequestSchema, RequestSchemaResult, verifySchema} from "./SchemaVerifier";
 import {IParamReader} from "./IParamReader";
 
 
@@ -155,8 +155,8 @@ export class ParamDecoder implements IParamReader {
                 if(typeof(val)!=="number") return null;
                 if(isNaN(val as number)) return null;
                 resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.BN || type===FieldTypeEnum.BNOptional) {
-                const result = parseBN(val);
+            } else if(type===FieldTypeEnum.BigInt || type===FieldTypeEnum.BigIntOptional) {
+                const result = parseBigInt(val);
                 if(result==null) return null;
                 resultSchema[fieldName] = result;
             } else if(type===FieldTypeEnum.String || type===FieldTypeEnum.StringOptional) {
@@ -199,8 +199,8 @@ export class ParamDecoder implements IParamReader {
                 if(typeof(val)!=="number") return null;
                 if(isNaN(val as number)) return null;
                 resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.BN || type===FieldTypeEnum.BNOptional) {
-                const result = parseBN(val);
+            } else if(type===FieldTypeEnum.BigInt || type===FieldTypeEnum.BigIntOptional) {
+                const result = parseBigInt(val);
                 if(result==null) return null;
                 resultSchema[fieldName] = result;
             } else if(type===FieldTypeEnum.String || type===FieldTypeEnum.StringOptional) {

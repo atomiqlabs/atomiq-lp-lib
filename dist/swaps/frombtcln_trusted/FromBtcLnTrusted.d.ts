@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { Express } from "express";
 import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState } from "./FromBtcLnTrustedSwap";
@@ -9,19 +8,21 @@ import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { FromBtcLnBaseSwapHandler } from "../FromBtcLnBaseSwapHandler";
 import { ILightningWallet } from "../../wallets/ILightningWallet";
 export type SwapForGasServerConfig = FromBtcBaseConfig & {
-    minCltv: BN;
+    minCltv: bigint;
     invoiceTimeoutSeconds?: number;
 };
 export type FromBtcLnTrustedRequestType = {
     address: string;
-    amount: BN;
-    exactOut?: boolean;
+    amount: bigint;
+    exactIn?: boolean;
+    token?: string;
 };
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
 export declare class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState> {
     readonly type: SwapHandlerType;
+    readonly swapType: any;
     activeSubscriptions: Map<string, AbortController>;
     processedTxIds: Map<string, string>;
     readonly config: SwapForGasServerConfig;
@@ -71,7 +72,7 @@ export declare class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLn
     startRestServer(restServer: Express): void;
     init(): Promise<void>;
     getInfoData(): any;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, swap: FromBtcLnTrustedSwap, event: RefundEvent<SwapData>): Promise<void>;
 }

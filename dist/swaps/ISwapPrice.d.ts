@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 export type ISwapPriceCoinsMap<T extends {
     decimals: number;
 }> = {
@@ -18,9 +17,9 @@ export declare abstract class ISwapPrice<T extends {
      *
      * @param tokenData
      */
-    protected abstract getPrice(tokenData: T): Promise<BN>;
+    protected abstract getPrice(tokenData: T): Promise<bigint>;
     getTokenData(tokenAddress: string, chainId: string): T;
-    preFetchPrice(token: string, chainId: string): Promise<BN>;
+    preFetchPrice(token: string, chainId: string): Promise<bigint>;
     /**
      * Returns amount of satoshis that are equivalent to {fromAmount} of {fromToken}
      *
@@ -30,7 +29,7 @@ export declare abstract class ISwapPrice<T extends {
      * @param roundUp Whether result should be rounded up
      * @param preFetch Price pre-fetch promise returned from preFetchPrice()
      */
-    getToBtcSwapAmount(fromAmount: BN, fromToken: string, tokenChainIdentification: string, roundUp?: boolean, preFetch?: Promise<BN>): Promise<BN>;
+    getToBtcSwapAmount(fromAmount: bigint, fromToken: string, tokenChainIdentification: string, roundUp?: boolean, preFetch?: Promise<bigint>): Promise<bigint>;
     /**
      * Returns amount of {toToken} that are equivalent to {fromAmount} satoshis
      *
@@ -40,5 +39,5 @@ export declare abstract class ISwapPrice<T extends {
      * @param roundUp Whether result should be rounded up
      * @param preFetch Price pre-fetch promise returned from preFetchPrice()
      */
-    getFromBtcSwapAmount(fromAmount: BN, toToken: string, tokenChainIdentification: string, roundUp?: boolean, preFetch?: Promise<BN>): Promise<BN>;
+    getFromBtcSwapAmount(fromAmount: bigint, toToken: string, tokenChainIdentification: string, roundUp?: boolean, preFetch?: Promise<bigint>): Promise<bigint>;
 }

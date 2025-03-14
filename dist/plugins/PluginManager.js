@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PluginManager = void 0;
 const IPlugin_1 = require("./IPlugin");
@@ -27,219 +18,200 @@ class PluginManager {
     static unregisterPlugin(name) {
         return PluginManager.plugins.delete(name);
     }
-    static enable(chainsData, bitcoinRpc, bitcoinWallet, lightningWallet, swapPricing, tokens, directory) {
-        return __awaiter(this, void 0, void 0, function* () {
+    static async enable(chainsData, bitcoinRpc, bitcoinWallet, lightningWallet, swapPricing, tokens, directory) {
+        try {
+            fs.mkdirSync(directory);
+        }
+        catch (e) { }
+        for (let [name, plugin] of PluginManager.plugins.entries()) {
             try {
-                fs.mkdirSync(directory);
-            }
-            catch (e) { }
-            for (let [name, plugin] of PluginManager.plugins.entries()) {
                 try {
-                    try {
-                        fs.mkdirSync(directory + "/" + name);
-                    }
-                    catch (e) { }
-                    yield plugin.onEnable(chainsData, bitcoinRpc, bitcoinWallet, lightningWallet, swapPricing, tokens, directory + "/" + name);
+                    fs.mkdirSync(directory + "/" + name);
                 }
-                catch (e) {
-                    pluginLogger.error(plugin, "enable(): plugin enable error", e);
-                }
+                catch (e) { }
+                await plugin.onEnable(chainsData, bitcoinRpc, bitcoinWallet, lightningWallet, swapPricing, tokens, directory + "/" + name);
             }
-        });
+            catch (e) {
+                pluginLogger.error(plugin, "enable(): plugin enable error", e);
+            }
+        }
     }
-    static disable() {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    yield plugin.onDisable();
-                }
-                catch (e) {
-                    pluginLogger.error(plugin, "disable(): plugin disable error", e);
-                }
+    static async disable() {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                await plugin.onDisable();
             }
-        });
-    }
-    static serviceInitialize(handler) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    yield plugin.onServiceInitialize(handler);
-                }
-                catch (e) {
-                    pluginLogger.error(plugin, "serviceInitialize(): plugin error", e);
-                }
+            catch (e) {
+                pluginLogger.error(plugin, "disable(): plugin disable error", e);
             }
-        });
+        }
     }
-    static onHttpServerStarted(httpServer) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onHttpServerStarted != null)
-                        yield plugin.onHttpServerStarted(httpServer);
-                }
-                catch (e) {
-                    pluginLogger.error(plugin, "onHttpServerStarted(): plugin error", e);
-                }
+    static async serviceInitialize(handler) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                await plugin.onServiceInitialize(handler);
             }
-        });
-    }
-    static swapStateChange(swap, oldState) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onSwapStateChange != null)
-                        yield plugin.onSwapStateChange(swap);
-                }
-                catch (e) {
-                    pluginLogger.error(plugin, "swapStateChange(): plugin error", e);
-                }
+            catch (e) {
+                pluginLogger.error(plugin, "serviceInitialize(): plugin error", e);
             }
-        });
+        }
     }
-    static swapCreate(swap) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onSwapCreate != null)
-                        yield plugin.onSwapCreate(swap);
-                }
-                catch (e) {
-                    pluginLogger.error(plugin, "swapCreate(): plugin error", e);
-                }
+    static async onHttpServerStarted(httpServer) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHttpServerStarted != null)
+                    await plugin.onHttpServerStarted(httpServer);
             }
-        });
-    }
-    static swapRemove(swap) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onSwapRemove != null)
-                        yield plugin.onSwapRemove(swap);
-                }
-                catch (e) {
-                    pluginLogger.error(plugin, "swapRemove(): plugin error", e);
-                }
+            catch (e) {
+                pluginLogger.error(plugin, "onHttpServerStarted(): plugin error", e);
             }
-        });
+        }
     }
-    static onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onHandlePostFromBtcQuote != null) {
-                        const result = yield plugin.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise);
-                        if (result != null) {
-                            if ((0, IPlugin_1.isQuoteSetFees)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteThrow)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                                return result;
-                            if ((0, IPlugin_1.isPluginQuote)(result)) {
-                                if (result.amount.input === requestedAmount.input)
-                                    throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
-                                return result;
-                            }
+    static async swapStateChange(swap, oldState) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onSwapStateChange != null)
+                    await plugin.onSwapStateChange(swap);
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "swapStateChange(): plugin error", e);
+            }
+        }
+    }
+    static async swapCreate(swap) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onSwapCreate != null)
+                    await plugin.onSwapCreate(swap);
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "swapCreate(): plugin error", e);
+            }
+        }
+    }
+    static async swapRemove(swap) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onSwapRemove != null)
+                    await plugin.onSwapRemove(swap);
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "swapRemove(): plugin error", e);
+            }
+        }
+    }
+    static async onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHandlePostFromBtcQuote != null) {
+                    const result = await plugin.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise);
+                    if (result != null) {
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteThrow)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
+                            return result;
+                        if ((0, IPlugin_1.isPluginQuote)(result)) {
+                            if (result.amount.input === requestedAmount.input)
+                                throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
+                            return result;
                         }
                     }
                 }
-                catch (e) {
-                    pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
+    }
+    static async onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHandlePreFromBtcQuote != null) {
+                    const result = await plugin.onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
+                    if (result != null) {
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteThrow)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
+                            return result;
+                    }
                 }
             }
-            return null;
-        });
+            catch (e) {
+                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
     }
-    static onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onHandlePreFromBtcQuote != null) {
-                        const result = yield plugin.onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
-                        if (result != null) {
-                            if ((0, IPlugin_1.isQuoteSetFees)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteThrow)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                                return result;
+    static async onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHandlePostToBtcQuote != null) {
+                    let networkFeeData;
+                    const result = await plugin.onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, {
+                        baseFeeInBtc: fees.baseFeeInBtc,
+                        feePPM: fees.feePPM,
+                        networkFeeGetter: async (amount) => {
+                            networkFeeData = await fees.networkFeeGetter(amount);
+                            return networkFeeData.networkFee;
+                        }
+                    }, pricePrefetchPromise);
+                    if (result != null) {
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteThrow)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
+                            return result;
+                        if ((0, IPlugin_1.isToBtcPluginQuote)(result)) {
+                            if (result.amount.input === requestedAmount.input)
+                                throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
+                            return {
+                                ...result,
+                                networkFeeData: networkFeeData
+                            };
                         }
                     }
                 }
-                catch (e) {
-                    pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
-                }
             }
-            return null;
-        });
+            catch (e) {
+                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
     }
-    static onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onHandlePostToBtcQuote != null) {
-                        let networkFeeData;
-                        const result = yield plugin.onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, {
-                            baseFeeInBtc: fees.baseFeeInBtc,
-                            feePPM: fees.feePPM,
-                            networkFeeGetter: (amount) => __awaiter(this, void 0, void 0, function* () {
-                                networkFeeData = yield fees.networkFeeGetter(amount);
-                                return networkFeeData.networkFee;
-                            })
-                        }, pricePrefetchPromise);
-                        if (result != null) {
-                            if ((0, IPlugin_1.isQuoteSetFees)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteThrow)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                                return result;
-                            if ((0, IPlugin_1.isToBtcPluginQuote)(result)) {
-                                if (result.amount.input === requestedAmount.input)
-                                    throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
-                                return Object.assign(Object.assign({}, result), { networkFeeData: networkFeeData });
-                            }
-                        }
+    static async onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHandlePreToBtcQuote != null) {
+                    const result = await plugin.onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
+                    if (result != null) {
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteThrow)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
+                            return result;
                     }
                 }
-                catch (e) {
-                    pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
-                }
             }
-            return null;
-        });
-    }
-    static onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees) {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let plugin of PluginManager.plugins.values()) {
-                try {
-                    if (plugin.onHandlePreToBtcQuote != null) {
-                        const result = yield plugin.onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
-                        if (result != null) {
-                            if ((0, IPlugin_1.isQuoteSetFees)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteThrow)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                                return result;
-                            if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                                return result;
-                        }
-                    }
-                }
-                catch (e) {
-                    pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
-                }
+            catch (e) {
+                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
             }
-            return null;
-        });
+        }
+        return null;
     }
     static getWhitelistedTxIds() {
         const whitelist = new Set();

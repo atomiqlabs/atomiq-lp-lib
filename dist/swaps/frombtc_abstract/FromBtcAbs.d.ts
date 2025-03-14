@@ -1,9 +1,8 @@
-import * as BN from "bn.js";
 import { Express } from "express";
 import { FromBtcSwapAbs, FromBtcSwapState } from "./FromBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
-import { ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
+import { ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { FromBtcBaseConfig, FromBtcBaseSwapHandler } from "../FromBtcBaseSwapHandler";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
@@ -13,9 +12,9 @@ export type FromBtcConfig = FromBtcBaseConfig & {
 };
 export type FromBtcRequestType = {
     address: string;
-    amount: BN;
+    amount: bigint;
     token: string;
-    sequence: BN;
+    sequence: bigint;
     exactOut?: boolean;
 };
 /**
@@ -23,18 +22,12 @@ export type FromBtcRequestType = {
  */
 export declare class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSwapState> {
     readonly type = SwapHandlerType.FROM_BTC;
+    readonly swapType = ChainSwapType.CHAIN;
     readonly config: FromBtcConfig & {
-        swapTsCsvDelta: BN;
+        swapTsCsvDelta: bigint;
     };
     readonly bitcoin: IBitcoinWallet;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcSwapAbs>, path: string, chains: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, config: FromBtcConfig);
-    /**
-     * Returns the TXO hash of the specific address and amount - sha256(u64le(amount) + outputScript(address))
-     *
-     * @param address
-     * @param amount
-     */
-    private getTxoHash;
     /**
      * Returns the payment hash of the swap, takes swap nonce into account. Payment hash is chain-specific.
      *
@@ -62,9 +55,9 @@ export declare class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, F
      * @protected
      */
     protected refundSwaps(refundSwaps: FromBtcSwapAbs[]): Promise<void>;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, savedSwap: FromBtcSwapAbs, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, savedSwap: FromBtcSwapAbs, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, savedSwap: FromBtcSwapAbs, event: RefundEvent<SwapData>): Promise<void>;
     /**
      * Calculates the requested claimer bounty, based on client's request
      *

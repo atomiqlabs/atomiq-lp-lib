@@ -1,9 +1,8 @@
 import { Express, Request } from "express";
 import { ISwapPrice } from "./ISwapPrice";
-import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, SwapEvent } from "@atomiqlabs/base";
+import { ChainSwapType, ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, SwapEvent } from "@atomiqlabs/base";
 import { SwapHandlerSwap } from "./SwapHandlerSwap";
 import { IIntermediaryStorage } from "../storage/IIntermediaryStorage";
-import * as BN from "bn.js";
 import { ServerParamEncoder } from "../utils/paramcoders/server/ServerParamEncoder";
 import { IParamReader } from "../utils/paramcoders/IParamReader";
 export declare enum SwapHandlerType {
@@ -26,13 +25,16 @@ export type SwapHandlerInfoType = {
     data?: any;
 };
 export type SwapBaseConfig = {
-    authorizationTimeout: number;
-    bitcoinBlocktime: BN;
-    baseFee: BN;
-    feePPM: BN;
-    max: BN;
-    min: BN;
-    safetyFactor: BN;
+    initAuthorizationTimeout: number;
+    initAuthorizationTimeouts?: {
+        [chainId: string]: number;
+    };
+    bitcoinBlocktime: bigint;
+    baseFee: bigint;
+    feePPM: bigint;
+    max: bigint;
+    min: bigint;
+    safetyFactor: bigint;
     swapCheckInterval: number;
 };
 export type MultichainData = {
@@ -46,6 +48,7 @@ export type ChainData<T extends ChainType = ChainType> = {
     swapContract: T["Contract"];
     chainEvents: T["Events"];
     allowedTokens: string[];
+    allowedDepositTokens?: string[];
     btcRelay?: T["BtcRelay"];
 };
 export type RequestData<T> = {
@@ -61,7 +64,9 @@ export type RequestData<T> = {
  */
 export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapHandlerSwap, S = any> {
     abstract readonly type: SwapHandlerType;
+    abstract readonly swapType: ChainSwapType;
     readonly storageManager: IIntermediaryStorage<V>;
+    readonly escrowHashMap: Map<string, V>;
     readonly path: string;
     readonly chains: MultichainData;
     readonly allowedTokens: {
@@ -89,9 +94,9 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * Starts the watchdog checking past swaps for expiry or claim eligibility.
      */
     startWatchdog(): Promise<void>;
-    protected abstract processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected abstract processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected abstract processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected abstract processInitializeEvent?(chainIdentifier: string, swap: V, event: InitializeEvent<SwapData>): Promise<void>;
+    protected abstract processClaimEvent?(chainIdentifier: string, swap: V, event: ClaimEvent<SwapData>): Promise<void>;
+    protected abstract processRefundEvent?(chainIdentifier: string, swap: V, event: RefundEvent<SwapData>): Promise<void>;
     /**
      * Chain event processor
      *
@@ -107,6 +112,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * Initializes swap handler, loads data and subscribes to chain events
      */
     abstract init(): Promise<void>;
+    protected loadData(ctor: new (data: any) => V): Promise<void>;
     /**
      * Sets up required listeners for the REST server
      *
@@ -123,7 +129,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * @param hash
      * @param sequence
      */
-    protected removeSwapData(hash: string, sequence: BN): Promise<void>;
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
     /**
      * Remove swap data
      *
@@ -131,6 +137,10 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * @param ultimateState set the ultimate state of the swap before removing
      */
     protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
+    protected saveSwapData(swap: V): Promise<void>;
+    protected saveSwapToEscrowHashMap(swap: V): void;
+    protected removeSwapFromEscrowHashMap(swap: V): void;
+    protected getSwapByEscrowHash(chainIdentifier: string, escrowHash: string): V;
     /**
      * Checks whether the bitcoin amount is within specified min/max bounds
      *
@@ -138,7 +148,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    protected checkBtcAmountInBounds(amount: BN): void;
+    protected checkBtcAmountInBounds(amount: bigint): void;
     /**
      * Handles and throws plugin errors
      *
@@ -170,7 +180,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      * @param sequence
      * @throws {DefinedRuntimeError} will throw an error if sequence number is out of bounds
      */
-    protected checkSequence(sequence: BN): void;
+    protected checkSequence(sequence: bigint): void;
     /**
      * Checks whether a given token is supported on a specified chain
      *
@@ -180,4 +190,5 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S>
      */
     protected isTokenSupported(chainId: string, token: string): boolean;
     getInfo(): SwapHandlerInfoType;
+    protected getInitAuthorizationTimeout(chainIdentifier: string): number;
 }

@@ -1,16 +1,16 @@
-import * as BN from "bn.js";
 import {Express, Request, Response} from "express";
 import {FromBtcSwapAbs, FromBtcSwapState} from "./FromBtcSwapAbs";
 import {MultichainData, SwapHandlerType} from "../SwapHandler";
 import {ISwapPrice} from "../ISwapPrice";
 import {
+    BigIntBufferUtils,
     ChainSwapType,
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
     SwapData
 } from "@atomiqlabs/base";
-import {createHash} from "crypto";
+import {randomBytes} from "crypto";
 import {expressHandlerWrapper} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../storage/IIntermediaryStorage";
@@ -28,9 +28,9 @@ export type FromBtcConfig = FromBtcBaseConfig & {
 
 export type FromBtcRequestType = {
     address: string,
-    amount: BN,
+    amount: bigint,
     token: string,
-    sequence: BN,
+    sequence: bigint,
     exactOut?: boolean
 };
 
@@ -38,10 +38,10 @@ export type FromBtcRequestType = {
  * Swap handler handling from BTC swaps using PTLCs (proof-time locked contracts) and btc relay (on-chain bitcoin SPV)
  */
 export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSwapState> {
-
     readonly type = SwapHandlerType.FROM_BTC;
+    readonly swapType = ChainSwapType.CHAIN;
 
-    readonly config: FromBtcConfig & {swapTsCsvDelta: BN};
+    readonly config: FromBtcConfig & {swapTsCsvDelta: bigint};
 
     readonly bitcoin: IBitcoinWallet;
 
@@ -57,23 +57,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         this.bitcoin = bitcoin;
         this.config = {
             ...config,
-            swapTsCsvDelta: new BN(config.swapCsvDelta).mul(config.bitcoinBlocktime.div(config.safetyFactor))
+            swapTsCsvDelta: BigInt(config.swapCsvDelta) * (config.bitcoinBlocktime / config.safetyFactor)
         };
-    }
-
-    /**
-     * Returns the TXO hash of the specific address and amount - sha256(u64le(amount) + outputScript(address))
-     *
-     * @param address
-     * @param amount
-     */
-    private getTxoHash(address: string, amount: BN): Buffer {
-        const parsedOutputScript = this.bitcoin.toOutputScript(address);
-
-        return createHash("sha256").update(Buffer.concat([
-            Buffer.from(amount.toArray("le", 8)),
-            parsedOutputScript
-        ])).digest();
     }
 
     /**
@@ -83,10 +68,10 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * @param address
      * @param amount
      */
-    private getHash(chainIdentifier: string, address: string, amount: BN): Buffer {
+    private getHash(chainIdentifier: string, address: string, amount: bigint): Buffer {
         const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const {swapContract} = this.getChain(chainIdentifier);
-        return swapContract.getHashForOnchain(parsedOutputScript, amount, new BN(0));
+        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations, 0n);
     }
 
     /**
@@ -107,7 +92,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             if(isCommited) {
                 this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap was commited, but processed from watchdog, address: "+swap.address);
                 await swap.setState(FromBtcSwapState.COMMITED);
-                await this.storageManager.saveData(swap.getHash(), swap.getSequence(), swap);
+                await this.saveSwapData(swap);
                 return false;
             }
 
@@ -119,7 +104,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
         //Check if commited swap expired by now
         if(swap.state===FromBtcSwapState.COMMITED) {
-            if(!swapContract.isExpired(signer.getAddress(), swap.data)) return false;
+            if(!await swapContract.isExpired(signer.getAddress(), swap.data)) return false;
 
             const isCommited = await swapContract.isCommited(swap.data);
             if(isCommited) {
@@ -150,7 +135,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
         const refundSwaps: FromBtcSwapAbs[] = [];
 
-        for(let swap of queriedData) {
+        for(let {obj: swap} of queriedData) {
             if(await this.processPastSwap(swap)) refundSwaps.push(swap);
         }
 
@@ -177,54 +162,23 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         }
     }
 
-    protected async processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>) {
-        //Only process on-chain requests
-        if (event.swapType !== ChainSwapType.CHAIN) return;
-
-        const swapData = await event.swapData();
-
-        const {signer} = this.getChain(chainIdentifier);
-
-        if (!swapData.isOfferer(signer.getAddress())) return;
-        //Only process requests that don't pay in from the program
-        if (swapData.isPayIn()) return;
-
-        const paymentHash = event.paymentHash;
-        const savedSwap = await this.storageManager.getData(paymentHash, event.sequence);
-        if(savedSwap==null || savedSwap.chainIdentifier!==chainIdentifier) return;
-
-        savedSwap.txIds.init = (event as any).meta?.txId;
-        if(savedSwap.metadata!=null) savedSwap.metadata.times.initTxReceived = Date.now();
-
+    protected async processInitializeEvent(chainIdentifier: string, savedSwap: FromBtcSwapAbs, event: InitializeEvent<SwapData>) {
         this.swapLogger.info(savedSwap, "SC: InitializeEvent: swap initialized by the client, address: "+savedSwap.address);
 
         if(savedSwap.state===FromBtcSwapState.CREATED) {
             await savedSwap.setState(FromBtcSwapState.COMMITED);
-            savedSwap.data = swapData;
-            await this.storageManager.saveData(paymentHash, event.sequence, savedSwap);
+            await this.saveSwapData(savedSwap);
         }
     }
 
-    protected async processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void> {
-        const paymentHashHex = event.paymentHash;
-
-        const savedSwap = await this.storageManager.getData(paymentHashHex, event.sequence);
-        if(savedSwap==null || savedSwap.chainIdentifier!==chainIdentifier) return;
-
-        savedSwap.txId = Buffer.from(event.secret, "hex").reverse().toString("hex");
-        savedSwap.txIds.claim = (event as any).meta?.txId;
-        if(savedSwap.metadata!=null) savedSwap.metadata.times.claimTxReceived = Date.now();
+    protected async processClaimEvent(chainIdentifier: string, savedSwap: FromBtcSwapAbs, event: ClaimEvent<SwapData>): Promise<void> {
+        savedSwap.txId = Buffer.from(event.result, "hex").reverse().toString("hex");
 
         this.swapLogger.info(savedSwap, "SC: ClaimEvent: swap successfully claimed by the client, address: "+savedSwap.address);
         await this.removeSwapData(savedSwap, FromBtcSwapState.CLAIMED);
     }
 
-    protected async processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>) {
-        if (event.paymentHash == null) return;
-
-        const savedSwap = await this.storageManager.getData(event.paymentHash, event.sequence);
-        if(savedSwap==null || savedSwap.chainIdentifier!==chainIdentifier) return;
-
+    protected async processRefundEvent(chainIdentifier: string, savedSwap: FromBtcSwapAbs, event: RefundEvent<SwapData>) {
         savedSwap.txIds.refund = (event as any).meta?.txId;
 
         this.swapLogger.info(event, "SC: RefundEvent: swap refunded, address: "+savedSwap.address);
@@ -241,14 +195,14 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * @throws {DefinedRuntimeError} will throw an error if the plugin cancelled the request
      * @returns {Promise<BN>} resulting claimer bounty to be used with the swap
      */
-    private async getClaimerBounty(req: Request & {paramReader: IParamReader}, expiry: BN, signal: AbortSignal): Promise<BN> {
+    private async getClaimerBounty(req: Request & {paramReader: IParamReader}, expiry: bigint, signal: AbortSignal): Promise<bigint> {
         const parsedClaimerBounty = await req.paramReader.getParams({
             claimerBounty: {
-                feePerBlock: FieldTypeEnum.BN,
-                safetyFactor: FieldTypeEnum.BN,
-                startTimestamp: FieldTypeEnum.BN,
-                addBlock: FieldTypeEnum.BN,
-                addFee: FieldTypeEnum.BN,
+                feePerBlock: FieldTypeEnum.BigInt,
+                safetyFactor: FieldTypeEnum.BigInt,
+                startTimestamp: FieldTypeEnum.BigInt,
+                addBlock: FieldTypeEnum.BigInt,
+                addFee: FieldTypeEnum.BigInt,
             },
         }).catch(e => null);
 
@@ -261,29 +215,28 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             };
         }
 
-        const tsDelta = expiry.sub(parsedClaimerBounty.claimerBounty.startTimestamp);
-        const blocksDelta = tsDelta.div(this.config.bitcoinBlocktime).mul(parsedClaimerBounty.claimerBounty.safetyFactor);
-        const totalBlock = blocksDelta.add(parsedClaimerBounty.claimerBounty.addBlock);
-        return parsedClaimerBounty.claimerBounty.addFee.add(totalBlock.mul(parsedClaimerBounty.claimerBounty.feePerBlock));
+        const tsDelta: bigint = expiry - parsedClaimerBounty.claimerBounty.startTimestamp;
+        const blocksDelta: bigint = tsDelta / this.config.bitcoinBlocktime * parsedClaimerBounty.claimerBounty.safetyFactor;
+        const totalBlock: bigint = blocksDelta + parsedClaimerBounty.claimerBounty.addBlock;
+        return parsedClaimerBounty.claimerBounty.addFee + (totalBlock * parsedClaimerBounty.claimerBounty.feePerBlock);
     }
 
     private getDummySwapData(chainIdentifier: string, useToken: string, address: string): Promise<SwapData> {
         const {swapContract, signer} = this.getChain(chainIdentifier);
+        const dummyAmount = BigInt(Math.floor(Math.random() * 0x1000000));
         return swapContract.createSwapData(
             ChainSwapType.CHAIN,
             signer.getAddress(),
             address,
             useToken,
-            null,
-            null,
-            null,
-            null,
-            new BN(0),
-            this.config.confirmations,
+            dummyAmount,
+            swapContract.getHashForOnchain(randomBytes(32), dummyAmount, 3, null).toString("hex"),
+            BigIntBufferUtils.fromBuffer(randomBytes(8)),
+            BigInt(Math.floor(Date.now()/1000)) + this.config.swapTsCsvDelta,
             false,
             true,
-            null,
-            null
+            BigInt(Math.floor(Math.random() * 0x10000)),
+            BigInt(Math.floor(Math.random() * 0x10000))
         );
     }
 
@@ -303,6 +256,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
             const chainIdentifier = req.query.chain as string ?? this.chains.default;
             const {swapContract, signer} = this.getChain(chainIdentifier);
+            const depositToken = req.query.depositToken as string ?? swapContract.getNativeCurrencyAddress();
+            this.checkAllowedDepositToken(chainIdentifier, depositToken);
 
             metadata.times.requestReceived = Date.now();
             /**
@@ -325,11 +280,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 address: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         swapContract.isValidAddress(val) ? val : null,
-                amount: FieldTypeEnum.BN,
+                amount: FieldTypeEnum.BigInt,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
-                sequence: FieldTypeEnum.BN,
+                sequence: FieldTypeEnum.BigInt,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
             if(parsedBody==null) throw {
@@ -357,13 +312,21 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const abortController = this.getAbortController(responseStream);
 
             //Pre-fetch data
-            const {pricePrefetchPromise, securityDepositPricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, abortController);
-            const balancePrefetch: Promise<BN> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
+            const {
+                pricePrefetchPromise,
+                gasTokenPricePrefetchPromise,
+                depositTokenPricePrefetchPromise
+            } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, depositToken, abortController);
+            const balancePrefetch: Promise<bigint> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const signDataPrefetchPromise: Promise<any> = this.getSignDataPrefetch(chainIdentifier, abortController, responseStream);
 
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address);
             abortController.signal.throwIfAborted();
-            const baseSDPromise: Promise<BN> = this.getBaseSecurityDepositPrefetch(chainIdentifier, dummySwapData, abortController);
+            const baseSDPromise: Promise<bigint> = this.getBaseSecurityDepositPrefetch(
+                chainIdentifier, dummySwapData, depositToken,
+                gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise,
+                abortController
+            );
 
             //Check valid amount specified (min/max)
             const {
@@ -384,14 +347,14 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             metadata.times.addressCreated = Date.now();
 
             const paymentHash = this.getHash(chainIdentifier, receiveAddress, amountBD);
-            const currentTimestamp = new BN(Math.floor(Date.now()/1000));
+            const currentTimestamp = BigInt(Math.floor(Date.now()/1000));
             const expiryTimeout = this.config.swapTsCsvDelta;
-            const expiry = currentTimestamp.add(expiryTimeout);
+            const expiry = currentTimestamp + expiryTimeout;
 
             //Calculate security deposit
             const totalSecurityDeposit = await this.getSecurityDeposit(
                 chainIdentifier, amountBD, swapFee, expiryTimeout,
-                baseSDPromise, securityDepositPricePrefetchPromise,
+                baseSDPromise, depositToken, depositTokenPricePrefetchPromise,
                 abortController.signal, metadata
             );
             metadata.times.securityDepositCalculated = Date.now();
@@ -410,14 +373,17 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 paymentHash.toString("hex"),
                 parsedBody.sequence,
                 expiry,
-                new BN(0),
-                this.config.confirmations,
                 false,
                 true,
                 totalSecurityDeposit,
-                totalClaimerBounty
+                totalClaimerBounty,
+                depositToken
             );
-            data.setTxoHash(this.getTxoHash(receiveAddress, amountBD).toString("hex"));
+            data.setExtraData(swapContract.getExtraData(
+                this.bitcoin.toOutputScript(receiveAddress),
+                amountBD,
+                this.config.confirmations
+            ).toString("hex"));
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
 
@@ -425,7 +391,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const sigData = await this.getFromBtcSignatureData(chainIdentifier, data, req, abortController.signal, signDataPrefetchPromise);
             metadata.times.swapSigned = Date.now();
 
-            const createdSwap: FromBtcSwapAbs = new FromBtcSwapAbs(chainIdentifier, receiveAddress, amountBD, swapFee, swapFeeInToken);
+            const createdSwap: FromBtcSwapAbs = new FromBtcSwapAbs(chainIdentifier, receiveAddress, this.config.confirmations, amountBD, swapFee, swapFeeInToken);
             createdSwap.data = data;
             createdSwap.metadata = metadata;
             createdSwap.prefix = sigData.prefix;
@@ -434,7 +400,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             createdSwap.feeRate = sigData.feeRate;
 
             await PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(createdSwap.data.getHash(), createdSwap.data.getSequence(), createdSwap);
+            await this.saveSwapData(createdSwap);
 
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: "+receiveAddress+" amount: "+amountBD.toString(10));
 
@@ -447,6 +413,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                     address: signer.getAddress(),
                     swapFee: swapFeeInToken.toString(10),
                     total: totalInToken.toString(10),
+                    confirmations: this.config.confirmations,
                     data: data.serialize(),
                     prefix: sigData.prefix,
                     timeout: sigData.timeout,
@@ -463,7 +430,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
      * Initializes swap handler, loads data and subscribes to chain events
      */
     async init() {
-        await this.storageManager.loadData(FromBtcSwapAbs);
+        await this.loadData(FromBtcSwapAbs);
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }
@@ -473,7 +440,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             confirmations: this.config.confirmations,
 
             cltv: this.config.swapCsvDelta,
-            timestampCltv: this.config.swapTsCsvDelta.toNumber()
+            timestampCltv: Number(this.config.swapTsCsvDelta)
         };
     }
 

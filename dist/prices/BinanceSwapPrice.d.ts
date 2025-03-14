@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { ISwapPrice } from "../swaps/ISwapPrice";
 export type BinancePriceData = {
     [pair: string]: {
@@ -23,5 +22,5 @@ export declare class BinanceSwapPrice extends ISwapPrice<{
     fetchPrice(pair: string): Promise<number>;
     getPrice(tokenData: {
         pair: string;
-    }): Promise<BN>;
+    }): Promise<bigint>;
 }

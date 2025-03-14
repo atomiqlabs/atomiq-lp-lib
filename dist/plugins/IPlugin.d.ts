@@ -1,7 +1,6 @@
 import { BitcoinRpc } from "@atomiqlabs/base";
 import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
-import * as BN from "bn.js";
 import { Command } from "@atomiqlabs/server-base";
 import { FromBtcLnTrustedRequestType } from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
 import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
@@ -13,23 +12,23 @@ export type QuoteThrow = {
 export declare function isQuoteThrow(obj: any): obj is QuoteThrow;
 export type QuoteSetFees = {
     type: "fees";
-    baseFee?: BN;
-    feePPM?: BN;
+    baseFee?: bigint;
+    feePPM?: bigint;
 };
 export declare function isQuoteSetFees(obj: any): obj is QuoteSetFees;
 export type QuoteAmountTooLow = {
     type: "low";
     data: {
-        min: BN;
-        max: BN;
+        min: bigint;
+        max: bigint;
     };
 };
 export declare function isQuoteAmountTooLow(obj: any): obj is QuoteAmountTooLow;
 export type QuoteAmountTooHigh = {
     type: "high";
     data: {
-        min: BN;
-        max: BN;
+        min: bigint;
+        max: bigint;
     };
 };
 export declare function isQuoteAmountTooHigh(obj: any): obj is QuoteAmountTooHigh;
@@ -37,18 +36,18 @@ export type PluginQuote = {
     type: "success";
     amount: {
         input: boolean;
-        amount: BN;
+        amount: bigint;
     };
     swapFee: {
-        inInputTokens: BN;
-        inOutputTokens: BN;
+        inInputTokens: bigint;
+        inOutputTokens: bigint;
     };
 };
 export declare function isPluginQuote(obj: any): obj is PluginQuote;
 export type ToBtcPluginQuote = PluginQuote & {
     networkFee: {
-        inInputTokens: BN;
-        inOutputTokens: BN;
+        inInputTokens: bigint;
+        inOutputTokens: bigint;
     };
 };
 export declare function isToBtcPluginQuote(obj: any): obj is ToBtcPluginQuote;
@@ -72,45 +71,45 @@ export interface IPlugin {
     onSwapRemove?(swap: SwapHandlerSwap): Promise<void>;
     onHandlePreFromBtcQuote?(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
         input: boolean;
-        amount: BN;
+        amount: bigint;
     }, chainIdentifier: string, token: string, constraints: {
-        minInBtc: BN;
-        maxInBtc: BN;
+        minInBtc: bigint;
+        maxInBtc: bigint;
     }, fees: {
-        baseFeeInBtc: BN;
-        feePPM: BN;
+        baseFeeInBtc: bigint;
+        feePPM: bigint;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostFromBtcQuote?(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
         input: boolean;
-        amount: BN;
+        amount: bigint;
     }, chainIdentifier: string, token: string, constraints: {
-        minInBtc: BN;
-        maxInBtc: BN;
+        minInBtc: bigint;
+        maxInBtc: bigint;
     }, fees: {
-        baseFeeInBtc: BN;
-        feePPM: BN;
-    }, pricePrefetchPromise?: Promise<BN> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
+        baseFeeInBtc: bigint;
+        feePPM: bigint;
+    }, pricePrefetchPromise?: Promise<bigint> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
     onHandlePreToBtcQuote?(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
-        amount: BN;
+        amount: bigint;
     }, chainIdentifier: string, token: string, constraints: {
-        minInBtc: BN;
-        maxInBtc: BN;
+        minInBtc: bigint;
+        maxInBtc: bigint;
     }, fees: {
-        baseFeeInBtc: BN;
-        feePPM: BN;
+        baseFeeInBtc: bigint;
+        feePPM: bigint;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostToBtcQuote?(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
-        amount: BN;
+        amount: bigint;
     }, chainIdentifier: string, token: string, constraints: {
-        minInBtc: BN;
-        maxInBtc: BN;
+        minInBtc: bigint;
+        maxInBtc: bigint;
     }, fees: {
-        baseFeeInBtc: BN;
-        feePPM: BN;
-        networkFeeGetter: (amount: BN) => Promise<BN>;
-    }, pricePrefetchPromise?: Promise<BN> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
+        baseFeeInBtc: bigint;
+        feePPM: bigint;
+        networkFeeGetter: (amount: bigint) => Promise<bigint>;
+    }, pricePrefetchPromise?: Promise<bigint> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
     /**
      * Returns whitelisted bitcoin txIds that are OK to spend even with 0-confs
      */

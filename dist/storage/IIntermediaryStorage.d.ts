@@ -1,5 +1,4 @@
 import { StorageObject } from "@atomiqlabs/base";
-import * as BN from "bn.js";
 export type StorageQueryParam = {
     key: string;
     value?: any;
@@ -7,9 +6,13 @@ export type StorageQueryParam = {
 };
 export interface IIntermediaryStorage<T extends StorageObject> {
     init(): Promise<void>;
-    query(params: StorageQueryParam[]): Promise<T[]>;
-    getData(hash: string, sequence: BN | null): Promise<T>;
-    saveData(hash: string, sequence: BN | null, object: T): Promise<void>;
-    removeData(hash: string, sequence: BN | null): Promise<void>;
+    query(params: StorageQueryParam[]): Promise<{
+        hash: string;
+        sequence: bigint;
+        obj: T;
+    }[]>;
+    getData(hash: string, sequence: bigint | null): Promise<T>;
+    saveData(hash: string, sequence: bigint | null, object: T): Promise<void>;
+    removeData(hash: string, sequence: bigint | null): Promise<void>;
     loadData(type: new (data: any) => T): Promise<void>;
 }

@@ -1,8 +1,15 @@
 import {Lockable, StorageObject, SwapData} from "@atomiqlabs/base";
 import {SwapHandlerType} from "./SwapHandler";
 import {PluginManager} from "../plugins/PluginManager";
-import * as BN from "bn.js";
 import {deserializeBN, serializeBN} from "../utils/Utils";
+
+function objectBigIntsToString(obj: Object) {
+    for(let key in obj) {
+        if(typeof obj[key] === "bigint") obj[key] = obj[key].toString(10);
+        if(typeof obj[key] === "object") objectBigIntsToString(obj[key]);
+    }
+    return obj;
+}
 
 export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> extends Lockable implements StorageObject {
 
@@ -21,20 +28,20 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
         claim?: string,
         refund?: string
     } = {};
-    readonly swapFee: BN;
-    readonly swapFeeInToken: BN;
+    readonly swapFee: bigint;
+    readonly swapFeeInToken: bigint;
 
     prefix: string;
     timeout: string;
     signature: string;
     feeRate: string;
 
-    protected constructor(chainIdentifier: string, swapFee: BN, swapFeeInToken: BN);
+    protected constructor(chainIdentifier: string, swapFee: bigint, swapFeeInToken: bigint);
     protected constructor(obj: any);
 
-    protected constructor(obj?: any | string, swapFee?: BN, swapFeeInToken?: BN) {
+    protected constructor(obj?: any | string, swapFee?: bigint, swapFeeInToken?: bigint) {
         super();
-        if(typeof(obj)==="string" && BN.isBN(swapFee) && BN.isBN(swapFeeInToken)) {
+        if(typeof(obj)==="string" && typeof(swapFee)==="bigint" && typeof(swapFeeInToken)==="bigint") {
             this.chainIdentifier = obj;
             this.swapFee = swapFee;
             this.swapFeeInToken = swapFeeInToken;
@@ -59,7 +66,7 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
             state: this.state,
             data: this.data==null ? null : this.data.serialize(),
             chainIdentifier: this.chainIdentifier,
-            metadata: this.metadata,
+            metadata: objectBigIntsToString(this.metadata),
             txIds: this.txIds,
             swapFee: serializeBN(this.swapFee),
             swapFeeInToken: serializeBN(this.swapFeeInToken),
@@ -81,12 +88,30 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
         return PluginManager.swapStateChange(this, oldState);
     }
 
-    getHash(): string {
-        return this.data.getHash();
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash(): string {
+        return this.data.getEscrowHash();
     }
 
-    getSequence(): BN {
-        return this.data.getSequence();
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash(): string {
+        return this.data.getClaimHash();
+    }
+
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash(): string {
+        return this.getClaimHash();
+    }
+
+    getSequence(): bigint | null {
+        return this.data?.getSequence==null ? null : this.data.getSequence();
     }
 
     /**
@@ -95,9 +120,16 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
      */
     getIdentifier(): string {
         if(this.getSequence()!=null) {
-            return this.chainIdentifier+"_"+this.getHash()+"_"+this.getSequence().toString(16);
+            return this.chainIdentifier+"_"+this.getIdentifierHash()+"_"+this.getSequence().toString(16);
         }
-        return this.getHash();
+        return this.chainIdentifier+"_"+this.getIdentifierHash();
+    }
+
+    /**
+     * Returns the smart chain token used for the swap
+     */
+    getToken(): string {
+        return this.data?.getToken();
     }
 
     /**
@@ -125,22 +157,22 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
     /**
      * Returns the input amount paid by the user (excluding fees)
      */
-    abstract getInputAmount(): BN;
+    abstract getInputAmount(): bigint;
 
     /**
      * Returns the total input amount paid by the user (including all fees)
      */
-    abstract getTotalInputAmount(): BN;
+    abstract getTotalInputAmount(): bigint;
 
     /**
      * Returns the actual output amount paid out to the user
      */
-    abstract getOutputAmount(): BN;
+    abstract getOutputAmount(): bigint;
 
     /**
      * Returns swap fee, denominated in input & output tokens (the fee is paid only once, it is just represented here in
      *  both denomination for ease of use)
      */
-    abstract getSwapFee(): {inInputToken: BN, inOutputToken: BN};
+    abstract getSwapFee(): {inInputToken: bigint, inOutputToken: bigint};
 
 }

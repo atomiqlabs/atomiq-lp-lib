@@ -24,7 +24,7 @@ function routesMatch(routesA, routesB) {
                 return false;
             }
             if (routesA[i][e].publicKey !== routesB[i][e].publicKey ||
-                !routesA[i][e].baseFeeMtokens.eq(routesB[i][e].baseFeeMtokens) ||
+                routesA[i][e].baseFeeMtokens !== routesB[i][e].baseFeeMtokens ||
                 routesA[i][e].channel !== routesB[i][e].channel ||
                 routesA[i][e].cltvDelta !== routesB[i][e].cltvDelta ||
                 routesA[i][e].feeRate !== routesB[i][e].feeRate) {

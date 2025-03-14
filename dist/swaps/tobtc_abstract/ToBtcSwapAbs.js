@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToBtcSwapAbs = exports.ToBtcSwapState = void 0;
-const BN = require("bn.js");
 const __1 = require("../..");
 const ToBtcBaseSwap_1 = require("../ToBtcBaseSwap");
 const Utils_1 = require("../../utils/Utils");
@@ -17,25 +16,26 @@ var ToBtcSwapState;
     ToBtcSwapState[ToBtcSwapState["CLAIMED"] = 4] = "CLAIMED";
 })(ToBtcSwapState = exports.ToBtcSwapState || (exports.ToBtcSwapState = {}));
 class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
-    constructor(chainIdOrObj, address, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken, satsPerVbyte, nonce, preferedConfirmationTarget) {
-        var _a;
+    constructor(chainIdOrObj, address, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken, satsPerVbyte, nonce, requiredConfirmations, preferedConfirmationTarget) {
         if (typeof (chainIdOrObj) === "string") {
             super(chainIdOrObj, amount, swapFee, swapFeeInToken, networkFee, networkFeeInToken);
             this.state = ToBtcSwapState.SAVED;
             this.address = address;
             this.satsPerVbyte = satsPerVbyte;
             this.nonce = nonce;
+            this.requiredConfirmations = requiredConfirmations;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
         }
         else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.satsPerVbyte = new BN(chainIdOrObj.satsPerVbyte);
-            this.nonce = new BN(chainIdOrObj.nonce);
+            this.satsPerVbyte = BigInt(chainIdOrObj.satsPerVbyte);
+            this.nonce = BigInt(chainIdOrObj.nonce);
+            this.requiredConfirmations = chainIdOrObj.requiredConfirmations;
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
             this.txId = chainIdOrObj.txId;
             //Compatibility
-            (_a = this.quotedNetworkFee) !== null && _a !== void 0 ? _a : (this.quotedNetworkFee = (0, Utils_1.deserializeBN)(chainIdOrObj.networkFee));
+            this.quotedNetworkFee ?? (this.quotedNetworkFee = (0, Utils_1.deserializeBN)(chainIdOrObj.networkFee));
         }
         this.type = __1.SwapHandlerType.TO_BTC;
     }
@@ -43,6 +43,7 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
         partialSerialized.satsPerVbyte = this.satsPerVbyte.toString(10);
+        partialSerialized.requiredConfirmations = this.requiredConfirmations;
         partialSerialized.nonce = this.nonce.toString(10);
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
         partialSerialized.txId = this.txId;

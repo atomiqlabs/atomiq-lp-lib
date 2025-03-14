@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { SwapData } from "@atomiqlabs/base";
 import { ToBtcBaseSwap } from "../ToBtcBaseSwap";
 export declare enum ToBtcSwapState {
@@ -13,11 +12,12 @@ export declare enum ToBtcSwapState {
 }
 export declare class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
     readonly address: string;
-    readonly satsPerVbyte: BN;
-    readonly nonce: BN;
+    readonly satsPerVbyte: bigint;
+    readonly nonce: bigint;
+    readonly requiredConfirmations: number;
     readonly preferedConfirmationTarget: number;
     txId: string;
-    constructor(chainIdentifier: string, address: string, amount: BN, swapFee: BN, swapFeeInToken: BN, networkFee: BN, networkFeeInToken: BN, satsPerVbyte: BN, nonce: BN, preferedConfirmationTarget: number);
+    constructor(chainIdentifier: string, address: string, amount: bigint, swapFee: bigint, swapFeeInToken: bigint, networkFee: bigint, networkFeeInToken: bigint, satsPerVbyte: bigint, nonce: bigint, requiredConfirmations: number, preferedConfirmationTarget: number);
     constructor(obj: any);
     serialize(): any;
     isInitiated(): boolean;

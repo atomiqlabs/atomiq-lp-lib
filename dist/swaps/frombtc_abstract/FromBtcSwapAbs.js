@@ -12,15 +12,17 @@ var FromBtcSwapState;
     FromBtcSwapState[FromBtcSwapState["CLAIMED"] = 2] = "CLAIMED";
 })(FromBtcSwapState = exports.FromBtcSwapState || (exports.FromBtcSwapState = {}));
 class FromBtcSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
-    constructor(prOrObj, address, amount, swapFee, swapFeeInToken) {
+    constructor(prOrObj, address, confirmations, amount, swapFee, swapFeeInToken) {
         if (typeof (prOrObj) === "string") {
             super(prOrObj, amount, swapFee, swapFeeInToken);
             this.state = FromBtcSwapState.CREATED;
             this.address = address;
+            this.confirmations = confirmations;
         }
         else {
             super(prOrObj);
             this.address = prOrObj.address;
+            this.confirmations = prOrObj.confirmations;
             this.txId = prOrObj.txId;
         }
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC;
@@ -28,11 +30,9 @@ class FromBtcSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     serialize() {
         const partialSerialized = super.serialize();
         partialSerialized.address = this.address;
+        partialSerialized.confirmations = this.confirmations;
         partialSerialized.txId = this.txId;
         return partialSerialized;
-    }
-    getTxoHash() {
-        return Buffer.from(this.data.getTxoHash(), "hex");
     }
     isInitiated() {
         return this.state !== FromBtcSwapState.CREATED;

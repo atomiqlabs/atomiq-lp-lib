@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {ISwapPrice} from "../swaps/ISwapPrice";
 
 const CACHE_DURATION = 15000;
@@ -59,11 +58,11 @@ export class BinanceSwapPrice extends ISwapPrice<{ pair: string, decimals: numbe
         return parseFloat(jsonBody.price);
     }
 
-    async getPrice(tokenData: {pair: string}): Promise<BN> {
+    async getPrice(tokenData: {pair: string}): Promise<bigint> {
         const pair = tokenData.pair;
         if(pair.startsWith("$fixed-")) {
             const amt: number = parseFloat(pair.substring(7));
-            return new BN(Math.floor(amt*1000000));
+            return BigInt(Math.floor(amt*1000000));
         }
 
         const arr = pair.split(";");
@@ -109,6 +108,6 @@ export class BinanceSwapPrice extends ISwapPrice<{ pair: string, decimals: numbe
             };
         }
 
-        return new BN(Math.floor(this.cache[pair].price*100000000000000));
+        return BigInt(Math.floor(this.cache[pair].price*100000000000000));
     }
 }

@@ -1,6 +1,7 @@
 import {Express, Request} from "express";
 import {ISwapPrice} from "./ISwapPrice";
 import {
+    ChainSwapType,
     ChainType,
     ClaimEvent,
     InitializeEvent, RefundEvent,
@@ -10,7 +11,6 @@ import {
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {PluginManager} from "../plugins/PluginManager";
 import {IIntermediaryStorage} from "../storage/IIntermediaryStorage";
-import * as BN from "bn.js";
 import {ServerParamEncoder} from "../utils/paramcoders/server/ServerParamEncoder";
 import {
     isQuoteAmountTooHigh,
@@ -39,13 +39,16 @@ export type SwapHandlerInfoType = {
 };
 
 export type SwapBaseConfig = {
-    authorizationTimeout: number,
-    bitcoinBlocktime: BN,
-    baseFee: BN,
-    feePPM: BN,
-    max: BN,
-    min: BN,
-    safetyFactor: BN,
+    initAuthorizationTimeout: number,
+    initAuthorizationTimeouts?: {
+        [chainId: string]: number
+    },
+    bitcoinBlocktime: bigint,
+    baseFee: bigint,
+    feePPM: bigint,
+    max: bigint,
+    min: bigint,
+    safetyFactor: bigint,
     swapCheckInterval: number
 };
 
@@ -61,6 +64,7 @@ export type ChainData<T extends ChainType = ChainType> = {
     swapContract: T["Contract"],
     chainEvents: T["Events"],
     allowedTokens: string[],
+    allowedDepositTokens?: string[],
     btcRelay?: T["BtcRelay"]
 }
 
@@ -77,8 +81,10 @@ export type RequestData<T> = {
 export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapHandlerSwap, S = any> {
 
     abstract readonly type: SwapHandlerType;
+    abstract readonly swapType: ChainSwapType;
 
     readonly storageManager: IIntermediaryStorage<V>;
+    readonly escrowHashMap: Map<string, V> = new Map();
     readonly path: string;
 
     readonly chains: MultichainData;
@@ -145,9 +151,9 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
         await rerun();
     }
 
-    protected abstract processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected abstract processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected abstract processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected abstract processInitializeEvent?(chainIdentifier: string, swap: V, event: InitializeEvent<SwapData>): Promise<void>;
+    protected abstract processClaimEvent?(chainIdentifier: string, swap: V, event: ClaimEvent<SwapData>): Promise<void>;
+    protected abstract processRefundEvent?(chainIdentifier: string, swap: V, event: RefundEvent<SwapData>): Promise<void>;
 
     /**
      * Chain event processor
@@ -156,16 +162,34 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @param eventData
      */
     protected async processEvent(chainIdentifier: string, eventData: SwapEvent<SwapData>[]): Promise<boolean> {
+        if(this.swapType==null) return true;
+
         for(let event of eventData) {
             if(event instanceof InitializeEvent) {
-                // this.swapLogger.debug(event, "SC: InitializeEvent: swap type: "+event.swapType);
-                await this.processInitializeEvent(chainIdentifier, event);
+                if(event.swapType!==this.swapType) continue;
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if(swap==null) continue;
+
+                swap.txIds.init = (event as any).meta?.txId;
+                if(swap.metadata!=null) swap.metadata.times.initTxReceived = Date.now();
+
+                await this.processInitializeEvent(chainIdentifier, swap, event);
             } else if(event instanceof ClaimEvent) {
-                // this.swapLogger.debug(event, "SC: ClaimEvent: swap secret: "+event.secret);
-                await this.processClaimEvent(chainIdentifier, event);
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if(swap==null) continue;
+
+                swap.txIds.claim = (event as any).meta?.txId;
+                if(swap.metadata!=null) swap.metadata.times.claimTxReceived = Date.now();
+
+                await this.processClaimEvent(chainIdentifier, swap, event);
             } else if(event instanceof RefundEvent) {
-                // this.swapLogger.debug(event, "SC: RefundEvent");
-                await this.processRefundEvent(chainIdentifier, event);
+                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
+                if(swap==null) continue;
+
+                swap.txIds.refund = (event as any).meta?.txId;
+                if(swap.metadata!=null) swap.metadata.times.refundTxReceived = Date.now();
+
+                await this.processRefundEvent(chainIdentifier, swap, event);
             }
         }
 
@@ -187,6 +211,22 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      */
     abstract init(): Promise<void>;
 
+    protected async loadData(ctor: new (data: any) => V) {
+        await this.storageManager.loadData(ctor);
+        //Check if all swaps contain a valid amount
+        for(let {obj: swap, hash, sequence} of await this.storageManager.query([])) {
+            if(hash!==swap.getIdentifierHash() || sequence !== (swap.getSequence() ?? 0n)) {
+                this.swapLogger.info(swap, "loadData(): Swap storage key or sequence mismatch, fixing,"+
+                    " old hash: "+hash+" new hash: "+swap.getIdentifierHash()+
+                    " old seq: "+sequence.toString(10)+" new seq: "+(swap.getSequence() ?? 0n).toString(10));
+
+                await this.storageManager.removeData(hash, sequence);
+                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+            }
+            this.saveSwapToEscrowHashMap(swap);
+        }
+    }
+
     /**
      * Sets up required listeners for the REST server
      *
@@ -205,7 +245,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @param hash
      * @param sequence
      */
-    protected removeSwapData(hash: string, sequence: BN): Promise<void>;
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
 
     /**
      * Remove swap data
@@ -215,18 +255,36 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      */
     protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
 
-    protected async removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: BN | S) {
+    protected async removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: bigint | S) {
         let swap: V;
         if(typeof(hashOrSwap)==="string") {
-            if(!BN.isBN(sequenceOrUltimateState)) throw new Error("Sequence must be a BN instance!");
+            if(typeof(sequenceOrUltimateState)!=="bigint") throw new Error("Sequence must be a BN instance!");
             swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
         } else {
             swap = hashOrSwap;
-            if(sequenceOrUltimateState!=null && !BN.isBN(sequenceOrUltimateState)) await swap.setState(sequenceOrUltimateState);
+            if(sequenceOrUltimateState!=null && typeof(sequenceOrUltimateState)!=="bigint") await swap.setState(sequenceOrUltimateState);
         }
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
-        await this.storageManager.removeData(swap.getHash(), swap.getSequence());
+        this.removeSwapFromEscrowHashMap(swap);
+        await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
+    }
+
+    protected async saveSwapData(swap: V) {
+        this.saveSwapToEscrowHashMap(swap);
+        await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+    }
+
+    protected saveSwapToEscrowHashMap(swap: V) {
+        if(swap.data!=null) this.escrowHashMap.set(swap.chainIdentifier+"_"+swap.getEscrowHash(), swap);
+    }
+
+    protected removeSwapFromEscrowHashMap(swap: V) {
+        if(swap.data!=null) this.escrowHashMap.delete(swap.chainIdentifier+"_"+swap.data.getEscrowHash());
+    }
+
+    protected getSwapByEscrowHash(chainIdentifier: string, escrowHash: string) {
+        return this.escrowHashMap.get(chainIdentifier+"_"+escrowHash);
     }
 
     /**
@@ -236,8 +294,8 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    protected checkBtcAmountInBounds(amount: BN): void {
-        if (amount.lt(this.config.min)) {
+    protected checkBtcAmountInBounds(amount: bigint): void {
+        if (amount < this.config.min) {
             throw {
                 code: 20003,
                 msg: "Amount too low!",
@@ -248,7 +306,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
             };
         }
 
-        if(amount.gt(this.config.max)) {
+        if(amount > this.config.max) {
             throw {
                 code: 20004,
                 msg: "Amount too high!",
@@ -297,6 +355,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      */
     protected getAbortController(responseStream: ServerParamEncoder): AbortController {
         const abortController = new AbortController();
+        if(responseStream==null || responseStream.getAbortSignal==null) return abortController;
         const responseStreamAbortController = responseStream.getAbortSignal();
         responseStreamAbortController.addEventListener("abort", () => abortController.abort(responseStreamAbortController.reason));
         return abortController;
@@ -331,13 +390,16 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
     }
 
     protected getIdentifierFromEvent(event: SwapEvent<SwapData>): string {
-        if(event.sequence.isZero()) return event.paymentHash;
-        return event.paymentHash+"_"+event.sequence.toString(16);
+        const foundSwap = this.escrowHashMap.get(event.escrowHash);
+        if(foundSwap!=null) {
+            return foundSwap.getIdentifier();
+        }
+        return "UNKNOWN_"+event.escrowHash;
     }
 
     protected getIdentifierFromSwapData(swapData: SwapData): string {
-        if(swapData.getSequence().isZero()) return swapData.getHash();
-        return swapData.getHash()+"_"+swapData.getSequence().toString(16);
+        if(swapData.getSequence==null) return swapData.getClaimHash();
+        return swapData.getClaimHash()+"_"+swapData.getSequence().toString(16);
     }
 
     protected getIdentifier(swap: SwapHandlerSwap | SwapEvent<SwapData> | SwapData) {
@@ -356,8 +418,8 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
      * @param sequence
      * @throws {DefinedRuntimeError} will throw an error if sequence number is out of bounds
      */
-    protected checkSequence(sequence: BN) {
-        if(sequence.isNeg() || sequence.gte(new BN(2).pow(new BN(64)))) {
+    protected checkSequence(sequence: bigint) {
+        if(sequence < 0n || sequence >= 2n ** 64n) {
             throw {
                 code: 20060,
                 msg: "Invalid sequence"
@@ -384,14 +446,18 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<SwapData, S> = SwapH
             chainTokens[chainId] = Array.from<string>(this.allowedTokens[chainId]);
         }
         return {
-            swapFeePPM: this.config.feePPM.toNumber(),
-            swapBaseFee: this.config.baseFee.toNumber(),
-            min: this.config.min.toNumber(),
-            max: this.config.max.toNumber(),
+            swapFeePPM: Number(this.config.feePPM),
+            swapBaseFee: Number(this.config.baseFee),
+            min: Number(this.config.min),
+            max: Number(this.config.max),
             data: this.getInfoData(),
             tokens: Array.from<string>(this.allowedTokens[this.chains.default]),
             chainTokens
         };
+    }
+
+    protected getInitAuthorizationTimeout(chainIdentifier: string) {
+        return this.config.initAuthorizationTimeouts?.[chainIdentifier] ?? this.config.initAuthorizationTimeout;
     }
 
 }

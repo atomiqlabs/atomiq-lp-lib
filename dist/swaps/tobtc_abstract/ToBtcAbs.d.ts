@@ -1,16 +1,15 @@
 import { Express } from "express";
-import * as BN from "bn.js";
 import { ToBtcSwapAbs, ToBtcSwapState } from "./ToBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
 import { ISwapPrice } from "../ISwapPrice";
-import { BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
+import { BtcTx, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { PromiseQueue } from "promise-queue-ts";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
 export type ToBtcConfig = ToBtcBaseConfig & {
-    sendSafetyFactor: BN;
-    minChainCltv: BN;
+    sendSafetyFactor: bigint;
+    minChainCltv: bigint;
     networkFeeMultiplier: number;
     minConfirmations: number;
     maxConfirmations: number;
@@ -20,10 +19,10 @@ export type ToBtcConfig = ToBtcBaseConfig & {
 };
 export type ToBtcRequestType = {
     address: string;
-    amount: BN;
+    amount: bigint;
     confirmationTarget: number;
     confirmations: number;
-    nonce: BN;
+    nonce: bigint;
     token: string;
     offerer: string;
     exactIn?: boolean;
@@ -33,6 +32,7 @@ export type ToBtcRequestType = {
  */
 export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState> {
     readonly type = SwapHandlerType.TO_BTC;
+    readonly swapType = ChainSwapType.CHAIN_NONCED;
     activeSubscriptions: {
         [txId: string]: ToBtcSwapAbs;
     };
@@ -46,6 +46,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      *
      * @param chainIdentifier
      * @param address
+     * @param confirmations
      * @param nonce
      * @param amount
      */
@@ -91,7 +92,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @private
      * @throws DefinedRuntimeError will throw an error in case the actual fee is higher than quoted fee
      */
-    protected checkCalculatedTxFee(quotedSatsPerVbyte: BN, actualSatsPerVbyte: BN): void;
+    protected checkCalculatedTxFee(quotedSatsPerVbyte: bigint, actualSatsPerVbyte: bigint): void;
     /**
      * Sends a bitcoin transaction to payout BTC for a swap
      *
@@ -106,16 +107,16 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param swap
      */
     private processInitialized;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: RefundEvent<SwapData>): Promise<void>;
     /**
      * Returns required expiry delta for swap params
      *
      * @param confirmationTarget
      * @param confirmations
      */
-    protected getExpiryFromCLTV(confirmationTarget: number, confirmations: number): BN;
+    protected getExpiryFromCLTV(confirmationTarget: number, confirmations: number): bigint;
     /**
      * Checks if the requested nonce is valid
      *
@@ -150,7 +151,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param swap
      * @throws {DefinedRuntimeError} will throw an error if the swap is expired
      */
-    protected checkExpired(swap: ToBtcSwapAbs): void;
+    protected checkExpired(swap: ToBtcSwapAbs): Promise<void>;
     /**
      * Checks & returns the network fee needed for a transaction
      *

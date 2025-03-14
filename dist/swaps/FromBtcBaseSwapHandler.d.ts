@@ -1,7 +1,6 @@
 import { SwapHandlerSwap } from "./SwapHandlerSwap";
 import { SwapData } from "@atomiqlabs/base";
 import { RequestData, SwapBaseConfig, SwapHandler } from "./SwapHandler";
-import * as BN from "bn.js";
 import { IParamReader } from "../utils/paramcoders/IParamReader";
 import { FromBtcLnRequestType } from "./frombtcln_abstract/FromBtcLnAbs";
 import { FromBtcRequestType } from "./frombtc_abstract/FromBtcAbs";
@@ -17,20 +16,25 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      *
      * @param chainIdentifier
      * @param useToken
+     * @param depositToken
      * @param abortController
      */
-    protected getFromBtcPricePrefetches(chainIdentifier: string, useToken: string, abortController: AbortController): {
-        pricePrefetchPromise: Promise<BN>;
-        securityDepositPricePrefetchPromise: Promise<BN>;
+    protected getFromBtcPricePrefetches(chainIdentifier: string, useToken: string, depositToken: string, abortController: AbortController): {
+        pricePrefetchPromise: Promise<bigint>;
+        gasTokenPricePrefetchPromise: Promise<bigint>;
+        depositTokenPricePrefetchPromise: Promise<bigint>;
     };
     /**
      * Starts a pre-fetch for base security deposit (transaction fee for refunding transaction on our side)
      *
      * @param chainIdentifier
      * @param dummySwapData
+     * @param depositToken
+     * @param gasTokenPricePrefetchPromise
+     * @param depositTokenPricePrefetchPromise
      * @param abortController
      */
-    protected getBaseSecurityDepositPrefetch(chainIdentifier: string, dummySwapData: SwapData, abortController: AbortController): Promise<BN>;
+    protected getBaseSecurityDepositPrefetch(chainIdentifier: string, dummySwapData: SwapData, depositToken: string, gasTokenPricePrefetchPromise: Promise<bigint>, depositTokenPricePrefetchPromise: Promise<bigint>, abortController: AbortController): Promise<bigint>;
     /**
      * Starts a pre-fetch for vault balance
      *
@@ -38,7 +42,7 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      * @param useToken
      * @param abortController
      */
-    protected getBalancePrefetch(chainIdentifier: string, useToken: string, abortController: AbortController): Promise<BN>;
+    protected getBalancePrefetch(chainIdentifier: string, useToken: string, abortController: AbortController): Promise<bigint>;
     /**
      * Checks if we have enough balance of the token in the swap vault
      *
@@ -47,7 +51,15 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      * @param signal
      * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
      */
-    protected checkBalance(totalInToken: BN, balancePrefetch: Promise<BN>, signal: AbortSignal | null): Promise<void>;
+    protected checkBalance(totalInToken: bigint, balancePrefetch: Promise<bigint>, signal: AbortSignal | null): Promise<void>;
+    /**
+     * Checks if the specified token is allowed as a deposit token
+     *
+     * @param chainIdentifier
+     * @param depositToken
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
+     */
+    protected checkAllowedDepositToken(chainIdentifier: string, depositToken: string): void;
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
@@ -58,10 +70,10 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      */
     protected preCheckAmounts(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
         input: boolean;
-        amount: BN;
+        amount: bigint;
     }, useToken: string): Promise<{
-        baseFee: BN;
-        feePPM: BN;
+        baseFee: bigint;
+        feePPM: bigint;
     }>;
     /**
      * Checks minimums/maximums, calculates the fee & total amount
@@ -76,29 +88,16 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      */
     protected checkFromBtcAmount(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
         input: boolean;
-        amount: BN;
+        amount: bigint;
     }, fees: {
-        baseFee: BN;
-        feePPM: BN;
-    }, useToken: string, signal: AbortSignal, pricePrefetchPromise?: Promise<BN>): Promise<{
-        amountBD: BN;
-        swapFee: BN;
-        swapFeeInToken: BN;
-        totalInToken: BN;
+        baseFee: bigint;
+        feePPM: bigint;
+    }, useToken: string, signal: AbortSignal, pricePrefetchPromise?: Promise<bigint>): Promise<{
+        amountBD: bigint;
+        swapFee: bigint;
+        swapFeeInToken: bigint;
+        totalInToken: bigint;
     }>;
-    /**
-     * Calculates the required security deposit
-     *
-     * @param chainIdentifier
-     * @param amountBD
-     * @param swapFee
-     * @param expiryTimeout
-     * @param baseSecurityDepositPromise
-     * @param securityDepositPricePrefetchPromise
-     * @param signal
-     * @param metadata
-     */
-    protected getSecurityDeposit(chainIdentifier: string, amountBD: BN, swapFee: BN, expiryTimeout: BN, baseSecurityDepositPromise: Promise<BN>, securityDepositPricePrefetchPromise: Promise<BN>, signal: AbortSignal, metadata: any): Promise<BN>;
     /**
      * Signs the created swap
      *
@@ -116,4 +115,18 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
         signature: string;
         feeRate: string;
     }>;
+    /**
+     * Calculates the required security deposit
+     *
+     * @param chainIdentifier
+     * @param amountBD
+     * @param swapFee
+     * @param expiryTimeout
+     * @param baseSecurityDepositPromise
+     * @param depositToken
+     * @param depositTokenPricePrefetchPromise
+     * @param signal
+     * @param metadata
+     */
+    protected getSecurityDeposit(chainIdentifier: string, amountBD: bigint, swapFee: bigint, expiryTimeout: bigint, baseSecurityDepositPromise: Promise<bigint>, depositToken: string, depositTokenPricePrefetchPromise: Promise<bigint>, signal: AbortSignal, metadata: any): Promise<bigint>;
 }

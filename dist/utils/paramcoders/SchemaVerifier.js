@@ -1,31 +1,30 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifySchema = exports.FieldTypeEnum = exports.parseBN = void 0;
-const BN = require("bn.js");
-function parseBN(str) {
+exports.verifySchema = exports.FieldTypeEnum = exports.parseBigInt = void 0;
+function parseBigInt(str) {
     if (str == null)
         return null;
     if (typeof (str) !== "string" && typeof (str) !== "number")
         return null;
     try {
-        return new BN(str);
+        return BigInt(str);
     }
     catch (e) {
         return null;
     }
 }
-exports.parseBN = parseBN;
+exports.parseBigInt = parseBigInt;
 var FieldTypeEnum;
 (function (FieldTypeEnum) {
     FieldTypeEnum[FieldTypeEnum["String"] = 0] = "String";
     FieldTypeEnum[FieldTypeEnum["Boolean"] = 1] = "Boolean";
     FieldTypeEnum[FieldTypeEnum["Number"] = 2] = "Number";
-    FieldTypeEnum[FieldTypeEnum["BN"] = 3] = "BN";
+    FieldTypeEnum[FieldTypeEnum["BigInt"] = 3] = "BigInt";
     FieldTypeEnum[FieldTypeEnum["Any"] = 4] = "Any";
     FieldTypeEnum[FieldTypeEnum["StringOptional"] = 100] = "StringOptional";
     FieldTypeEnum[FieldTypeEnum["BooleanOptional"] = 101] = "BooleanOptional";
     FieldTypeEnum[FieldTypeEnum["NumberOptional"] = 102] = "NumberOptional";
-    FieldTypeEnum[FieldTypeEnum["BNOptional"] = 103] = "BNOptional";
+    FieldTypeEnum[FieldTypeEnum["BigIntOptional"] = 103] = "BigIntOptional";
     FieldTypeEnum[FieldTypeEnum["AnyOptional"] = 104] = "AnyOptional";
 })(FieldTypeEnum = exports.FieldTypeEnum || (exports.FieldTypeEnum = {}));
 function verifySchema(req, schema) {
@@ -61,8 +60,8 @@ function verifySchema(req, schema) {
                 return null;
             resultSchema[fieldName] = val;
         }
-        else if (type === FieldTypeEnum.BN || type === FieldTypeEnum.BNOptional) {
-            const result = parseBN(val);
+        else if (type === FieldTypeEnum.BigInt || type === FieldTypeEnum.BigIntOptional) {
+            const result = parseBigInt(val);
             if (result == null)
                 return null;
             resultSchema[fieldName] = result;

@@ -3,7 +3,6 @@ import { FromBtcTrustedSwap, FromBtcTrustedSwapState } from "./FromBtcTrustedSwa
 import { BitcoinRpc, BtcBlock, BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { Express } from "express";
 import { MultichainData, SwapHandlerType } from "../SwapHandler";
-import * as BN from "bn.js";
 import { IIntermediaryStorage } from "../../storage/IIntermediaryStorage";
 import { ISwapPrice } from "../ISwapPrice";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
@@ -14,11 +13,14 @@ export type FromBtcTrustedConfig = FromBtcBaseConfig & {
 };
 export type FromBtcTrustedRequestType = {
     address: string;
-    amount: BN;
-    exactOut?: boolean;
+    amount: bigint;
+    exactIn?: boolean;
+    refundAddress?: string;
+    token?: string;
 };
 export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
     readonly type: SwapHandlerType;
+    readonly swapType: any;
     readonly config: FromBtcTrustedConfig;
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
@@ -29,8 +31,8 @@ export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTruste
     readonly processedTxIds: Map<string, {
         scTxId: string;
         txId: string;
-        adjustedAmount: BN;
-        adjustedTotal: BN;
+        adjustedAmount: bigint;
+        adjustedTotal: bigint;
     }>;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcTrustedSwap>, path: string, chains: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, bitcoinRpc: BitcoinRpc<BtcBlock>, config: FromBtcTrustedConfig);
     private getAllAncestors;
@@ -46,7 +48,7 @@ export declare class FromBtcTrusted extends FromBtcBaseSwapHandler<FromBtcTruste
     startWatchdog(): Promise<void>;
     init(): Promise<void>;
     getInfoData(): any;
-    protected processClaimEvent(chainIdentifier: string, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processInitializeEvent(chainIdentifier: string, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, event: RefundEvent<SwapData>): Promise<void>;
+    protected processClaimEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: ClaimEvent<SwapData>): Promise<void>;
+    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: InitializeEvent<SwapData>): Promise<void>;
+    protected processRefundEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: RefundEvent<SwapData>): Promise<void>;
 }
