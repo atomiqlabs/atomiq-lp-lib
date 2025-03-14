@@ -62,6 +62,7 @@ export type MultichainData = {
 export type ChainData<T extends ChainType = ChainType> = {
     signer: T["Signer"],
     swapContract: T["Contract"],
+    chainInterface: T["ChainInterface"],
     chainEvents: T["Events"],
     allowedTokens: string[],
     allowedDepositTokens?: string[],

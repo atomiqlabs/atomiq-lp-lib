@@ -637,7 +637,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         restServer.post(this.path + "/payInvoice", (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
             const metadata = { request: {}, times: {} };
             const chainIdentifier = req.query.chain ?? this.chains.default;
-            const { swapContract, signer } = this.getChain(chainIdentifier);
+            const { swapContract, signer, chainInterface } = this.getChain(chainIdentifier);
             metadata.times.requestReceived = Date.now();
             /**
              *Sent initially:
@@ -661,7 +661,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 offerer: (val) => val != null &&
                     typeof (val) === "string" &&
-                    swapContract.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val) ? val : null,
                 exactIn: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
                 amount: SchemaVerifier_1.FieldTypeEnum.BigIntOptional
             });

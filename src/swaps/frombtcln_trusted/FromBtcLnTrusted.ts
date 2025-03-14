@@ -193,7 +193,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
      */
     private async htlcReceived(invoiceData: FromBtcLnTrustedSwap, invoice: { id: string }) {
 
-        const {swapContract, signer} = this.getChain(invoiceData.chainIdentifier);
+        const { signer, chainInterface} = this.getChain(invoiceData.chainIdentifier);
 
         //Important to prevent race condition and issuing 2 signed init messages at the same time
         if(invoiceData.state===FromBtcLnTrustedSwapState.CREATED) {
@@ -203,7 +203,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         }
 
         if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
-            const balance: Promise<bigint> = swapContract.getBalance(signer.getAddress(), invoiceData.token, false);
+            const balance: Promise<bigint> = chainInterface.getBalance(signer.getAddress(), invoiceData.token);
             try {
                 await this.checkBalance(invoiceData.output, balance, null);
                 if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcBalanceChecked = Date.now();
@@ -214,12 +214,12 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             if(invoiceData.state!==FromBtcLnTrustedSwapState.RECEIVED) return;
 
-            const txns = await swapContract.txsTransfer(signer.getAddress(), invoiceData.token, invoiceData.output, invoiceData.dstAddress);
+            const txns = await chainInterface.txsTransfer(signer.getAddress(), invoiceData.token, invoiceData.output, invoiceData.dstAddress);
 
             let unlock = invoiceData.lock(Infinity);
             if(unlock==null) return;
 
-            const result = await swapContract.sendAndConfirm(signer, txns, true, null, false, async (txId: string, rawTx: string) => {
+            const result = await chainInterface.sendAndConfirm(signer, txns, true, null, false, async (txId: string, rawTx: string) => {
                 invoiceData.txIds = {init: txId};
                 invoiceData.scRawTx = rawTx;
                 if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
@@ -253,7 +253,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
         if(invoiceData.state===FromBtcLnTrustedSwapState.SENT) {
             if(invoiceData.isLocked()) return;
 
-            const txStatus = await swapContract.getTxStatus(invoiceData.scRawTx);
+            const txStatus = await chainInterface.getTxStatus(invoiceData.scRawTx);
             if(txStatus==="not_found") {
                 //Retry
                 invoiceData.txIds = {init: null};
@@ -324,8 +324,8 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             chainIdentifier = this.chains.default;
             address = invoice.description;
         }
-        const {swapContract} = this.getChain(chainIdentifier);
-        if(!swapContract.isValidAddress(address)) throw {
+        const { chainInterface} = this.getChain(chainIdentifier);
+        if(!chainInterface.isValidAddress(address)) throw {
             _httpStatus: 200,
             code: 10001,
             msg: "Invoice expired/canceled"
@@ -371,7 +371,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
             } = {request: {}, times: {}};
 
             const chainIdentifier = req.query.chain as string ?? this.chains.default;
-            const {swapContract, signer} = this.getChain(chainIdentifier);
+            const {signer, chainInterface} = this.getChain(chainIdentifier);
 
             metadata.times.requestReceived = Date.now();
             /**
@@ -379,12 +379,12 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
              * amount: string               amount (in lamports/smart chain base units) of the invoice
              */
 
-            req.query.token ??= swapContract.getNativeCurrencyAddress();
+            req.query.token ??= chainInterface.getNativeCurrencyAddress();
 
             const parsedBody: FromBtcLnTrustedRequestType = verifySchema(req.query,{
                 address: (val: string) => val!=null &&
                     typeof(val)==="string" &&
-                    swapContract.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val) ? val : null,
                 token: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -417,7 +417,7 @@ export class FromBtcLnTrusted extends FromBtcLnBaseSwapHandler<FromBtcLnTrustedS
 
             //Pre-fetch data
             const {pricePrefetchPromise} = this.getFromBtcPricePrefetches(chainIdentifier, useToken, useToken, abortController);
-            const balancePrefetch = swapContract.getBalance(signer.getAddress(), useToken, false).catch(e => {
+            const balancePrefetch = chainInterface.getBalance(signer.getAddress(), useToken).catch(e => {
                 this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
                 abortController.abort(e);
                 return null;

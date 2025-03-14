@@ -499,8 +499,8 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             chainIdentifier = this.chains.default;
             address = invoice.description;
         }
-        const {swapContract} = this.getChain(chainIdentifier);
-        if(!swapContract.isValidAddress(address)) throw {
+        const {chainInterface} = this.getChain(chainIdentifier);
+        if(!chainInterface.isValidAddress(address)) throw {
             _httpStatus: 200,
             code: 10001,
             msg: "Invoice expired/canceled"
@@ -542,8 +542,8 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             } = {request: {}, times: {}};
 
             const chainIdentifier = req.query.chain as string ?? this.chains.default;
-            const {swapContract, signer} = this.getChain(chainIdentifier);
-            const depositToken = req.query.depositToken as string ?? swapContract.getNativeCurrencyAddress();
+            const {swapContract, signer, chainInterface} = this.getChain(chainIdentifier);
+            const depositToken = req.query.depositToken as string ?? chainInterface.getNativeCurrencyAddress();
             this.checkAllowedDepositToken(chainIdentifier, depositToken);
 
             metadata.times.requestReceived = Date.now();
@@ -563,7 +563,7 @@ export class FromBtcLnAbs extends FromBtcLnBaseSwapHandler<FromBtcLnSwapAbs, Fro
             const parsedBody: FromBtcLnRequestType = await req.paramReader.getParams({
                 address: (val: string) => val!=null &&
                             typeof(val)==="string" &&
-                            swapContract.isValidAddress(val) ? val : null,
+                            chainInterface.isValidAddress(val) ? val : null,
                 paymentHash: (val: string) => val!=null &&
                             typeof(val)==="string" &&
                             val.length===64 &&

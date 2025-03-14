@@ -179,8 +179,8 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         restServer.post(this.path + "/getAddress", (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
             const metadata = { request: {}, times: {} };
             const chainIdentifier = req.query.chain ?? this.chains.default;
-            const { swapContract, signer } = this.getChain(chainIdentifier);
-            const depositToken = req.query.depositToken ?? swapContract.getNativeCurrencyAddress();
+            const { swapContract, signer, chainInterface } = this.getChain(chainIdentifier);
+            const depositToken = req.query.depositToken ?? chainInterface.getNativeCurrencyAddress();
             this.checkAllowedDepositToken(chainIdentifier, depositToken);
             metadata.times.requestReceived = Date.now();
             /**
@@ -202,7 +202,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const parsedBody = await req.paramReader.getParams({
                 address: (val) => val != null &&
                     typeof (val) === "string" &&
-                    swapContract.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val) ? val : null,
                 amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
