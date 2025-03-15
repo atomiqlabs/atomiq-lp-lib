@@ -755,16 +755,4 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
         return {};
     }
 
-    protected processClaimEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: ClaimEvent<SwapData>): Promise<void> {
-        return Promise.resolve(undefined);
-    }
-
-    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: InitializeEvent<SwapData>): Promise<void> {
-        return Promise.resolve(undefined);
-    }
-
-    protected processRefundEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: RefundEvent<SwapData>): Promise<void> {
-        return Promise.resolve(undefined);
-    }
-
 }
