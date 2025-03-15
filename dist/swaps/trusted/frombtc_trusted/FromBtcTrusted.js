@@ -646,14 +646,5 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
     getInfoData() {
         return {};
     }
-    processClaimEvent(chainIdentifier, swap, event) {
-        return Promise.resolve(undefined);
-    }
-    processInitializeEvent(chainIdentifier, swap, event) {
-        return Promise.resolve(undefined);
-    }
-    processRefundEvent(chainIdentifier, swap, event) {
-        return Promise.resolve(undefined);
-    }
 }
 exports.FromBtcTrusted = FromBtcTrusted;

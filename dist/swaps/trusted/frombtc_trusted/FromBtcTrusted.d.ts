@@ -1,6 +1,6 @@
 import { FromBtcBaseConfig } from "../../escrow/FromBtcBaseSwapHandler";
 import { FromBtcTrustedSwap, FromBtcTrustedSwapState } from "./FromBtcTrustedSwap";
-import { BitcoinRpc, BtcBlock, BtcTx, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
+import { BitcoinRpc, BtcBlock, BtcTx } from "@atomiqlabs/base";
 import { Express } from "express";
 import { MultichainData, SwapHandler, SwapHandlerType } from "../../SwapHandler";
 import { IIntermediaryStorage } from "../../../storage/IIntermediaryStorage";
@@ -49,7 +49,4 @@ export declare class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, From
     startWatchdog(): Promise<void>;
     init(): Promise<void>;
     getInfoData(): any;
-    protected processClaimEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: ClaimEvent<SwapData>): Promise<void>;
-    protected processInitializeEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: InitializeEvent<SwapData>): Promise<void>;
-    protected processRefundEvent(chainIdentifier: string, swap: FromBtcTrustedSwap, event: RefundEvent<SwapData>): Promise<void>;
 }
