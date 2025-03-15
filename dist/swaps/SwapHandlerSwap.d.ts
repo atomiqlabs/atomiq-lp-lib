@@ -1,10 +1,9 @@
-import { Lockable, StorageObject, SwapData } from "@atomiqlabs/base";
+import { Lockable, StorageObject } from "@atomiqlabs/base";
 import { SwapHandlerType } from "./SwapHandler";
-export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> extends Lockable implements StorageObject {
+export declare abstract class SwapHandlerSwap<S = any> extends Lockable implements StorageObject {
     chainIdentifier: string;
     state: S;
     type: SwapHandlerType;
-    data: T;
     metadata: {
         request: any;
         times: {
@@ -13,16 +12,10 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
         [key: string]: any;
     };
     txIds: {
-        init?: string;
-        claim?: string;
-        refund?: string;
+        [key: string]: string;
     };
     readonly swapFee: bigint;
     readonly swapFeeInToken: bigint;
-    prefix: string;
-    timeout: string;
-    signature: string;
-    feeRate: string;
     protected constructor(chainIdentifier: string, swapFee: bigint, swapFeeInToken: bigint);
     protected constructor(obj: any);
     serialize(): any;
@@ -33,19 +26,11 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
      */
     setState(newState: S): Promise<void>;
     /**
-     * Returns the escrow hash - i.e. hash of the escrow data
-     */
-    getEscrowHash(): string;
-    /**
-     * Returns the claim data hash - i.e. hash passed to the claim handler
-     */
-    getClaimHash(): string;
-    /**
      * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
      *  lightning swaps the identifier hash is used instead of claim data hash
      */
-    getIdentifierHash(): string;
-    getSequence(): bigint | null;
+    abstract getIdentifierHash(): string;
+    abstract getSequence(): bigint | null;
     /**
      * Returns unique identifier of the swap in the form <hash>_<sequence> or just <hash> if the swap type doesn't
      *  use sequence number
@@ -54,7 +39,7 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
     /**
      * Returns the smart chain token used for the swap
      */
-    getToken(): string;
+    abstract getToken(): string;
     /**
      * Checks whether the swap is finished, such that it is final and either successful or failed
      */
@@ -74,7 +59,7 @@ export declare abstract class SwapHandlerSwap<T extends SwapData = SwapData, S =
     /**
      * Returns the input amount paid by the user (excluding fees)
      */
-    abstract getInputAmount(): bigint;
+    getInputAmount(): bigint;
     /**
      * Returns the total input amount paid by the user (including all fees)
      */

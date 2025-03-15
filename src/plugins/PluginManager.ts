@@ -18,7 +18,7 @@ import {
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
 import * as fs from "fs";
 import {getLogger} from "../utils/Utils";
-import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import {FromBtcLnTrustedRequestType} from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
 import {ILightningWallet} from "../wallets/ILightningWallet";
 
@@ -135,7 +135,7 @@ export class PluginManager {
         }
     }
 
-    static async swapStateChange<T extends SwapData>(swap: SwapHandlerSwap<T>, oldState?: any) {
+    static async swapStateChange(swap: SwapHandlerSwap, oldState?: any) {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onSwapStateChange!=null) await plugin.onSwapStateChange(swap);
@@ -145,7 +145,7 @@ export class PluginManager {
         }
     }
 
-    static async swapCreate<T extends SwapData>(swap: SwapHandlerSwap<T>) {
+    static async swapCreate(swap: SwapHandlerSwap) {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onSwapCreate!=null) await plugin.onSwapCreate(swap);
@@ -155,7 +155,7 @@ export class PluginManager {
         }
     }
 
-    static async swapRemove<T extends SwapData>(swap: SwapHandlerSwap<T>) {
+    static async swapRemove(swap: SwapHandlerSwap) {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onSwapRemove!=null) await plugin.onSwapRemove(swap);

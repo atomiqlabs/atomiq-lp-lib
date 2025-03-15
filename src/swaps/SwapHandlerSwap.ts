@@ -11,30 +11,22 @@ function objectBigIntsToString(obj: Object) {
     return obj;
 }
 
-export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> extends Lockable implements StorageObject {
+export abstract class SwapHandlerSwap<S = any> extends Lockable implements StorageObject {
 
     chainIdentifier: string;
     state: S;
 
     type: SwapHandlerType;
-    data: T;
     metadata: {
         request: any,
         times: {[key: string]: number},
         [key: string]: any
     };
     txIds: {
-        init?: string,
-        claim?: string,
-        refund?: string
+        [key: string]: string
     } = {};
     readonly swapFee: bigint;
     readonly swapFeeInToken: bigint;
-
-    prefix: string;
-    timeout: string;
-    signature: string;
-    feeRate: string;
 
     protected constructor(chainIdentifier: string, swapFee: bigint, swapFeeInToken: bigint);
     protected constructor(obj: any);
@@ -47,33 +39,23 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
             this.swapFeeInToken = swapFeeInToken;
             return;
         } else {
-            this.data = obj.data==null ? null : SwapData.deserialize(obj.data);
             this.metadata = obj.metadata;
             this.chainIdentifier = obj.chainIdentifier;
             this.txIds = obj.txIds || {};
             this.state = obj.state;
             this.swapFee = deserializeBN(obj.swapFee);
             this.swapFeeInToken = deserializeBN(obj.swapFeeInToken);
-            this.prefix = obj.prefix;
-            this.timeout = obj.timeout;
-            this.signature = obj.signature;
-            this.feeRate = obj.feeRate;
         }
     }
 
     serialize(): any {
         return {
             state: this.state,
-            data: this.data==null ? null : this.data.serialize(),
             chainIdentifier: this.chainIdentifier,
             metadata: objectBigIntsToString(this.metadata),
             txIds: this.txIds,
             swapFee: serializeBN(this.swapFee),
-            swapFeeInToken: serializeBN(this.swapFeeInToken),
-            prefix: this.prefix,
-            timeout: this.timeout,
-            signature: this.signature,
-            feeRate: this.feeRate
+            swapFeeInToken: serializeBN(this.swapFeeInToken)
         }
     }
 
@@ -89,30 +71,12 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
     }
 
     /**
-     * Returns the escrow hash - i.e. hash of the escrow data
-     */
-    getEscrowHash(): string {
-        return this.data.getEscrowHash();
-    }
-
-    /**
-     * Returns the claim data hash - i.e. hash passed to the claim handler
-     */
-    getClaimHash(): string {
-        return this.data.getClaimHash();
-    }
-
-    /**
      * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
      *  lightning swaps the identifier hash is used instead of claim data hash
      */
-    getIdentifierHash(): string {
-        return this.getClaimHash();
-    }
+    abstract getIdentifierHash(): string;
 
-    getSequence(): bigint | null {
-        return this.data?.getSequence==null ? null : this.data.getSequence();
-    }
+    abstract getSequence(): bigint | null;
 
     /**
      * Returns unique identifier of the swap in the form <hash>_<sequence> or just <hash> if the swap type doesn't
@@ -128,9 +92,7 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
     /**
      * Returns the smart chain token used for the swap
      */
-    getToken(): string {
-        return this.data?.getToken();
-    }
+    abstract getToken(): string
 
     /**
      * Checks whether the swap is finished, such that it is final and either successful or failed
@@ -157,7 +119,9 @@ export abstract class SwapHandlerSwap<T extends SwapData = SwapData, S = any> ex
     /**
      * Returns the input amount paid by the user (excluding fees)
      */
-    abstract getInputAmount(): bigint;
+    getInputAmount(): bigint {
+        return this.getTotalInputAmount() - this.getSwapFee().inInputToken;
+    }
 
     /**
      * Returns the total input amount paid by the user (including all fees)

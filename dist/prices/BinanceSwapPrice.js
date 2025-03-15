@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BinanceSwapPrice = void 0;
-const ISwapPrice_1 = require("../swaps/ISwapPrice");
+const ISwapPrice_1 = require("./ISwapPrice");
 const CACHE_DURATION = 15000;
 class BinanceSwapPrice extends ISwapPrice_1.ISwapPrice {
     constructor(url, coins) {

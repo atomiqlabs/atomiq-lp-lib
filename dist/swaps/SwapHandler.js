@@ -1,10 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapHandler = exports.SwapHandlerType = void 0;
-const base_1 = require("@atomiqlabs/base");
-const SwapHandlerSwap_1 = require("./SwapHandlerSwap");
 const PluginManager_1 = require("../plugins/PluginManager");
-const IPlugin_1 = require("../plugins/IPlugin");
 var SwapHandlerType;
 (function (SwapHandlerType) {
     SwapHandlerType["TO_BTC"] = "TO_BTC";
@@ -13,13 +10,13 @@ var SwapHandlerType;
     SwapHandlerType["FROM_BTCLN"] = "FROM_BTCLN";
     SwapHandlerType["FROM_BTCLN_TRUSTED"] = "FROM_BTCLN_TRUSTED";
     SwapHandlerType["FROM_BTC_TRUSTED"] = "FROM_BTC_TRUSTED";
+    SwapHandlerType["FROM_BTC_SPV"] = "FROM_BTC_SPV";
 })(SwapHandlerType = exports.SwapHandlerType || (exports.SwapHandlerType = {}));
 /**
  * An abstract class defining a singular swap service
  */
 class SwapHandler {
     constructor(storageDirectory, path, chainsData, swapPricing) {
-        this.escrowHashMap = new Map();
         this.logger = {
             debug: (msg, ...args) => console.debug("SwapHandler(" + this.type + "): " + msg, ...args),
             info: (msg, ...args) => console.info("SwapHandler(" + this.type + "): " + msg, ...args),
@@ -27,10 +24,10 @@ class SwapHandler {
             error: (msg, ...args) => console.error("SwapHandler(" + this.type + "): " + msg, ...args)
         };
         this.swapLogger = {
-            debug: (swap, msg, ...args) => this.logger.debug(this.getIdentifier(swap) + ": " + msg, ...args),
-            info: (swap, msg, ...args) => this.logger.info(this.getIdentifier(swap) + ": " + msg, ...args),
-            warn: (swap, msg, ...args) => this.logger.warn(this.getIdentifier(swap) + ": " + msg, ...args),
-            error: (swap, msg, ...args) => this.logger.error(this.getIdentifier(swap) + ": " + msg, ...args)
+            debug: (swap, msg, ...args) => this.logger.debug(swap.getIdentifier() + ": " + msg, ...args),
+            info: (swap, msg, ...args) => this.logger.info(swap.getIdentifier() + ": " + msg, ...args),
+            warn: (swap, msg, ...args) => this.logger.warn(swap.getIdentifier() + ": " + msg, ...args),
+            error: (swap, msg, ...args) => this.logger.error(swap.getIdentifier() + ": " + msg, ...args)
         };
         this.storageManager = storageDirectory;
         this.chains = chainsData;
@@ -65,57 +62,6 @@ class SwapHandler {
         };
         await rerun();
     }
-    /**
-     * Chain event processor
-     *
-     * @param chainIdentifier
-     * @param eventData
-     */
-    async processEvent(chainIdentifier, eventData) {
-        if (this.swapType == null)
-            return true;
-        for (let event of eventData) {
-            if (event instanceof base_1.InitializeEvent) {
-                if (event.swapType !== this.swapType)
-                    continue;
-                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
-                if (swap == null)
-                    continue;
-                swap.txIds.init = event.meta?.txId;
-                if (swap.metadata != null)
-                    swap.metadata.times.initTxReceived = Date.now();
-                await this.processInitializeEvent(chainIdentifier, swap, event);
-            }
-            else if (event instanceof base_1.ClaimEvent) {
-                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
-                if (swap == null)
-                    continue;
-                swap.txIds.claim = event.meta?.txId;
-                if (swap.metadata != null)
-                    swap.metadata.times.claimTxReceived = Date.now();
-                await this.processClaimEvent(chainIdentifier, swap, event);
-            }
-            else if (event instanceof base_1.RefundEvent) {
-                const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
-                if (swap == null)
-                    continue;
-                swap.txIds.refund = event.meta?.txId;
-                if (swap.metadata != null)
-                    swap.metadata.times.refundTxReceived = Date.now();
-                await this.processRefundEvent(chainIdentifier, swap, event);
-            }
-        }
-        return true;
-    }
-    /**
-     * Initializes chain events subscription
-     */
-    subscribeToEvents() {
-        for (let key in this.chains.chains) {
-            this.chains.chains[key].chainEvents.registerListener((events) => this.processEvent(key, events));
-        }
-        this.logger.info("SC: Events: subscribed to smartchain events");
-    }
     async loadData(ctor) {
         await this.storageManager.loadData(ctor);
         //Check if all swaps contain a valid amount
@@ -127,7 +73,6 @@ class SwapHandler {
                 await this.storageManager.removeData(hash, sequence);
                 await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
             }
-            this.saveSwapToEscrowHashMap(swap);
         }
     }
     async removeSwapData(hashOrSwap, sequenceOrUltimateState) {
@@ -145,143 +90,29 @@ class SwapHandler {
         if (swap != null)
             await PluginManager_1.PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
-        this.removeSwapFromEscrowHashMap(swap);
         await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
     async saveSwapData(swap) {
-        this.saveSwapToEscrowHashMap(swap);
         await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
     }
-    saveSwapToEscrowHashMap(swap) {
-        if (swap.data != null)
-            this.escrowHashMap.set(swap.chainIdentifier + "_" + swap.getEscrowHash(), swap);
-    }
-    removeSwapFromEscrowHashMap(swap) {
-        if (swap.data != null)
-            this.escrowHashMap.delete(swap.chainIdentifier + "_" + swap.data.getEscrowHash());
-    }
-    getSwapByEscrowHash(chainIdentifier, escrowHash) {
-        return this.escrowHashMap.get(chainIdentifier + "_" + escrowHash);
-    }
     /**
-     * Checks whether the bitcoin amount is within specified min/max bounds
+     * Checks if we have enough balance of the token in the swap vault
      *
-     * @param amount
-     * @protected
-     * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
+     * @param totalInToken
+     * @param balancePrefetch
+     * @param signal
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
      */
-    checkBtcAmountInBounds(amount) {
-        if (amount < this.config.min) {
+    async checkBalance(totalInToken, balancePrefetch, signal) {
+        const balance = await balancePrefetch;
+        if (signal != null)
+            signal.throwIfAborted();
+        if (balance == null || balance < totalInToken) {
             throw {
-                code: 20003,
-                msg: "Amount too low!",
-                data: {
-                    min: this.config.min.toString(10),
-                    max: this.config.max.toString(10)
-                }
+                code: 20002,
+                msg: "Not enough liquidity"
             };
         }
-        if (amount > this.config.max) {
-            throw {
-                code: 20004,
-                msg: "Amount too high!",
-                data: {
-                    min: this.config.min.toString(10),
-                    max: this.config.max.toString(10)
-                }
-            };
-        }
-    }
-    /**
-     * Handles and throws plugin errors
-     *
-     * @param res Response as returned from the PluginManager.onHandlePost{To,From}BtcQuote
-     * @protected
-     * @throws {DefinedRuntimeError} will throw an error if the response is an error
-     */
-    handlePluginErrorResponses(res) {
-        if ((0, IPlugin_1.isQuoteThrow)(res))
-            throw {
-                code: 29999,
-                msg: res.message
-            };
-        if ((0, IPlugin_1.isQuoteAmountTooHigh)(res))
-            throw {
-                code: 20004,
-                msg: "Amount too high!",
-                data: {
-                    min: res.data.min.toString(10),
-                    max: res.data.max.toString(10)
-                }
-            };
-        if ((0, IPlugin_1.isQuoteAmountTooLow)(res))
-            throw {
-                code: 20003,
-                msg: "Amount too low!",
-                data: {
-                    min: res.data.min.toString(10),
-                    max: res.data.max.toString(10)
-                }
-            };
-    }
-    /**
-     * Creates an abort controller that extends the responseStream's abort signal
-     *
-     * @param responseStream
-     */
-    getAbortController(responseStream) {
-        const abortController = new AbortController();
-        if (responseStream == null || responseStream.getAbortSignal == null)
-            return abortController;
-        const responseStreamAbortController = responseStream.getAbortSignal();
-        responseStreamAbortController.addEventListener("abort", () => abortController.abort(responseStreamAbortController.reason));
-        return abortController;
-    }
-    /**
-     * Starts a pre-fetch for signature data
-     *
-     * @param chainIdentifier
-     * @param abortController
-     * @param responseStream
-     */
-    getSignDataPrefetch(chainIdentifier, abortController, responseStream) {
-        const { swapContract } = this.getChain(chainIdentifier);
-        let signDataPrefetchPromise = swapContract.preFetchBlockDataForSignatures != null ? swapContract.preFetchBlockDataForSignatures().catch(e => {
-            this.logger.error("getSignDataPrefetch(): signDataPrefetch: ", e);
-            abortController.abort(e);
-            return null;
-        }) : null;
-        if (signDataPrefetchPromise != null && responseStream != null) {
-            signDataPrefetchPromise = signDataPrefetchPromise.then(val => val == null || abortController.signal.aborted ? null : responseStream.writeParams({
-                signDataPrefetch: val
-            }).then(() => val).catch(e => {
-                this.logger.error("getSignDataPrefetch(): signDataPreFetch: error when sending sign data to the client: ", e);
-                abortController.abort(e);
-                return null;
-            }));
-        }
-        return signDataPrefetchPromise;
-    }
-    getIdentifierFromEvent(event) {
-        const foundSwap = this.escrowHashMap.get(event.escrowHash);
-        if (foundSwap != null) {
-            return foundSwap.getIdentifier();
-        }
-        return "UNKNOWN_" + event.escrowHash;
-    }
-    getIdentifierFromSwapData(swapData) {
-        if (swapData.getSequence == null)
-            return swapData.getClaimHash();
-        return swapData.getClaimHash() + "_" + swapData.getSequence().toString(16);
-    }
-    getIdentifier(swap) {
-        if (swap instanceof SwapHandlerSwap_1.SwapHandlerSwap) {
-            return swap.getIdentifier();
-        }
-        if (swap instanceof base_1.SwapEvent) {
-            return this.getIdentifierFromEvent(swap);
-        }
-        return this.getIdentifierFromSwapData(swap);
     }
     /**
      * Checks if the sequence number is between 0-2^64

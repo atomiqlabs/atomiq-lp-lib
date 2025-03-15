@@ -1,4 +1,4 @@
-import {ISwapPrice} from "../swaps/ISwapPrice";
+import {ISwapPrice} from "./ISwapPrice";
 
 const CACHE_DURATION = 15000;
 

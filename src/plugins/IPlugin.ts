@@ -9,7 +9,7 @@ import {
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
 import {Command} from "@atomiqlabs/server-base";
-import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import {FromBtcLnTrustedRequestType} from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
 import {ILightningWallet} from "../wallets/ILightningWallet";
 

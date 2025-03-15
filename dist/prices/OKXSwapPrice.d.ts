@@ -1,4 +1,4 @@
-import { ISwapPrice } from "../swaps/ISwapPrice";
+import { ISwapPrice } from "./ISwapPrice";
 export type OKXPriceData = {
     [pair: string]: {
         [chainId: string]: {

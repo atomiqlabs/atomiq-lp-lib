@@ -2,7 +2,7 @@ import { BitcoinRpc, SwapData } from "@atomiqlabs/base";
 import { IPlugin, PluginQuote, QuoteAmountTooHigh, QuoteAmountTooLow, QuoteSetFees, QuoteThrow, ToBtcPluginQuote } from "./IPlugin";
 import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
-import { FromBtcLnTrustedRequestType } from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
 import { ILightningWallet } from "../wallets/ILightningWallet";
 export type FailSwapResponse = {
@@ -37,9 +37,9 @@ export declare class PluginManager {
     static disable(): Promise<void>;
     static serviceInitialize(handler: SwapHandler<any>): Promise<void>;
     static onHttpServerStarted(httpServer: any): Promise<void>;
-    static swapStateChange<T extends SwapData>(swap: SwapHandlerSwap<T>, oldState?: any): Promise<void>;
-    static swapCreate<T extends SwapData>(swap: SwapHandlerSwap<T>): Promise<void>;
-    static swapRemove<T extends SwapData>(swap: SwapHandlerSwap<T>): Promise<void>;
+    static swapStateChange(swap: SwapHandlerSwap, oldState?: any): Promise<void>;
+    static swapCreate(swap: SwapHandlerSwap): Promise<void>;
+    static swapRemove(swap: SwapHandlerSwap): Promise<void>;
     static onHandlePostFromBtcQuote(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
