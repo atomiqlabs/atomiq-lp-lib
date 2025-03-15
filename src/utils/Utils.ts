@@ -56,7 +56,14 @@ export function expressHandlerWrapper(func: (
     }
 }
 
-export function getLogger(prefix: string) {
+export type LoggerType = {
+    debug: (msg: string, ...args: any[]) => void,
+    info: (msg: string, ...args: any[]) => void,
+    warn: (msg: string, ...args: any[]) => void,
+    error: (msg: string, ...args: any[]) => void
+};
+
+export function getLogger(prefix: string): LoggerType {
     return {
         debug: (msg, ...args) => console.debug(prefix+msg, ...args),
         info: (msg, ...args) => console.info(prefix+msg, ...args),
@@ -73,4 +80,17 @@ export function serializeBN(bn: bigint | null): string | null {
 
 export function deserializeBN(str: string | null): bigint | null {
     return str==null ? null : BigInt(str);
+}
+
+/**
+ * Creates an abort controller that extends the responseStream's abort signal
+ *
+ * @param responseStream
+ */
+export function getAbortController(responseStream: ServerParamEncoder): AbortController {
+    const abortController = new AbortController();
+    if(responseStream==null || responseStream.getAbortSignal==null) return abortController;
+    const responseStreamAbortController = responseStream.getAbortSignal();
+    responseStreamAbortController.addEventListener("abort", () => abortController.abort(responseStreamAbortController.reason));
+    return abortController;
 }

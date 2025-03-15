@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.getLogger = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = void 0;
+exports.getAbortController = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.getLogger = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = void 0;
 function isDefinedRuntimeError(obj) {
     if (obj.code != null && typeof (obj.code) === "number") {
         if (obj.msg != null && typeof (obj.msg) !== "string")
@@ -64,3 +64,17 @@ function deserializeBN(str) {
     return str == null ? null : BigInt(str);
 }
 exports.deserializeBN = deserializeBN;
+/**
+ * Creates an abort controller that extends the responseStream's abort signal
+ *
+ * @param responseStream
+ */
+function getAbortController(responseStream) {
+    const abortController = new AbortController();
+    if (responseStream == null || responseStream.getAbortSignal == null)
+        return abortController;
+    const responseStreamAbortController = responseStream.getAbortSignal();
+    responseStreamAbortController.addEventListener("abort", () => abortController.abort(responseStreamAbortController.reason));
+    return abortController;
+}
+exports.getAbortController = getAbortController;
