@@ -18,14 +18,12 @@ export class ToBtcAmountAssertions extends AmountAssertions {
      */
     async preCheckToBtcAmounts(
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: bigint},
-        useToken: string
+        requestedAmount: {input: boolean, amount: bigint, token: string}
     ): Promise<{baseFee: bigint, feePPM: bigint}> {
         const res = await PluginManager.onHandlePreToBtcQuote(
             request,
             requestedAmount,
             request.chainIdentifier,
-            useToken,
             {minInBtc: this.config.min, maxInBtc: this.config.max},
             {baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM},
         );
@@ -53,21 +51,17 @@ export class ToBtcAmountAssertions extends AmountAssertions {
      * @param request
      * @param requestedAmount
      * @param fees
-     * @param useToken
      * @param getNetworkFee
      * @param signal
-     * @param pricePrefetchPromise
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds,
      *  or if we don't have enough funds (getNetworkFee callback throws)
      */
     async checkToBtcAmount<T extends {networkFee: bigint}>(
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: bigint},
+        requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         fees: {baseFee: bigint, feePPM: bigint},
-        useToken: string,
         getNetworkFee: (amount: bigint) => Promise<T>,
-        signal: AbortSignal,
-        pricePrefetchPromise?: Promise<bigint>
+        signal: AbortSignal
     ): Promise<{
         amountBD: bigint,
         networkFeeData: T,
@@ -83,10 +77,8 @@ export class ToBtcAmountAssertions extends AmountAssertions {
             request,
             requestedAmount,
             request.chainIdentifier,
-            useToken,
             {minInBtc: this.config.min, maxInBtc: this.config.max},
-            {baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM, networkFeeGetter: getNetworkFee},
-            pricePrefetchPromise
+            {baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM, networkFeeGetter: getNetworkFee}
         );
         signal.throwIfAborted();
         if(res!=null) {
@@ -123,7 +115,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
         let amountBD: bigint;
         let tooLow = false;
         if(requestedAmount.input) {
-            amountBD = await this.swapPricing.getToBtcSwapAmount(requestedAmount.amount, useToken, chainIdentifier, null, pricePrefetchPromise);
+            amountBD = await this.swapPricing.getToBtcSwapAmount(requestedAmount.amount, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
             signal.throwIfAborted();
 
             //Decrease by base fee
@@ -158,10 +150,10 @@ export class ToBtcAmountAssertions extends AmountAssertions {
                 adjustedMin = adjustedMin + fees.baseFee + resp.networkFee;
                 adjustedMax = adjustedMax + fees.baseFee + resp.networkFee;
                 const minIn = await this.swapPricing.getFromBtcSwapAmount(
-                    adjustedMin, useToken, chainIdentifier, null, pricePrefetchPromise
+                    adjustedMin, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch
                 );
                 const maxIn = await this.swapPricing.getFromBtcSwapAmount(
-                    adjustedMax, useToken, chainIdentifier, null, pricePrefetchPromise
+                    adjustedMax, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch
                 );
                 throw {
                     code: tooLow ? 20003 : 2004,
@@ -177,10 +169,10 @@ export class ToBtcAmountAssertions extends AmountAssertions {
         const swapFee = fees.baseFee + (amountBD * fees.feePPM / 1000000n);
 
         const networkFeeInToken = await this.swapPricing.getFromBtcSwapAmount(
-            resp.networkFee, useToken, chainIdentifier, true, pricePrefetchPromise
+            resp.networkFee, requestedAmount.token, chainIdentifier, true, requestedAmount.pricePrefetch
         );
         const swapFeeInToken = await this.swapPricing.getFromBtcSwapAmount(
-            swapFee, useToken, chainIdentifier, true, pricePrefetchPromise
+            swapFee, requestedAmount.token, chainIdentifier, true, requestedAmount.pricePrefetch
         );
         signal.throwIfAborted();
 
@@ -189,7 +181,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
             total = requestedAmount.amount;
         } else {
             const amountInToken = await this.swapPricing.getFromBtcSwapAmount(
-                requestedAmount.amount, useToken, chainIdentifier, true, pricePrefetchPromise
+                requestedAmount.amount, requestedAmount.token, chainIdentifier, true, requestedAmount.pricePrefetch
             );
             signal.throwIfAborted();
             total = amountInToken + swapFeeInToken + networkFeeInToken;

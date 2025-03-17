@@ -1,13 +1,12 @@
 import { Express } from "express";
 import { FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState } from "./FromBtcLnTrustedSwap";
-import { FromBtcBaseConfig } from "../../escrow/FromBtcBaseSwapHandler";
 import { ISwapPrice } from "../../../prices/ISwapPrice";
-import { MultichainData, SwapHandler, SwapHandlerType } from "../../SwapHandler";
+import { MultichainData, SwapBaseConfig, SwapHandler, SwapHandlerType } from "../../SwapHandler";
 import { IIntermediaryStorage } from "../../../storage/IIntermediaryStorage";
 import { ILightningWallet } from "../../../wallets/ILightningWallet";
 import { FromBtcAmountAssertions } from "../../assertions/FromBtcAmountAssertions";
 import { LightningAssertions } from "../../assertions/LightningAssertions";
-export type SwapForGasServerConfig = FromBtcBaseConfig & {
+export type SwapForGasServerConfig = SwapBaseConfig & {
     minCltv: bigint;
     invoiceTimeoutSeconds?: number;
 };

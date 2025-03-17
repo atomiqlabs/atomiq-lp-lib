@@ -466,7 +466,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     msg: "Invalid request body"
                 };
             metadata.request = parsedBody;
-            const requestedAmount = { input: !parsedBody.exactOut, amount: parsedBody.amount };
+            const requestedAmount = { input: !parsedBody.exactOut, amount: parsedBody.amount, token: parsedBody.token };
             const request = {
                 chainIdentifier,
                 raw: req,
@@ -476,7 +476,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const useToken = parsedBody.token;
             //Check request params
             this.checkDescriptionHash(parsedBody.descriptionHash);
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
             metadata.times.requestChecked = Date.now();
             //Create abortController for parallel prefetches
             const responseStream = res.responseStream;
@@ -491,7 +491,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Asynchronously send the node's public key to the client
             this.sendPublicKeyAsync(responseStream);
             //Check valid amount specified (min/max)
-            const { amountBD, swapFee, swapFeeInToken, totalInToken, securityDepositApyPPM, securityDepositBaseMultiplierPPM } = await this.AmountAssertions.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
+            const { amountBD, swapFee, swapFeeInToken, totalInToken, securityDepositApyPPM, securityDepositBaseMultiplierPPM } = await this.AmountAssertions.checkFromBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
             if (securityDepositApyPPM != null)
                 fees.securityDepositApyPPM = securityDepositApyPPM;

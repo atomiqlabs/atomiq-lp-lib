@@ -523,7 +523,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     msg: "Invalid request body"
                 };
             metadata.request = parsedBody;
-            const requestedAmount = { input: !!parsedBody.exactIn, amount: parsedBody.amount };
+            const requestedAmount = { input: !!parsedBody.exactIn, amount: parsedBody.amount, token: parsedBody.token };
             const request = {
                 chainIdentifier,
                 raw: req,
@@ -537,18 +537,18 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             this.checkRequiredConfirmations(parsedBody.confirmations);
             this.checkAddress(parsedBody.address);
             await this.checkVaultInitialized(chainIdentifier, parsedBody.token);
-            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount);
             metadata.times.requestChecked = Date.now();
             //Initialize abort controller for the parallel async operations
             const abortController = (0, Utils_1.getAbortController)(responseStream);
             const { pricePrefetchPromise, signDataPrefetchPromise } = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
-            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amount) => {
+            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amount) => {
                 metadata.times.amountsChecked = Date.now();
                 const resp = await this.checkAndGetNetworkFee(parsedBody.address, amount);
                 this.logger.debug("checkToBtcAmount(): network fee calculated, amount: " + amountBD.toString(10) + " fee: " + resp.networkFee.toString(10));
                 metadata.times.chainFeeCalculated = Date.now();
                 return resp;
-            }, abortController.signal, pricePrefetchPromise);
+            }, abortController.signal);
             metadata.times.priceCalculated = Date.now();
             const paymentHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.confirmations, parsedBody.nonce, amountBD).toString("hex");
             //Add grace period another time, so the user has 1 hour to commit

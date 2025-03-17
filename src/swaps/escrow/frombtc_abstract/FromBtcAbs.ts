@@ -293,7 +293,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             };
             metadata.request = parsedBody;
 
-            const requestedAmount = {input: !parsedBody.exactOut, amount: parsedBody.amount};
+            const requestedAmount = {input: !parsedBody.exactOut, amount: parsedBody.amount, token: parsedBody.token};
             const request = {
                 chainIdentifier,
                 raw: req,
@@ -304,7 +304,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
             //Check request params
             this.checkSequence(parsedBody.sequence);
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -336,7 +336,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 totalInToken,
                 securityDepositApyPPM,
                 securityDepositBaseMultiplierPPM
-            } = await this.AmountAssertions.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
+            } = await this.AmountAssertions.checkFromBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             if(securityDepositApyPPM!=null) fees.securityDepositApyPPM = securityDepositApyPPM;

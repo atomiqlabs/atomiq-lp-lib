@@ -51,6 +51,8 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
         roundUp?: boolean,
         preFetch?: Promise<bigint>
     ): Promise<bigint> {
+        if(fromAmount===0n) return 0n;
+
         const coin = this.getTokenData(fromToken, tokenChainIdentification);
 
         const price = (preFetch==null ? null : await preFetch) || await this.getPrice(coin);
@@ -74,6 +76,8 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
         roundUp?: boolean,
         preFetch?: Promise<bigint>
     ): Promise<bigint> {
+        if(fromAmount===0n) return 0n;
+
         const coin = this.getTokenData(toToken, tokenChainIdentification);
 
         const price = (preFetch==null ? null : await preFetch) || await this.getPrice(coin);

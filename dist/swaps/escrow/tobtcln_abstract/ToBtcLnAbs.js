@@ -651,9 +651,10 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const { parsedPR, halfConfidence } = await this.checkPaymentRequest(chainIdentifier, parsedBody.pr);
             const requestedAmount = {
                 input: !!parsedBody.exactIn,
-                amount: !!parsedBody.exactIn ? parsedBody.amount : (parsedPR.mtokens + 999n) / 1000n
+                amount: !!parsedBody.exactIn ? parsedBody.amount : (parsedPR.mtokens + 999n) / 1000n,
+                token: useToken
             };
-            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount);
             metadata.times.requestChecked = Date.now();
             //Create abort controller for parallel pre-fetches
             const abortController = (0, Utils_1.getAbortController)(responseStream);
@@ -663,7 +664,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             await this.LightningAssertions.checkPriorPayment(parsedPR.id, abortController.signal);
             metadata.times.priorPaymentChecked = Date.now();
             //Check amounts
-            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amountBD) => {
+            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amountBD) => {
                 //Check if we have enough liquidity to process the swap
                 await this.LightningAssertions.checkLiquidity(amountBD, abortController.signal, true);
                 metadata.times.liquidityChecked = Date.now();
@@ -671,7 +672,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     await this.swapPricing.getToBtcSwapAmount(parsedBody.maxFee, useToken, chainIdentifier, null, pricePrefetchPromise) :
                     parsedBody.maxFee;
                 return await this.checkAndGetNetworkFee(amountBD, maxFee, parsedBody.expiryTimestamp, currentTimestamp, parsedBody.pr, metadata, abortController.signal);
-            }, abortController.signal, pricePrefetchPromise);
+            }, abortController.signal);
             metadata.times.priceCalculated = Date.now();
             //For exactIn swap, just save and wait for the actual invoice to be submitted
             if (parsedBody.exactIn) {

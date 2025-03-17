@@ -1,10 +1,11 @@
-import { BitcoinRpc } from "@atomiqlabs/base";
+import { BitcoinRpc, SpvWithdrawalTransactionData } from "@atomiqlabs/base";
 import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { Command } from "@atomiqlabs/server-base";
 import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
 import { ILightningWallet } from "../wallets/ILightningWallet";
+import { SpvVault } from "../swaps/spv_vault_swap/SpvVault";
 export type QuoteThrow = {
     type: "throw";
     message: string;
@@ -74,27 +75,40 @@ export interface IPlugin {
     onHandlePreFromBtcQuote?(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
         baseFeeInBtc: bigint;
         feePPM: bigint;
+    }, gasTokenAmount?: {
+        input: false;
+        amount: bigint;
+        token: string;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostFromBtcQuote?(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+        pricePrefetch?: Promise<bigint>;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
         baseFeeInBtc: bigint;
         feePPM: bigint;
-    }, pricePrefetchPromise?: Promise<bigint> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
+    }, gasTokenAmount?: {
+        input: false;
+        amount: bigint;
+        token: string;
+        pricePrefetch?: Promise<bigint>;
+    }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
     onHandlePreToBtcQuote?(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
@@ -104,14 +118,23 @@ export interface IPlugin {
     onHandlePostToBtcQuote?(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+        pricePrefetch?: Promise<bigint>;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
         baseFeeInBtc: bigint;
         feePPM: bigint;
         networkFeeGetter: (amount: bigint) => Promise<bigint>;
-    }, pricePrefetchPromise?: Promise<bigint> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
+    }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
+    onVaultSelection?(chainIdentifier: string, requestedAmount: {
+        amount: bigint;
+        token: string;
+    }, gasAmount: {
+        amount: bigint;
+        token: string;
+    }, candidates: SpvVault<SpvWithdrawalTransactionData>[]): Promise<SpvVault<SpvWithdrawalTransactionData> | null>;
     /**
      * Returns whitelisted bitcoin txIds that are OK to spend even with 0-confs
      */

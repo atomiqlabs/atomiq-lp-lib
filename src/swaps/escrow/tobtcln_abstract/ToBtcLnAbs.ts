@@ -838,9 +838,10 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             const {parsedPR, halfConfidence} = await this.checkPaymentRequest(chainIdentifier, parsedBody.pr);
             const requestedAmount = {
                 input: !!parsedBody.exactIn,
-                amount: !!parsedBody.exactIn ? parsedBody.amount : (parsedPR.mtokens + 999n) / 1000n
+                amount: !!parsedBody.exactIn ? parsedBody.amount : (parsedPR.mtokens + 999n) / 1000n,
+                token: useToken
             };
-            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abort controller for parallel pre-fetches
@@ -861,7 +862,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 swapFee,
                 swapFeeInToken,
                 networkFeeInToken
-            } = await this.AmountAssertions.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amountBD: bigint) => {
+            } = await this.AmountAssertions.checkToBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, async (amountBD: bigint) => {
                 //Check if we have enough liquidity to process the swap
                 await this.LightningAssertions.checkLiquidity(amountBD, abortController.signal, true);
                 metadata.times.liquidityChecked = Date.now();
@@ -871,7 +872,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                     parsedBody.maxFee;
 
                 return await this.checkAndGetNetworkFee(amountBD, maxFee, parsedBody.expiryTimestamp, currentTimestamp, parsedBody.pr, metadata, abortController.signal);
-            }, abortController.signal, pricePrefetchPromise);
+            }, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             //For exactIn swap, just save and wait for the actual invoice to be submitted

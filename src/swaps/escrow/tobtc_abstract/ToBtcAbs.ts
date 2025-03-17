@@ -632,7 +632,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             };
             metadata.request = parsedBody;
 
-            const requestedAmount = {input: !!parsedBody.exactIn, amount: parsedBody.amount};
+            const requestedAmount = {input: !!parsedBody.exactIn, amount: parsedBody.amount, token: parsedBody.token};
             const request = {
                 chainIdentifier,
                 raw: req,
@@ -648,7 +648,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             this.checkRequiredConfirmations(parsedBody.confirmations);
             this.checkAddress(parsedBody.address);
             await this.checkVaultInitialized(chainIdentifier, parsedBody.token);
-            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount);
 
             metadata.times.requestChecked = Date.now();
 
@@ -664,13 +664,13 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 swapFee,
                 swapFeeInToken,
                 networkFeeInToken
-            } = await this.AmountAssertions.checkToBtcAmount(request, requestedAmount, fees, useToken, async (amount: bigint) => {
+            } = await this.AmountAssertions.checkToBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, async (amount: bigint) => {
                 metadata.times.amountsChecked = Date.now();
                 const resp = await this.checkAndGetNetworkFee(parsedBody.address, amount);
                 this.logger.debug("checkToBtcAmount(): network fee calculated, amount: "+amountBD.toString(10)+" fee: "+resp.networkFee.toString(10));
                 metadata.times.chainFeeCalculated = Date.now();
                 return resp;
-            }, abortController.signal, pricePrefetchPromise);
+            }, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             const paymentHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.confirmations, parsedBody.nonce, amountBD).toString("hex");
