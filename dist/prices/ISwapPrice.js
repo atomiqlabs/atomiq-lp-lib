@@ -29,6 +29,8 @@ class ISwapPrice {
      * @param preFetch Price pre-fetch promise returned from preFetchPrice()
      */
     async getToBtcSwapAmount(fromAmount, fromToken, tokenChainIdentification, roundUp, preFetch) {
+        if (fromAmount === 0n)
+            return 0n;
         const coin = this.getTokenData(fromToken, tokenChainIdentification);
         const price = (preFetch == null ? null : await preFetch) || await this.getPrice(coin);
         return ((fromAmount * price / (10n ** BigInt(coin.decimals))) + (roundUp ? 999999n : 0n)) / 1000000n;
@@ -43,6 +45,8 @@ class ISwapPrice {
      * @param preFetch Price pre-fetch promise returned from preFetchPrice()
      */
     async getFromBtcSwapAmount(fromAmount, toToken, tokenChainIdentification, roundUp, preFetch) {
+        if (fromAmount === 0n)
+            return 0n;
         const coin = this.getTokenData(toToken, tokenChainIdentification);
         const price = (preFetch == null ? null : await preFetch) || await this.getPrice(coin);
         return ((fromAmount * (10n ** BigInt(coin.decimals)) * 1000000n) + (roundUp ? price - 1n : 0n)) / price;

@@ -1,13 +1,12 @@
-import { FromBtcBaseConfig } from "../../escrow/FromBtcBaseSwapHandler";
 import { FromBtcTrustedSwap, FromBtcTrustedSwapState } from "./FromBtcTrustedSwap";
 import { BitcoinRpc, BtcBlock, BtcTx } from "@atomiqlabs/base";
 import { Express } from "express";
-import { MultichainData, SwapHandler, SwapHandlerType } from "../../SwapHandler";
+import { MultichainData, SwapBaseConfig, SwapHandler, SwapHandlerType } from "../../SwapHandler";
 import { IIntermediaryStorage } from "../../../storage/IIntermediaryStorage";
 import { ISwapPrice } from "../../../prices/ISwapPrice";
 import { IBitcoinWallet } from "../../../wallets/IBitcoinWallet";
 import { FromBtcAmountAssertions } from "../../assertions/FromBtcAmountAssertions";
-export type FromBtcTrustedConfig = FromBtcBaseConfig & {
+export type FromBtcTrustedConfig = SwapBaseConfig & {
     doubleSpendCheckInterval: number;
     swapAddressExpiry: number;
     recommendFeeMultiplier?: number;

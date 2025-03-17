@@ -82,6 +82,12 @@ export function deserializeBN(str: string | null): bigint | null {
     return str==null ? null : BigInt(str);
 }
 
+export function bigIntSorter(a: bigint, b: bigint): -1 | 0 | 1 {
+    if(a < b) return -1;
+    if(a > b) return 1;
+    return 0;
+}
+
 /**
  * Creates an abort controller that extends the responseStream's abort signal
  *

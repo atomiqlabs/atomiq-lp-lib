@@ -51,7 +51,7 @@ export abstract class AmountAssertions {
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the response is an error
      */
-    protected handlePluginErrorResponses(res: any): void {
+    handlePluginErrorResponses(res: any): void {
         if(isQuoteThrow(res)) throw {
             code: 29999,
             msg: res.message

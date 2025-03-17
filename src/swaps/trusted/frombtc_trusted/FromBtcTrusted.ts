@@ -1,17 +1,12 @@
-import {FromBtcBaseConfig, FromBtcBaseSwapHandler} from "../../escrow/FromBtcBaseSwapHandler";
 import {FromBtcTrustedSwap, FromBtcTrustedSwapState} from "./FromBtcTrustedSwap";
 import {
     BitcoinRpc,
     BtcBlock,
     BtcTx,
-    BtcVout,
-    ClaimEvent,
-    InitializeEvent,
-    RefundEvent,
-    SwapData
+    BtcVout
 } from "@atomiqlabs/base";
 import {Express, Request, Response} from "express";
-import {MultichainData, SwapHandler, SwapHandlerType} from "../../SwapHandler";
+import {MultichainData, SwapBaseConfig, SwapHandler, SwapHandlerType} from "../../SwapHandler";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
 import {ISwapPrice} from "../../../prices/ISwapPrice";
 import {PluginManager} from "../../../plugins/PluginManager";
@@ -22,7 +17,7 @@ import {FieldTypeEnum, verifySchema} from "../../../utils/paramcoders/SchemaVeri
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {FromBtcAmountAssertions} from "../../assertions/FromBtcAmountAssertions";
 
-export type FromBtcTrustedConfig = FromBtcBaseConfig & {
+export type FromBtcTrustedConfig = SwapBaseConfig & {
     doubleSpendCheckInterval: number,
     swapAddressExpiry: number,
     recommendFeeMultiplier?: number
@@ -436,7 +431,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
 
             const refundAddress = parsedBody.refundAddress==="" ? null : parsedBody.refundAddress;
 
-            const requestedAmount = {input: parsedBody.exactIn, amount: parsedBody.amount};
+            const requestedAmount = {input: parsedBody.exactIn, amount: parsedBody.amount, token: parsedBody.token};
             const request = {
                 chainIdentifier,
                 raw: req,
@@ -446,7 +441,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
             const useToken = parsedBody.token;
 
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -471,7 +466,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                 swapFee,
                 swapFeeInToken,
                 totalInToken
-            } = await this.AmountAssertions.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
+            } = await this.AmountAssertions.checkFromBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             //Make sure we have MORE THAN ENOUGH to honor the swap request

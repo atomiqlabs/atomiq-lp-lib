@@ -1,9 +1,8 @@
 import {Express, Request, Response} from "express";
 import {createHash, randomBytes} from "crypto";
 import {FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState} from "./FromBtcLnTrustedSwap";
-import {FromBtcBaseConfig} from "../../escrow/FromBtcBaseSwapHandler";
 import {ISwapPrice} from "../../../prices/ISwapPrice";
-import {MultichainData, SwapHandler, SwapHandlerType} from "../../SwapHandler";
+import {MultichainData, SwapBaseConfig, SwapHandler, SwapHandlerType} from "../../SwapHandler";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
 import {expressHandlerWrapper, getAbortController, HEX_REGEX} from "../../../utils/Utils";
 import {IParamReader} from "../../../utils/paramcoders/IParamReader";
@@ -19,7 +18,7 @@ import {
 import {FromBtcAmountAssertions} from "../../assertions/FromBtcAmountAssertions";
 import { LightningAssertions } from "../../assertions/LightningAssertions";
 
-export type SwapForGasServerConfig = FromBtcBaseConfig & {
+export type SwapForGasServerConfig = SwapBaseConfig & {
     minCltv: bigint,
 
     invoiceTimeoutSeconds?: number
@@ -398,7 +397,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             };
             metadata.request = parsedBody;
 
-            const requestedAmount = {input: parsedBody.exactIn, amount: parsedBody.amount};
+            const requestedAmount = {input: parsedBody.exactIn, amount: parsedBody.amount, token: parsedBody.token};
             const request = {
                 chainIdentifier,
                 raw: req,
@@ -408,7 +407,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             const useToken = parsedBody.token;
 
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount, useToken);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -434,7 +433,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 swapFee,
                 swapFeeInToken,
                 totalInToken
-            } = await this.AmountAssertions.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
+            } = await this.AmountAssertions.checkFromBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             //Check if we have enough funds to honor the request

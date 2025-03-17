@@ -50,6 +50,9 @@ export type ChainData<T extends ChainType = ChainType> = {
     chainInterface: T["ChainInterface"];
     chainEvents: T["Events"];
     allowedTokens: string[];
+    tokenMultipliers?: {
+        [tokenAddress: string]: bigint;
+    };
     allowedDepositTokens?: string[];
     btcRelay?: T["BtcRelay"];
 };

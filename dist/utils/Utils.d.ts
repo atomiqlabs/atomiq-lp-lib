@@ -20,6 +20,7 @@ export declare function getLogger(prefix: string): LoggerType;
 export declare const HEX_REGEX: RegExp;
 export declare function serializeBN(bn: bigint | null): string | null;
 export declare function deserializeBN(str: string | null): bigint | null;
+export declare function bigIntSorter(a: bigint, b: bigint): -1 | 0 | 1;
 /**
  * Creates an abort controller that extends the responseStream's abort signal
  *

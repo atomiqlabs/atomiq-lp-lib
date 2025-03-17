@@ -14,7 +14,8 @@ export declare class ToBtcAmountAssertions extends AmountAssertions {
     preCheckToBtcAmounts(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, useToken: string): Promise<{
+        token: string;
+    }): Promise<{
         baseFee: bigint;
         feePPM: bigint;
     }>;
@@ -24,10 +25,8 @@ export declare class ToBtcAmountAssertions extends AmountAssertions {
      * @param request
      * @param requestedAmount
      * @param fees
-     * @param useToken
      * @param getNetworkFee
      * @param signal
-     * @param pricePrefetchPromise
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds,
      *  or if we don't have enough funds (getNetworkFee callback throws)
      */
@@ -36,10 +35,12 @@ export declare class ToBtcAmountAssertions extends AmountAssertions {
     }>(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
+        token: string;
+        pricePrefetch?: Promise<bigint>;
     }, fees: {
         baseFee: bigint;
         feePPM: bigint;
-    }, useToken: string, getNetworkFee: (amount: bigint) => Promise<T>, signal: AbortSignal, pricePrefetchPromise?: Promise<bigint>): Promise<{
+    }, getNetworkFee: (amount: bigint) => Promise<T>, signal: AbortSignal): Promise<{
         amountBD: bigint;
         networkFeeData: T;
         swapFee: bigint;
