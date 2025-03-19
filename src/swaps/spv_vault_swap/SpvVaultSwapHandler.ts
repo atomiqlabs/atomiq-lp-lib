@@ -3,7 +3,7 @@ import {Express, Request, Response} from "express";
 import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 import {
     BitcoinRpc,
-    BtcBlock,
+    BtcBlock, BtcTx,
     ChainEvent,
     IStorageManager,
     SpvVaultClaimEvent,
@@ -19,15 +19,16 @@ import {ISwapPrice} from "../../prices/ISwapPrice";
 import {SpvVaultSwap, SpvVaultSwapState} from "./SpvVaultSwap";
 import {ISpvVaultSigner} from "../../wallets/ISpvVaultSigner";
 import {PluginManager} from "../../plugins/PluginManager";
-import {SpvVault, SpvVaultState} from "./SpvVault";
+import {SpvVault} from "./SpvVault";
 import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDecoder";
-import {bigIntSorter, expressHandlerWrapper, getAbortController, HEX_REGEX} from "../../utils/Utils";
+import {expressHandlerWrapper, getAbortController, HEX_REGEX} from "../../utils/Utils";
 import {IParamReader} from "../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEncoder";
 import {FieldTypeEnum} from "../../utils/paramcoders/SchemaVerifier";
 import {FromBtcAmountAssertions} from "../assertions/FromBtcAmountAssertions";
 import {randomBytes} from "crypto";
 import {Transaction} from "@scure/btc-signer";
+import {SpvVaults} from "./SpvVaults";
 
 const VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
@@ -58,11 +59,11 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
     readonly vaultSigner: ISpvVaultSigner;
-    readonly vaultStorage: IStorageManager<SpvVault>;
 
     readonly outstandingQuotes: Map<string, SpvVaultSwap> = new Map();
 
     readonly AmountAssertions: FromBtcAmountAssertions;
+    readonly Vaults: SpvVaults;
 
     config: SpvVaultSwapHandlerConfig;
 
@@ -81,39 +82,12 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
         this.bitcoinRpc = bitcoinRpc;
         this.bitcoin = bitcoin;
         this.vaultSigner = spvVaultSigner;
-        this.vaultStorage = vaultStorage;
         this.config = config;
         this.AmountAssertions = new FromBtcAmountAssertions(config, swapPricing);
+        this.Vaults = new SpvVaults(vaultStorage, bitcoin, spvVaultSigner, bitcoinRpc, this.getChain.bind(this), config);
     }
 
-    protected async processDepositEvent(vault: SpvVault, event: SpvVaultDepositEvent): Promise<void> {
-        vault.update(event);
-        await this.vaultStorage.saveData(vault.getIdentifier(), vault);
-    }
-
-    protected async processOpenEvent(vault: SpvVault, event: SpvVaultOpenEvent): Promise<void> {
-        if(vault.state===SpvVaultState.BTC_CONFIRMED) {
-            vault.state = SpvVaultState.OPENED;
-            vault.update(event);
-            await this.vaultStorage.saveData(vault.getIdentifier(), vault);
-        }
-    }
-
-    protected async processCloseEvent(vault: SpvVault, event: SpvVaultCloseEvent): Promise<void> {
-        if(vault.state===SpvVaultState.OPENED) {
-            vault.state = SpvVaultState.CLOSED;
-            vault.update(event);
-            await this.vaultStorage.saveData(vault.getIdentifier(), vault);
-        }
-    }
-
-    protected async processClaimEvent(vault: SpvVault, swap: SpvVaultSwap | null, event: SpvVaultClaimEvent): Promise<void> {
-        //Update vault
-        const foundPendingWithdrawal = vault.pendingWithdrawals.findIndex(val => val.btcTx.txid===event.btcTxId);
-        if(foundPendingWithdrawal!==-1) vault.pendingWithdrawals.splice(foundPendingWithdrawal, 1);
-        vault.update(event);
-        await this.vaultStorage.saveData(vault.getIdentifier(), vault);
-
+    protected async processClaimEvent(swap: SpvVaultSwap | null, event: SpvVaultClaimEvent): Promise<void> {
         if(swap==null) return;
         //Update swap
         swap.txIds.claim = event.meta?.txId;
@@ -130,13 +104,13 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
         for(let event of eventData) {
             if(!(event instanceof SpvVaultEvent)) continue;
 
-            const vault = this.vaultStorage.data[chainIdentifier+"_"+event.owner+"_"+event.vaultId.toString(10)];
+            const vault = await this.Vaults.getVault(chainIdentifier, event.owner, event.vaultId);
             if(vault==null) continue;
 
             if(event instanceof SpvVaultOpenEvent) {
-                await this.processOpenEvent(vault, event);
+                await this.Vaults.processOpenEvent(vault, event);
             } else if(event instanceof SpvVaultCloseEvent) {
-                await this.processCloseEvent(vault, event);
+                await this.Vaults.processCloseEvent(vault, event);
             } else if(event instanceof SpvVaultClaimEvent) {
                 const swap = await this.storageManager.getData(event.btcTxId, 0n);
 
@@ -145,9 +119,10 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
                     if(swap.metadata!=null) swap.metadata.times.claimTxReceived = Date.now();
                 }
 
-                await this.processClaimEvent(vault, swap, event);
+                await this.Vaults.processClaimEvent(vault, swap, event);
+                await this.processClaimEvent(swap, event);
             } else if(event instanceof SpvVaultDepositEvent) {
-                await this.processDepositEvent(vault, event);
+                await this.Vaults.processDepositEvent(vault, event);
             }
         }
 
@@ -164,190 +139,62 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
         this.logger.info("SC: Events: subscribed to smartchain events");
     }
 
-    async createVaults(chainId: string, count: number, token: string, confirmations: number = 2, feeRate?: number): Promise<{vaultsCreated: bigint[], btcTxId: string}> {
-        const {signer, chainInterface, tokenMultipliers, spvVaultContract} = this.getChain(chainId);
-
-        //Check vaultId of the latest saved vault
-        let latestVaultId: bigint = -1n;
-        for(let key in this.vaultStorage.data) {
-            const vault = this.vaultStorage.data[key];
-            if(vault.chainId!==chainId) continue;
-            if(vault.data.getOwner()!==signer.getAddress()) continue;
-            if(vault.data.getVaultId() > latestVaultId) latestVaultId = vault.data.getVaultId();
-        }
-
-        latestVaultId++;
-
-        const vaultAddreses: {vaultId: bigint, address: string}[] = [];
-        for(let i=0;i<count;i++) {
-            const vaultId = latestVaultId + BigInt(i);
-            const address = await this.vaultSigner.getAddress(chainId, vaultId);
-            vaultAddreses.push({vaultId, address});
-        }
-
-        //Construct transaction
-        const txResult = await this.bitcoin.getSignedMultiTransaction(vaultAddreses.map(val => {
-            return {address: val.address, amount: VAULT_DUST_AMOUNT}
-        }), feeRate);
-
-        const nativeToken = chainInterface.getNativeCurrencyAddress();
-
-        const vaults = await Promise.all(vaultAddreses.map(async (val, index) => {
-            const vaultData = await spvVaultContract.createVaultData(val.vaultId, txResult.txId+":"+index, confirmations, [
-                {token, multiplier: tokenMultipliers?.[token] ?? 1n},
-                {token: nativeToken, multiplier: tokenMultipliers?.[nativeToken] ?? 1n}
-            ]);
-            return new SpvVault(chainId, vaultData, val.address);
-        }));
-
-        //Save vaults
-        await this.vaultStorage.saveDataArr(vaults.map(val => {
-            return {id: val.getIdentifier(), object: val}
-        }));
-
-        //Send bitcoin tx
-        await this.bitcoin.sendRawTransaction(txResult.raw);
-
-        this.logger.info("createVaults(): Funding "+count+" vaults, bitcoin txId: "+txResult.txId);
-
-        return {
-            vaultsCreated: vaults.map(val => val.data.getVaultId()),
-            btcTxId: txResult.txId
-        };
-    }
-
-    async listVaults(chainId?: string, token?: string) {
-        return Object.keys(this.vaultStorage.data)
-            .map(key => this.vaultStorage.data[key])
-            .filter(val => chainId==null ? true : val.chainId===chainId)
-            .filter(val => token==null ? true : val.data.getTokenData()[0].token===token);
-    }
-
-    async fundVault(vault: SpvVault, tokenAmounts: bigint[]): Promise<string> {
-        if(vault.state!==SpvVaultState.OPENED) throw new Error("Vault not opened!");
-
-        this.logger.info("fundVault(): Depositing tokens to the vault "+vault.data.getVaultId().toString(10)+", amounts: "+tokenAmounts.map(val => val.toString(10)).join(", "));
-
-        const {signer, spvVaultContract} = this.getChain(vault.chainId);
-
-        const txId = await spvVaultContract.deposit(signer, vault.data, tokenAmounts, {waitForConfirmation: true});
-
-        this.logger.info("fundVault(): Tokens deposited to vault "+vault.data.getVaultId().toString(10)+", amounts: "+tokenAmounts.map(val => val.toString(10)).join(", ")+", txId: "+txId);
-
-        return txId;
-    }
-
-    async syncVaults(vaults: SpvVault<SpvWithdrawalTransactionData>[]) {
-
-    }
-
-    async checkVaults() {
-        const vaults = Object.keys(this.vaultStorage.data).map(key => this.vaultStorage.data[key]);
-
-        for(let vault of vaults) {
-            const {signer, spvVaultContract} = this.getChain(vault.chainId);
-            if(vault.data.getOwner()!==signer.getAddress()) continue;
-
-            if(vault.state===SpvVaultState.BTC_INITIATED) {
-                //Check if btc tx confirmed
-                const txId = vault.initialUtxo.split(":")[0];
-                const btcTx = await this.bitcoinRpc.getTransaction(txId);
-                if(btcTx.confirmations >= VAULT_INIT_CONFIRMATIONS) {
-                    //Double-check the state here to prevent race condition
-                    if(vault.state===SpvVaultState.BTC_INITIATED) {
-                        vault.state = SpvVaultState.BTC_CONFIRMED;
-                        await this.vaultStorage.saveData(vault.getIdentifier(), vault);
-                    }
-                    this.logger.info("checkVaults(): Vault ID "+vault.data.getVaultId().toString(10)+" confirmed on bitcoin, opening vault on "+vault.chainId);
-                }
-            }
-
-            if(vault.state===SpvVaultState.BTC_CONFIRMED) {
-                const txId = await spvVaultContract.open(signer, vault.data, {waitForConfirmation: true});
-                this.logger.info("checkVaults(): Vault ID "+vault.data.getVaultId().toString(10)+" opened on "+vault.chainId+" txId: "+txId);
-
-                vault.state = SpvVaultState.OPENED;
-                await this.vaultStorage.saveData(vault.getIdentifier(), vault);
-            }
-        }
-    }
-
-    async startVaultsWatchdog() {
-        let rerun: () => Promise<void>;
-        rerun = async () => {
-            await this.checkVaults().catch( e => console.error(e));
-            setTimeout(rerun, this.config.vaultsCheckInterval);
-        };
-        await rerun();
-    }
-
     async startWatchdog() {
         await super.startWatchdog();
-        await this.startVaultsWatchdog();
+        await this.Vaults.startVaultsWatchdog();
     }
 
     async init(): Promise<void> {
         await this.storageManager.loadData(SpvVaultSwap);
-        const vaults = await this.vaultStorage.loadData(SpvVault);
-        await this.syncVaults(vaults);
+        await this.Vaults.init();
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }
 
-    protected processPastSwaps(): Promise<void> {
-        return Promise.resolve(undefined);
+    protected async processPastSwap(swap: SpvVaultSwap): Promise<void> {
+        if(swap.state===SpvVaultSwapState.SIGNED) {
+            //Check if sent
+            const tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
+            if(tx==null) {
+                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                return;
+            } else if(tx.confirmations===0) {
+                await swap.setState(SpvVaultSwapState.SENT)
+                await this.saveSwapData(swap);
+                return;
+            } else {
+                await swap.setState(SpvVaultSwapState.BTC_CONFIRMED)
+                await this.saveSwapData(swap);
+            }
+        }
+
+        if(swap.state===SpvVaultSwapState.SENT) {
+            //Check if confirmed or double-spent
+            const tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
+            if(tx==null) {
+                await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
+                return;
+            } else if(tx.confirmations > 0) {
+                await swap.setState(SpvVaultSwapState.BTC_CONFIRMED)
+                await this.saveSwapData(swap);
+            }
+        }
     }
 
-    protected async getVault(chainId: string, owner: string, vaultId: bigint) {
-        const vault = this.vaultStorage.data[chainId+"_"+owner+"_"+vaultId.toString(10)];
-        if(vault==null) return null;
-        if(vault.state!==SpvVaultState.OPENED) return null;
-        return vault;
-    }
+    protected async processPastSwaps(): Promise<void> {
+        const swaps = await this.storageManager.query([
+            {
+                key: "state",
+                value: [
+                    SpvVaultSwapState.SIGNED, //Check if sent
+                    SpvVaultSwapState.SENT //Check if confirmed or double-spent
+                ]
+            }
+        ]);
 
-    /**
-     * Returns a ready-to-use vault for a specific request
-     *
-     * @param chainIdentifier
-     * @param token
-     * @param amount
-     * @param gasToken
-     * @param gasTokenAmount
-     * @protected
-     */
-    protected async findVaultForSwap(chainIdentifier: string, token: string, amount: bigint, gasToken: string, gasTokenAmount: bigint): Promise<SpvVault<SpvWithdrawalTransactionData> | null> {
-        const {signer} = this.getChain(chainIdentifier);
-
-        const candidates = Object.keys(this.vaultStorage.data)
-            .map(key => this.vaultStorage.data[key])
-            .filter(vault =>
-                vault.chainId===chainIdentifier && vault.data.getOwner()===signer.getAddress() && vault.isReady()
-            )
-            .filter(vault => {
-                const token0 = vault.balances[0];
-                if(token0.token!==token || token0.scaledAmount < amount) return false;
-                if(gasToken!=null && gasTokenAmount!==0n) {
-                    const token1 = vault.balances[1];
-                    if(token1.token!==gasToken || token1.scaledAmount < gasTokenAmount) return false;
-                }
-                return true;
-            });
-
-        candidates.sort((a, b) => bigIntSorter(a.balances[0].scaledAmount, b.balances[0].scaledAmount));
-
-        const pluginResponse = await PluginManager.onVaultSelection(
-            chainIdentifier, {token, amount}, {token: gasToken, amount: gasTokenAmount}, candidates
-        );
-        this.AmountAssertions.handlePluginErrorResponses(pluginResponse);
-
-        const result = pluginResponse as SpvVault<SpvWithdrawalTransactionData> ?? candidates[0];
-
-        if(result==null) throw {
-            code: 20301,
-            msg: "No suitable swap vault found, try again later!"
-        };
-
-        return result;
+        for(let {obj: swap} of swaps) {
+            await this.processPastSwap(swap);
+        }
     }
 
     protected getPricePrefetches(chainIdentifier: string, token: string, gasToken: string, abortController: AbortController) {
@@ -456,7 +303,7 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
             metadata.times.priceCalculated = Date.now();
 
             //Check if we have enough funds to honor the request
-            const vault = await this.findVaultForSwap(chainIdentifier, useToken, totalInToken, gasToken, totalInGasToken);
+            const vault = await this.Vaults.findVaultForSwap(chainIdentifier, useToken, totalInToken, gasToken, totalInGasToken);
             metadata.times.vaultPicked = Date.now();
 
             //Create swap receive bitcoin address
@@ -559,7 +406,7 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
             };
             this.outstandingQuotes.delete(parsedBody.quoteId);
 
-            const vault = await this.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
+            const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             if(vault==null || !vault.isReady()) {
                 throw {
                     code: 20506,
@@ -637,7 +484,7 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
                 };
             }
             vault.addWithdrawal(data);
-            await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+            await this.Vaults.saveVault(vault);
 
             swap.btcTxId = signedTx.id;
             swap.state = SpvVaultSwapState.SIGNED;
@@ -652,7 +499,7 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
             } catch (e) {
                 this.swapLogger.error(swap, "REST: /postQuote: Failed to send BTC transaction: ", e);
                 vault.removeWithdrawal(data);
-                await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+                await this.Vaults.saveVault(vault);
                 await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
                 throw {
                     code: 20512,

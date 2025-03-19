@@ -42,7 +42,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
             gasAmount
         );
         if(res!=null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions.handlePluginErrorResponses(res);
             if(isQuoteSetFees(res)) {
                 return {
                     baseFee: res.baseFee || this.config.baseFee,
@@ -108,7 +108,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         );
         signal.throwIfAborted();
         if(res!=null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions.handlePluginErrorResponses(res);
             if(isQuoteSetFees(res)) {
                 if(res.baseFee!=null) fees.baseFee = res.baseFee;
                 if(res.feePPM!=null) fees.feePPM = res.feePPM;

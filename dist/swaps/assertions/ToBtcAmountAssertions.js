@@ -16,7 +16,7 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
     async preCheckToBtcAmounts(request, requestedAmount) {
         const res = await PluginManager_1.PluginManager.onHandlePreToBtcQuote(request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM });
         if (res != null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
                 return {
                     baseFee: res.baseFee || this.config.baseFee,
@@ -48,7 +48,7 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
         const res = await PluginManager_1.PluginManager.onHandlePostToBtcQuote(request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM, networkFeeGetter: getNetworkFee });
         signal.throwIfAborted();
         if (res != null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
                 if (res.baseFee != null)
                     fees.baseFee = res.baseFee;
