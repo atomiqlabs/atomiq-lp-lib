@@ -3,7 +3,7 @@ import {Express, Request, Response} from "express";
 import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 import {
     BitcoinRpc,
-    BtcBlock, BtcTx,
+    BtcBlock,
     ChainEvent,
     IStorageManager,
     SpvVaultClaimEvent,
@@ -28,10 +28,7 @@ import {FieldTypeEnum} from "../../utils/paramcoders/SchemaVerifier";
 import {FromBtcAmountAssertions} from "../assertions/FromBtcAmountAssertions";
 import {randomBytes} from "crypto";
 import {Transaction} from "@scure/btc-signer";
-import {SpvVaults} from "./SpvVaults";
-
-const VAULT_DUST_AMOUNT = 600;
-const VAULT_INIT_CONFIRMATIONS = 2;
+import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
@@ -431,7 +428,7 @@ class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
 
             let data: SpvWithdrawalTransactionData;
             try {
-                data = await spvVaultContract.getWithdrawalDataFromTx(await this.bitcoin.parsePsbt(transaction));
+                data = await spvVaultContract.getWithdrawalData(await this.bitcoin.parsePsbt(transaction));
             } catch (e) {
                 this.swapLogger.error(swap, "REST: /postQuote: failed to parse PSBT to withdrawal tx data: ", e);
                 throw {

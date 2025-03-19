@@ -11,8 +11,6 @@ const FromBtcAmountAssertions_1 = require("../assertions/FromBtcAmountAssertions
 const crypto_1 = require("crypto");
 const btc_signer_1 = require("@scure/btc-signer");
 const SpvVaults_1 = require("./SpvVaults");
-const VAULT_DUST_AMOUNT = 600;
-const VAULT_INIT_CONFIRMATIONS = 2;
 class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config) {
         super(storageDirectory, path, chainsData, swapPricing);
@@ -304,7 +302,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const { spvVaultContract } = this.getChain(swap.chainIdentifier);
             let data;
             try {
-                data = await spvVaultContract.getWithdrawalDataFromTx(await this.bitcoin.parsePsbt(transaction));
+                data = await spvVaultContract.getWithdrawalData(await this.bitcoin.parsePsbt(transaction));
             }
             catch (e) {
                 this.swapLogger.error(swap, "REST: /postQuote: failed to parse PSBT to withdrawal tx data: ", e);
@@ -320,7 +318,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 data.rawAmounts[0] !== swap.rawAmountToken ||
                 data.rawAmounts[1] !== swap.rawAmountGasToken ||
                 data.getSpentVaultUtxo() !== swap.vaultUtxo ||
-                data.btcTx.outs[0].value !== VAULT_DUST_AMOUNT ||
+                data.btcTx.outs[0].value !== SpvVaults_1.VAULT_DUST_AMOUNT ||
                 !Buffer.from(data.btcTx.outs[0].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.vaultAddress)) ||
                 BigInt(data.btcTx.outs[1].value) !== swap.amountBtc ||
                 !Buffer.from(data.btcTx.outs[1].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.btcAddress))) {

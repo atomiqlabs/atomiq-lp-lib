@@ -1,11 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SpvVaults = void 0;
+exports.SpvVaults = exports.VAULT_DUST_AMOUNT = void 0;
 const SpvVault_1 = require("./SpvVault");
 const Utils_1 = require("../../utils/Utils");
 const PluginManager_1 = require("../../plugins/PluginManager");
 const AmountAssertions_1 = require("../assertions/AmountAssertions");
-const VAULT_DUST_AMOUNT = 600;
+exports.VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
 const BTC_FINALIZATION_CONFIRMATIONS = 6;
 class SpvVaults {
@@ -51,13 +51,14 @@ class SpvVaults {
     }
     async createVaults(chainId, count, token, confirmations = 2, feeRate) {
         const { signer, chainInterface, tokenMultipliers, spvVaultContract } = this.getChain(chainId);
+        const signerAddress = signer.getAddress();
         //Check vaultId of the latest saved vault
         let latestVaultId = -1n;
         for (let key in this.vaultStorage.data) {
             const vault = this.vaultStorage.data[key];
             if (vault.chainId !== chainId)
                 continue;
-            if (vault.data.getOwner() !== signer.getAddress())
+            if (vault.data.getOwner() !== signerAddress)
                 continue;
             if (vault.data.getVaultId() > latestVaultId)
                 latestVaultId = vault.data.getVaultId();
@@ -71,11 +72,11 @@ class SpvVaults {
         }
         //Construct transaction
         const txResult = await this.bitcoin.getSignedMultiTransaction(vaultAddreses.map(val => {
-            return { address: val.address, amount: VAULT_DUST_AMOUNT };
+            return { address: val.address, amount: exports.VAULT_DUST_AMOUNT };
         }), feeRate);
         const nativeToken = chainInterface.getNativeCurrencyAddress();
         const vaults = await Promise.all(vaultAddreses.map(async (val, index) => {
-            const vaultData = await spvVaultContract.createVaultData(val.vaultId, txResult.txId + ":" + index, confirmations, [
+            const vaultData = await spvVaultContract.createVaultData(signerAddress, val.vaultId, txResult.txId + ":" + index, confirmations, [
                 { token, multiplier: tokenMultipliers?.[token] ?? 1n },
                 { token: nativeToken, multiplier: tokenMultipliers?.[nativeToken] ?? 1n }
             ]);

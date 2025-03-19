@@ -4,6 +4,7 @@ import { SpvVaultSwap } from "./SpvVaultSwap";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
 import { ISpvVaultSigner } from "../../wallets/ISpvVaultSigner";
 import { ChainData } from "../SwapHandler";
+export declare const VAULT_DUST_AMOUNT = 600;
 export declare class SpvVaults {
     readonly vaultStorage: IStorageManager<SpvVault>;
     readonly bitcoin: IBitcoinWallet;
