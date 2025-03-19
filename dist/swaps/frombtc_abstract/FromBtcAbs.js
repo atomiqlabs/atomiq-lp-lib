@@ -239,8 +239,12 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             abortController.signal.throwIfAborted();
             const baseSDPromise = this.getBaseSecurityDepositPrefetch(chainIdentifier, dummySwapData, depositToken, gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise, abortController);
             //Check valid amount specified (min/max)
-            const { amountBD, swapFee, swapFeeInToken, totalInToken } = await this.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
+            const { amountBD, swapFee, swapFeeInToken, totalInToken, securityDepositApyPPM, securityDepositBaseMultiplierPPM } = await this.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
             metadata.times.priceCalculated = Date.now();
+            if (securityDepositApyPPM != null)
+                fees.securityDepositApyPPM = securityDepositApyPPM;
+            if (securityDepositBaseMultiplierPPM != null)
+                fees.securityDepositBaseMultiplierPPM = securityDepositBaseMultiplierPPM;
             //Check if we have enough funds to honor the request
             await this.checkBalance(totalInToken, balancePrefetch, abortController.signal);
             metadata.times.balanceChecked = Date.now();
@@ -253,7 +257,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const expiryTimeout = this.config.swapTsCsvDelta;
             const expiry = currentTimestamp + expiryTimeout;
             //Calculate security deposit
-            const totalSecurityDeposit = await this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSDPromise, depositToken, depositTokenPricePrefetchPromise, abortController.signal, metadata);
+            const totalSecurityDeposit = await this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSDPromise, depositToken, depositTokenPricePrefetchPromise, fees, abortController.signal, metadata);
             metadata.times.securityDepositCalculated = Date.now();
             //Calculate claimer bounty
             const totalClaimerBounty = await this.getClaimerBounty(req, expiry, abortController.signal);

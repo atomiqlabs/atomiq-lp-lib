@@ -488,8 +488,12 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
             //Asynchronously send the node's public key to the client
             this.sendPublicKeyAsync(responseStream);
             //Check valid amount specified (min/max)
-            const { amountBD, swapFee, swapFeeInToken, totalInToken } = await this.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
+            const { amountBD, swapFee, swapFeeInToken, totalInToken, securityDepositApyPPM, securityDepositBaseMultiplierPPM } = await this.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
             metadata.times.priceCalculated = Date.now();
+            if (securityDepositApyPPM != null)
+                fees.securityDepositApyPPM = securityDepositApyPPM;
+            if (securityDepositBaseMultiplierPPM != null)
+                fees.securityDepositBaseMultiplierPPM = securityDepositBaseMultiplierPPM;
             //Check if we have enough funds to honor the request
             await this.checkBalance(totalInToken, balancePrefetch, abortController.signal);
             await this.checkInboundLiquidity(amountBD, channelsPrefetch, abortController.signal);
@@ -510,7 +514,7 @@ class FromBtcLnAbs extends FromBtcLnBaseSwapHandler_1.FromBtcLnBaseSwapHandler {
             metadata.invoiceResponse = { ...hodlInvoice };
             //Pre-compute the security deposit
             const expiryTimeout = (this.config.minCltv * this.config.bitcoinBlocktime / this.config.safetyFactor) - this.config.gracePeriod;
-            const totalSecurityDeposit = await this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSDPromise, depositToken, depositTokenPricePrefetchPromise, abortController.signal, metadata);
+            const totalSecurityDeposit = await this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSDPromise, depositToken, depositTokenPricePrefetchPromise, fees, abortController.signal, metadata);
             metadata.times.securityDepositCalculated = Date.now();
             const createdSwap = new FromBtcLnSwapAbs_1.FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, parsedBody.paymentHash, hodlInvoice.mtokens, swapFee, swapFeeInToken, parsedBody.address, useToken, totalInToken, swapContract.getHashForHtlc(Buffer.from(parsedBody.paymentHash, "hex")).toString("hex"), totalSecurityDeposit, depositToken);
             metadata.times.swapCreated = Date.now();

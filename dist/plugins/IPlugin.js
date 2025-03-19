@@ -8,7 +8,9 @@ exports.isQuoteThrow = isQuoteThrow;
 function isQuoteSetFees(obj) {
     return obj.type === "fees" &&
         (obj.baseFee == null || typeof (obj.baseFee) === "bigint") &&
-        (obj.feePPM == null || typeof (obj.feePPM) === "bigint");
+        (obj.feePPM == null || typeof (obj.feePPM) === "bigint") &&
+        (obj.securityDepositApyPPM == null || typeof (obj.securityDepositApyPPM) === "bigint") &&
+        (obj.securityDepositBaseMultiplierPPM == null || typeof (obj.securityDepositBaseMultiplierPPM) === "bigint");
 }
 exports.isQuoteSetFees = isQuoteSetFees;
 function isQuoteAmountTooLow(obj) {

@@ -333,9 +333,14 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 amountBD,
                 swapFee,
                 swapFeeInToken,
-                totalInToken
+                totalInToken,
+                securityDepositApyPPM,
+                securityDepositBaseMultiplierPPM
             } = await this.checkFromBtcAmount(request, requestedAmount, fees, useToken, abortController.signal, pricePrefetchPromise);
             metadata.times.priceCalculated = Date.now();
+
+            if(securityDepositApyPPM!=null) fees.securityDepositApyPPM = securityDepositApyPPM;
+            if(securityDepositBaseMultiplierPPM!=null) fees.securityDepositBaseMultiplierPPM = securityDepositBaseMultiplierPPM;
 
             //Check if we have enough funds to honor the request
             await this.checkBalance(totalInToken, balancePrefetch, abortController.signal);
@@ -354,7 +359,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             //Calculate security deposit
             const totalSecurityDeposit = await this.getSecurityDeposit(
                 chainIdentifier, amountBD, swapFee, expiryTimeout,
-                baseSDPromise, depositToken, depositTokenPricePrefetchPromise,
+                baseSDPromise, depositToken, depositTokenPricePrefetchPromise, fees,
                 abortController.signal, metadata
             );
             metadata.times.securityDepositCalculated = Date.now();

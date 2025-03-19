@@ -155,7 +155,9 @@ class FromBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
                 return {
                     baseFee: res.baseFee || this.config.baseFee,
-                    feePPM: res.feePPM || this.config.feePPM
+                    feePPM: res.feePPM || this.config.feePPM,
+                    securityDepositApyPPM: res.securityDepositApyPPM,
+                    securityDepositBaseMultiplierPPM: res.securityDepositBaseMultiplierPPM
                 };
             }
         }
@@ -179,6 +181,8 @@ class FromBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
      */
     async checkFromBtcAmount(request, requestedAmount, fees, useToken, signal, pricePrefetchPromise = Promise.resolve(null)) {
         const chainIdentifier = request.chainIdentifier;
+        let securityDepositApyPPM;
+        let securityDepositBaseMultiplierPPM;
         const res = await PluginManager_1.PluginManager.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, useToken, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM }, pricePrefetchPromise);
         signal.throwIfAborted();
         if (res != null) {
@@ -188,6 +192,10 @@ class FromBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
                     fees.baseFee = res.baseFee;
                 if (res.feePPM != null)
                     fees.feePPM = res.feePPM;
+                if (res.securityDepositApyPPM != null)
+                    securityDepositApyPPM = res.securityDepositApyPPM;
+                if (res.securityDepositBaseMultiplierPPM != null)
+                    securityDepositBaseMultiplierPPM = res.securityDepositBaseMultiplierPPM;
             }
             if ((0, IPlugin_1.isPluginQuote)(res)) {
                 if (!requestedAmount.input) {
@@ -251,7 +259,9 @@ class FromBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
             amountBD,
             swapFee,
             swapFeeInToken,
-            totalInToken
+            totalInToken,
+            securityDepositApyPPM,
+            securityDepositBaseMultiplierPPM
         };
     }
     /**
@@ -292,16 +302,19 @@ class FromBtcBaseSwapHandler extends SwapHandler_1.SwapHandler {
      * @param baseSecurityDepositPromise
      * @param depositToken
      * @param depositTokenPricePrefetchPromise
+     * @param securityDepositData
      * @param signal
      * @param metadata
      */
-    async getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSecurityDepositPromise, depositToken, depositTokenPricePrefetchPromise, signal, metadata) {
+    async getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSecurityDepositPromise, depositToken, depositTokenPricePrefetchPromise, securityDepositData, signal, metadata) {
         let baseSD = await baseSecurityDepositPromise;
+        if (securityDepositData.securityDepositBaseMultiplierPPM != null)
+            baseSD = baseSD * securityDepositData.securityDepositBaseMultiplierPPM / 1000000n;
         signal.throwIfAborted();
         metadata.times.refundFeeFetched = Date.now();
         const swapValueInDepositToken = await this.swapPricing.getFromBtcSwapAmount(amountBD - swapFee, depositToken, chainIdentifier, true, depositTokenPricePrefetchPromise);
         signal.throwIfAborted();
-        const apyPPM = BigInt(Math.floor(this.config.securityDepositAPY * 1000000));
+        const apyPPM = securityDepositData.securityDepositApyPPM ?? BigInt(Math.floor(this.config.securityDepositAPY * 1000000));
         const variableSD = swapValueInDepositToken * apyPPM * expiryTimeout / 1000000n / secondsInYear;
         this.logger.debug("getSecurityDeposit(): base security deposit: " + baseSD.toString(10) +
             " deposit token: " + depositToken +

@@ -14,6 +14,8 @@ export type QuoteSetFees = {
     type: "fees";
     baseFee?: bigint;
     feePPM?: bigint;
+    securityDepositApyPPM?: bigint;
+    securityDepositBaseMultiplierPPM?: bigint;
 };
 export declare function isQuoteSetFees(obj: any): obj is QuoteSetFees;
 export type QuoteAmountTooLow = {

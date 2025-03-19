@@ -25,13 +25,17 @@ export function isQuoteThrow(obj: any): obj is QuoteThrow {
 export type QuoteSetFees = {
     type: "fees"
     baseFee?: bigint,
-    feePPM?: bigint
+    feePPM?: bigint,
+    securityDepositApyPPM?: bigint,
+    securityDepositBaseMultiplierPPM?: bigint
 };
 
 export function isQuoteSetFees(obj: any): obj is QuoteSetFees {
     return obj.type==="fees" &&
         (obj.baseFee==null || typeof(obj.baseFee) === "bigint") &&
-        (obj.feePPM==null || typeof(obj.feePPM) === "bigint");
+        (obj.feePPM==null || typeof(obj.feePPM) === "bigint") &&
+        (obj.securityDepositApyPPM==null || typeof(obj.securityDepositApyPPM) === "bigint") &&
+        (obj.securityDepositBaseMultiplierPPM==null || typeof(obj.securityDepositBaseMultiplierPPM) === "bigint");
 }
 
 export type QuoteAmountTooLow = {

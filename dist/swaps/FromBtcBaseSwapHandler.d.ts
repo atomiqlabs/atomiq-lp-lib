@@ -74,6 +74,8 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
     }, useToken: string): Promise<{
         baseFee: bigint;
         feePPM: bigint;
+        securityDepositApyPPM?: bigint;
+        securityDepositBaseMultiplierPPM?: bigint;
     }>;
     /**
      * Checks minimums/maximums, calculates the fee & total amount
@@ -97,6 +99,8 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
         swapFee: bigint;
         swapFeeInToken: bigint;
         totalInToken: bigint;
+        securityDepositApyPPM?: bigint;
+        securityDepositBaseMultiplierPPM?: bigint;
     }>;
     /**
      * Signs the created swap
@@ -125,8 +129,12 @@ export declare abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<S
      * @param baseSecurityDepositPromise
      * @param depositToken
      * @param depositTokenPricePrefetchPromise
+     * @param securityDepositData
      * @param signal
      * @param metadata
      */
-    protected getSecurityDeposit(chainIdentifier: string, amountBD: bigint, swapFee: bigint, expiryTimeout: bigint, baseSecurityDepositPromise: Promise<bigint>, depositToken: string, depositTokenPricePrefetchPromise: Promise<bigint>, signal: AbortSignal, metadata: any): Promise<bigint>;
+    protected getSecurityDeposit(chainIdentifier: string, amountBD: bigint, swapFee: bigint, expiryTimeout: bigint, baseSecurityDepositPromise: Promise<bigint>, depositToken: string, depositTokenPricePrefetchPromise: Promise<bigint>, securityDepositData: {
+        securityDepositApyPPM?: bigint;
+        securityDepositBaseMultiplierPPM?: bigint;
+    }, signal: AbortSignal, metadata: any): Promise<bigint>;
 }

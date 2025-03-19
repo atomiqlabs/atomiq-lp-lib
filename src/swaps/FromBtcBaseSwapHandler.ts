@@ -174,7 +174,12 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
         request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
         requestedAmount: {input: boolean, amount: bigint},
         useToken: string
-    ): Promise<{baseFee: bigint, feePPM: bigint}> {
+    ): Promise<{
+        baseFee: bigint,
+        feePPM: bigint,
+        securityDepositApyPPM?: bigint,
+        securityDepositBaseMultiplierPPM?: bigint,
+    }> {
         const res = await PluginManager.onHandlePreFromBtcQuote(
             request,
             requestedAmount,
@@ -188,7 +193,9 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             if(isQuoteSetFees(res)) {
                 return {
                     baseFee: res.baseFee || this.config.baseFee,
-                    feePPM: res.feePPM || this.config.feePPM
+                    feePPM: res.feePPM || this.config.feePPM,
+                    securityDepositApyPPM: res.securityDepositApyPPM,
+                    securityDepositBaseMultiplierPPM: res.securityDepositBaseMultiplierPPM
                 }
             }
         }
@@ -221,9 +228,14 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
         amountBD: bigint,
         swapFee: bigint, //Swap fee in BTC
         swapFeeInToken: bigint, //Swap fee in token on top of what should be paid out to the user
-        totalInToken: bigint //Total to be paid out to the user
+        totalInToken: bigint, //Total to be paid out to the user
+        securityDepositApyPPM?: bigint,
+        securityDepositBaseMultiplierPPM?: bigint
     }> {
         const chainIdentifier = request.chainIdentifier;
+
+        let securityDepositApyPPM: bigint;
+        let securityDepositBaseMultiplierPPM: bigint;
 
         const res = await PluginManager.onHandlePostFromBtcQuote(
             request,
@@ -240,6 +252,8 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             if(isQuoteSetFees(res)) {
                 if(res.baseFee!=null) fees.baseFee = res.baseFee;
                 if(res.feePPM!=null) fees.feePPM = res.feePPM;
+                if(res.securityDepositApyPPM!=null) securityDepositApyPPM = res.securityDepositApyPPM;
+                if(res.securityDepositBaseMultiplierPPM!=null) securityDepositBaseMultiplierPPM = res.securityDepositBaseMultiplierPPM;
             }
             if(isPluginQuote(res)) {
                 if(!requestedAmount.input) {
@@ -310,7 +324,9 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
             amountBD,
             swapFee,
             swapFeeInToken,
-            totalInToken
+            totalInToken,
+            securityDepositApyPPM,
+            securityDepositBaseMultiplierPPM
         }
     }
 
@@ -373,6 +389,7 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
      * @param baseSecurityDepositPromise
      * @param depositToken
      * @param depositTokenPricePrefetchPromise
+     * @param securityDepositData
      * @param signal
      * @param metadata
      */
@@ -384,10 +401,16 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
         baseSecurityDepositPromise: Promise<bigint>,
         depositToken: string,
         depositTokenPricePrefetchPromise: Promise<bigint>,
+        securityDepositData: {
+            securityDepositApyPPM?: bigint,
+            securityDepositBaseMultiplierPPM?: bigint,
+        },
         signal: AbortSignal,
         metadata: any
     ): Promise<bigint> {
         let baseSD: bigint = await baseSecurityDepositPromise;
+        if(securityDepositData.securityDepositBaseMultiplierPPM!=null)
+            baseSD = baseSD * securityDepositData.securityDepositBaseMultiplierPPM / 1_000_000n;
 
         signal.throwIfAborted();
 
@@ -403,7 +426,7 @@ export abstract class FromBtcBaseSwapHandler<V extends SwapHandlerSwap<SwapData,
 
         signal.throwIfAborted();
 
-        const apyPPM = BigInt(Math.floor(this.config.securityDepositAPY*1000000));
+        const apyPPM = securityDepositData.securityDepositApyPPM ?? BigInt(Math.floor(this.config.securityDepositAPY*1000000));
         const variableSD = swapValueInDepositToken * apyPPM * expiryTimeout / 1000000n / secondsInYear;
 
         this.logger.debug(
