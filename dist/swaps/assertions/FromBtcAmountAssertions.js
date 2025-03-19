@@ -20,7 +20,7 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
     async preCheckFromBtcAmounts(request, requestedAmount, gasAmount) {
         const res = await PluginManager_1.PluginManager.onHandlePreFromBtcQuote(request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM }, gasAmount);
         if (res != null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
                 return {
                     baseFee: res.baseFee || this.config.baseFee,
@@ -65,7 +65,7 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
         const res = await PluginManager_1.PluginManager.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM }, gasTokenAmount);
         signal.throwIfAborted();
         if (res != null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
                 if (res.baseFee != null)
                     fees.baseFee = res.baseFee;

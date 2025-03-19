@@ -43,7 +43,7 @@ class AmountAssertions {
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the response is an error
      */
-    handlePluginErrorResponses(res) {
+    static handlePluginErrorResponses(res) {
         if ((0, IPlugin_1.isQuoteThrow)(res))
             throw {
                 code: 29999,

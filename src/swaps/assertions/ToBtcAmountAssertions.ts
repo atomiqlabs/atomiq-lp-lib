@@ -28,7 +28,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
             {baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM},
         );
         if(res!=null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions.handlePluginErrorResponses(res);
             if(isQuoteSetFees(res)) {
                 return {
                     baseFee: res.baseFee || this.config.baseFee,
@@ -82,7 +82,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
         );
         signal.throwIfAborted();
         if(res!=null) {
-            this.handlePluginErrorResponses(res);
+            AmountAssertions.handlePluginErrorResponses(res);
             if(isQuoteSetFees(res)) {
                 if(res.baseFee!=null) fees.baseFee = res.baseFee;
                 if(res.feePPM!=null) fees.feePPM = res.feePPM;
