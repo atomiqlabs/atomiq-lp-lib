@@ -15,7 +15,7 @@ import {ISpvVaultSigner} from "../../wallets/ISpvVaultSigner";
 import {AmountAssertions} from "../assertions/AmountAssertions";
 import {ChainData} from "../SwapHandler";
 
-const VAULT_DUST_AMOUNT = 600;
+export const VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
 const BTC_FINALIZATION_CONFIRMATIONS = 6;
 
@@ -84,12 +84,14 @@ export class SpvVaults {
     async createVaults(chainId: string, count: number, token: string, confirmations: number = 2, feeRate?: number): Promise<{vaultsCreated: bigint[], btcTxId: string}> {
         const {signer, chainInterface, tokenMultipliers, spvVaultContract} = this.getChain(chainId);
 
+        const signerAddress = signer.getAddress();
+
         //Check vaultId of the latest saved vault
         let latestVaultId: bigint = -1n;
         for(let key in this.vaultStorage.data) {
             const vault = this.vaultStorage.data[key];
             if(vault.chainId!==chainId) continue;
-            if(vault.data.getOwner()!==signer.getAddress()) continue;
+            if(vault.data.getOwner()!==signerAddress) continue;
             if(vault.data.getVaultId() > latestVaultId) latestVaultId = vault.data.getVaultId();
         }
 
@@ -110,7 +112,7 @@ export class SpvVaults {
         const nativeToken = chainInterface.getNativeCurrencyAddress();
 
         const vaults = await Promise.all(vaultAddreses.map(async (val, index) => {
-            const vaultData = await spvVaultContract.createVaultData(val.vaultId, txResult.txId+":"+index, confirmations, [
+            const vaultData = await spvVaultContract.createVaultData(signerAddress, val.vaultId, txResult.txId+":"+index, confirmations, [
                 {token, multiplier: tokenMultipliers?.[token] ?? 1n},
                 {token: nativeToken, multiplier: tokenMultipliers?.[nativeToken] ?? 1n}
             ]);
