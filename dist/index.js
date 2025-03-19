@@ -49,3 +49,4 @@ __exportStar(require("./utils/paramcoders/server/ServerParamDecoder"), exports);
 __exportStar(require("./utils/paramcoders/server/ServerParamEncoder"), exports);
 __exportStar(require("./wallets/IBitcoinWallet"), exports);
 __exportStar(require("./wallets/ILightningWallet"), exports);
+__exportStar(require("./wallets/ISpvVaultSigner"), exports);

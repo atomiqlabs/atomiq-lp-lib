@@ -33,3 +33,4 @@ export * from "./utils/paramcoders/server/ServerParamDecoder";
 export * from "./utils/paramcoders/server/ServerParamEncoder";
 export * from "./wallets/IBitcoinWallet";
 export * from "./wallets/ILightningWallet";
+export * from "./wallets/ISpvVaultSigner";
