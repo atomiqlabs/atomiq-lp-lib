@@ -89,6 +89,8 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
         }
     }
 
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
+    protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
     protected async removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: bigint | S) {
         let swap: V;
         if(typeof(hashOrSwap)==="string") {

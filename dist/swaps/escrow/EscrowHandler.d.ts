@@ -31,7 +31,8 @@ export declare abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData
      */
     protected subscribeToEvents(): void;
     protected loadData(ctor: new (data: any) => V): Promise<void>;
-    protected removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: bigint | S): Promise<void>;
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
+    protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
     protected saveSwapData(swap: V): Promise<void>;
     protected saveSwapToEscrowHashMap(swap: V): void;
     protected removeSwapFromEscrowHashMap(swap: V): void;
