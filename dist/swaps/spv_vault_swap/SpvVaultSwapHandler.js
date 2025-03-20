@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.SpvVaultSwapHandler = void 0;
 const SwapHandler_1 = require("../SwapHandler");
 const base_1 = require("@atomiqlabs/base");
 const SpvVaultSwap_1 = require("./SpvVaultSwap");
@@ -382,3 +383,4 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         return {};
     }
 }
+exports.SpvVaultSwapHandler = SpvVaultSwapHandler;
