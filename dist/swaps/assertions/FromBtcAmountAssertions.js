@@ -33,12 +33,12 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
         if (requestedAmount.input)
             this.checkBtcAmountInBounds(requestedAmount.amount);
         if (gasAmount != null && gasAmount.amount !== 0n) {
-            if (gasAmount.amount > (this.config.gasTokenMax ?? 0n)) {
+            if (gasAmount.amount > (this.config.gasTokenMax?.[request.chainIdentifier] ?? 0n)) {
                 throw {
                     code: 20504,
                     msg: "Gas token amount too high!",
                     data: {
-                        max: this.config.gasTokenMax.toString(10)
+                        max: (this.config.gasTokenMax?.[request.chainIdentifier] ?? 0n).toString(10)
                     }
                 };
             }

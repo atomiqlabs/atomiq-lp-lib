@@ -380,7 +380,16 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         }));
     }
     getInfoData() {
-        return {};
+        const mappedDict = {};
+        for (let chainId in this.config.gasTokenMax) {
+            mappedDict[chainId] = {
+                gasToken: this.getChain(chainId).chainInterface.getNativeCurrencyAddress(),
+                max: this.config.gasTokenMax[chainId].toString(10)
+            };
+        }
+        return {
+            gasTokens: mappedDict
+        };
     }
 }
 exports.SpvVaultSwapHandler = SpvVaultSwapHandler;

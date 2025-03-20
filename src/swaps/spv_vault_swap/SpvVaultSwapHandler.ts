@@ -32,7 +32,7 @@ import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
-    gasTokenMax: bigint
+    gasTokenMax: {[chainId: string]: bigint}
 };
 
 export type SpvVaultSwapRequestType = {
@@ -515,7 +515,16 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
     }
 
     getInfoData(): any {
-        return {};
+        const mappedDict = {};
+        for(let chainId in this.config.gasTokenMax) {
+            mappedDict[chainId] = {
+                gasToken: this.getChain(chainId).chainInterface.getNativeCurrencyAddress(),
+                max: this.config.gasTokenMax[chainId].toString(10)
+            };
+        }
+        return {
+            gasTokens: mappedDict
+        };
     }
 
 }
