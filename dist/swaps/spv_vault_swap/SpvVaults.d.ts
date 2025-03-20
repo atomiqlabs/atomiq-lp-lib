@@ -33,7 +33,9 @@ export declare class SpvVaults {
     }>;
     listVaults(chainId?: string, token?: string): Promise<SpvVault<SpvWithdrawalTransactionData, import("@atomiqlabs/base").SpvVaultData<SpvWithdrawalTransactionData>>[]>;
     fundVault(vault: SpvVault, tokenAmounts: bigint[]): Promise<string>;
+    withdrawFromVault(vault: SpvVault, tokenAmounts: bigint[], feeRate?: number): Promise<string>;
     checkVaults(): Promise<void>;
+    claimWithdrawal(vault: SpvVault, withdrawal: SpvWithdrawalTransactionData): Promise<boolean>;
     getVault(chainId: string, owner: string, vaultId: bigint): Promise<SpvVault<SpvWithdrawalTransactionData, import("@atomiqlabs/base").SpvVaultData<SpvWithdrawalTransactionData>>>;
     /**
      * Returns a ready-to-use vault for a specific request
