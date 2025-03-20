@@ -120,9 +120,15 @@ export class SpvVaults {
         }));
 
         //Save vaults
-        await this.vaultStorage.saveDataArr(vaults.map(val => {
-            return {id: val.getIdentifier(), object: val}
-        }));
+        if(this.vaultStorage.saveDataArr!=null) {
+            await this.vaultStorage.saveDataArr(vaults.map(val => {
+                return {id: val.getIdentifier(), object: val}
+            }));
+        } else {
+            for(let vault of vaults) {
+                await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+            }
+        }
 
         //Send bitcoin tx
         await this.bitcoin.sendRawTransaction(txResult.raw);
