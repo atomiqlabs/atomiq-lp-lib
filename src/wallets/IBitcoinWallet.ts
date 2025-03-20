@@ -52,6 +52,7 @@ export interface IBitcoinWallet {
     getWalletTransaction(txId: string): Promise<BtcTx | null>;
     subscribeToWalletTransactions(callback: (tx: BtcTx) => void, abortSignal?: AbortSignal): void;
 
+    fundPsbt(psbt: Transaction, feeRate?: number): Promise<Transaction>;
     signPsbt(psbt: Transaction): Promise<SignPsbtResponse>;
     sendRawTransaction(tx: string): Promise<void>;
     getSignedTransaction(destination: string, amount: number, feeRate?: number, nonce?: bigint, maxAllowedFeeRate?: number): Promise<SignPsbtResponse>;

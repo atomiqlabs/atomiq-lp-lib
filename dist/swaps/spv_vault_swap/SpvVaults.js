@@ -5,6 +5,7 @@ const SpvVault_1 = require("./SpvVault");
 const Utils_1 = require("../../utils/Utils");
 const PluginManager_1 = require("../../plugins/PluginManager");
 const AmountAssertions_1 = require("../assertions/AmountAssertions");
+const btc_signer_1 = require("@scure/btc-signer");
 exports.VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
 const BTC_FINALIZATION_CONFIRMATIONS = 6;
@@ -116,8 +117,71 @@ class SpvVaults {
         this.logger.info("fundVault(): Tokens deposited to vault " + vault.data.getVaultId().toString(10) + ", amounts: " + tokenAmounts.map(val => val.toString(10)).join(", ") + ", txId: " + txId);
         return txId;
     }
+    async withdrawFromVault(vault, tokenAmounts, feeRate) {
+        tokenAmounts.forEach((rawAmount, index) => {
+            if (vault.balances[index] == null)
+                throw new Error("Token not found in the vault");
+            if (vault.balances[index].rawAmount < rawAmount)
+                throw new Error("Not enough balance in the vault");
+        });
+        if (!vault.isReady())
+            throw new Error("Vault not ready, wait for the latest swap to get at least 1 confirmation!");
+        const { signer, spvVaultContract } = this.getChain(vault.chainId);
+        const latestUtxo = vault.getLatestUtxo();
+        const [txId, voutStr] = latestUtxo.split(":");
+        const opReturnData = spvVaultContract.toOpReturnData(signer.getAddress(), tokenAmounts);
+        let opReturnScript;
+        if (opReturnData.length < 76) {
+            opReturnScript = Buffer.concat([
+                Buffer.from([0x6a, opReturnData.length]),
+                opReturnData
+            ]);
+        }
+        else {
+            opReturnScript = Buffer.concat([
+                Buffer.from([0x6a, 0x4c, opReturnData.length]),
+                opReturnData
+            ]);
+        }
+        let psbt = new btc_signer_1.Transaction();
+        psbt.addInput({
+            txid: txId,
+            index: parseInt(voutStr),
+            witnessUtxo: {
+                amount: BigInt(exports.VAULT_DUST_AMOUNT),
+                script: this.bitcoin.toOutputScript(vault.btcAddress)
+            }
+        });
+        psbt.addOutput({
+            amount: BigInt(exports.VAULT_DUST_AMOUNT),
+            script: this.bitcoin.toOutputScript(vault.btcAddress)
+        });
+        psbt.addOutput({
+            amount: 0n,
+            script: opReturnScript
+        });
+        psbt = await this.bitcoin.fundPsbt(psbt, feeRate);
+        if (psbt.inputsLength < 2)
+            throw new Error("PSBT needs at least 2 inputs!");
+        psbt = await this.vaultSigner.signPsbt(vault.chainId, vault.data.getVaultId(), psbt, [0]);
+        const res = await this.bitcoin.signPsbt(psbt);
+        const parsedTransaction = await this.bitcoinRpc.parseTransaction(res.raw);
+        const withdrawalData = await spvVaultContract.getWithdrawalData(parsedTransaction);
+        vault.addWithdrawal(withdrawalData);
+        await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+        try {
+            await this.bitcoin.sendRawTransaction(res.raw);
+        }
+        catch (e) {
+            vault.removeWithdrawal(withdrawalData);
+            await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+            throw e;
+        }
+        return res.txId;
+    }
     async checkVaults() {
         const vaults = Object.keys(this.vaultStorage.data).map(key => this.vaultStorage.data[key]);
+        const claimWithdrawals = [];
         for (let vault of vaults) {
             const { signer, spvVaultContract } = this.getChain(vault.chainId);
             if (vault.data.getOwner() !== signer.getAddress())
@@ -143,7 +207,9 @@ class SpvVaults {
             }
             if (vault.state === SpvVault_1.SpvVaultState.OPENED) {
                 //Check if some of the pendingWithdrawals got confirmed
-                for (let pendingWithdrawal of vault.pendingWithdrawals) {
+                let latestOwnWithdrawalIndex = -1;
+                for (let i = 0; i < vault.pendingWithdrawals.length; i++) {
+                    const pendingWithdrawal = vault.pendingWithdrawals[i];
                     //Check all the pending withdrawals that were not finalized yet
                     if (pendingWithdrawal.btcTx.confirmations < BTC_FINALIZATION_CONFIRMATIONS) {
                         const btcTx = await this.bitcoinRpc.getTransaction(pendingWithdrawal.btcTx.txid);
@@ -162,8 +228,38 @@ class SpvVaults {
                             pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
                         }
                     }
+                    //Check if the pending withdrawals contain a withdrawal to our own address
+                    if (pendingWithdrawal.isRecipient(signer.getAddress())) {
+                        //Check it has enough confirmations
+                        if (pendingWithdrawal.btcTx.confirmations >= vault.data.getConfirmations()) {
+                            latestOwnWithdrawalIndex = i;
+                        }
+                    }
+                }
+                if (latestOwnWithdrawalIndex !== -1) {
+                    claimWithdrawals.push({ vault, withdrawals: vault.pendingWithdrawals.slice(0, latestOwnWithdrawalIndex + 1) });
                 }
             }
+        }
+        for (let { vault, withdrawals } of claimWithdrawals) {
+            for (let withdrawal of withdrawals) {
+                if (!await this.claimWithdrawal(vault, withdrawal)) {
+                    this.logger.error("checkVaults(): Cannot process withdrawal " + withdrawal.btcTx.txid + " for vault: " + vault.data.getVaultId());
+                    break;
+                }
+            }
+        }
+    }
+    async claimWithdrawal(vault, withdrawal) {
+        const { signer, spvVaultContract } = this.getChain(vault.chainId);
+        try {
+            const txId = await spvVaultContract.claim(signer, vault.data, withdrawal);
+            this.logger.info("claimWithdrawal(): Successfully claimed withdrawal, btcTxId: " + withdrawal.btcTx.txid + " smartChainTxId: " + txId);
+            return true;
+        }
+        catch (e) {
+            this.logger.error("claimWithdrawal(): Tried to claim but got error: ", e);
+            return false;
         }
     }
     async getVault(chainId, owner, vaultId) {
