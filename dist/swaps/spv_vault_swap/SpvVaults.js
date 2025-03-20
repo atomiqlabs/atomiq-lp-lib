@@ -31,16 +31,16 @@ class SpvVaults {
     async processOpenEvent(vault, event) {
         if (vault.state === SpvVault_1.SpvVaultState.BTC_CONFIRMED) {
             vault.state = SpvVault_1.SpvVaultState.OPENED;
-            vault.update(event);
-            await this.saveVault(vault);
         }
+        vault.update(event);
+        await this.saveVault(vault);
     }
     async processCloseEvent(vault, event) {
         if (vault.state === SpvVault_1.SpvVaultState.OPENED) {
             vault.state = SpvVault_1.SpvVaultState.CLOSED;
-            vault.update(event);
-            await this.saveVault(vault);
         }
+        vault.update(event);
+        await this.saveVault(vault);
     }
     async processClaimEvent(vault, swap, event) {
         //Update vault
@@ -168,13 +168,13 @@ class SpvVaults {
         const parsedTransaction = await this.bitcoinRpc.parseTransaction(res.raw);
         const withdrawalData = await spvVaultContract.getWithdrawalData(parsedTransaction);
         vault.addWithdrawal(withdrawalData);
-        await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+        await this.saveVault(vault);
         try {
             await this.bitcoin.sendRawTransaction(res.raw);
         }
         catch (e) {
             vault.removeWithdrawal(withdrawalData);
-            await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+            await this.saveVault(vault);
             throw e;
         }
         return res.txId;
