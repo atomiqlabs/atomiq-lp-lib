@@ -11,7 +11,9 @@ import { FromBtcAmountAssertions } from "../assertions/FromBtcAmountAssertions";
 import { SpvVaults } from "./SpvVaults";
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number;
-    gasTokenMax: bigint;
+    gasTokenMax: {
+        [chainId: string]: bigint;
+    };
 };
 export type SpvVaultSwapRequestType = {
     address: string;

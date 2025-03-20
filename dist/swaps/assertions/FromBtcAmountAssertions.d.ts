@@ -5,7 +5,9 @@ import { RequestData } from "../SwapHandler";
 import { AmountAssertions, AmountAssertionsConfig } from "./AmountAssertions";
 import { ISwapPrice } from "../../prices/ISwapPrice";
 export type FromBtcAmountAssertionsConfig = AmountAssertionsConfig & {
-    gasTokenMax?: bigint;
+    gasTokenMax?: {
+        [chainId: string]: bigint;
+    };
 };
 export declare class FromBtcAmountAssertions extends AmountAssertions {
     readonly config: FromBtcAmountAssertionsConfig;
