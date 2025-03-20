@@ -49,7 +49,7 @@ export type SpvVaultPostQuote = {
     psbtHex: string
 }
 
-class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
+export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
 
     readonly type: SwapHandlerType = SwapHandlerType.FROM_BTC_SPV;
 
