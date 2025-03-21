@@ -143,7 +143,9 @@ class SpvVaults {
                 opReturnData
             ]);
         }
-        let psbt = new btc_signer_1.Transaction();
+        let psbt = new btc_signer_1.Transaction({
+            allowUnknownOutputs: true
+        });
         psbt.addInput({
             txid: txId,
             index: parseInt(voutStr),

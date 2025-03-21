@@ -191,7 +191,9 @@ export class SpvVaults {
             ]);
         }
 
-        let psbt = new Transaction();
+        let psbt = new Transaction({
+            allowUnknownOutputs: true
+        });
         psbt.addInput({
             txid: txId,
             index: parseInt(voutStr),
