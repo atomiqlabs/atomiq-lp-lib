@@ -270,6 +270,7 @@ export class SpvVaults {
             }
 
             if(vault.state===SpvVaultState.OPENED) {
+                let changed = false;
                 //Check if some of the pendingWithdrawals got confirmed
                 let latestOwnWithdrawalIndex = -1;
                 for(let i=0; i<vault.pendingWithdrawals.length; i++) {
@@ -285,9 +286,13 @@ export class SpvVaults {
                             } else {
                                 vault.pendingWithdrawals.splice(index, 1);
                             }
+                            changed = true;
                         } else {
                             //Update confirmations count
-                            pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
+                            if(pendingWithdrawal.btcTx.confirmations !== btcTx.confirmations) {
+                                pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
+                                changed = true;
+                            }
                         }
                     }
                     //Check if the pending withdrawals contain a withdrawal to our own address
@@ -297,6 +302,9 @@ export class SpvVaults {
                             latestOwnWithdrawalIndex = i;
                         }
                     }
+                }
+                if(changed) {
+                    await this.saveVault(vault);
                 }
                 if(latestOwnWithdrawalIndex!==-1) {
                     claimWithdrawals.push({vault, withdrawals: vault.pendingWithdrawals.slice(0, latestOwnWithdrawalIndex+1)});
