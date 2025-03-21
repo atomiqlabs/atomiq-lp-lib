@@ -467,6 +467,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const responseStream = res.responseStream;
 
             const signedTx = await this.vaultSigner.signPsbt(swap.chainIdentifier, swap.vaultId, transaction, [0]);
+            signedTx.finalize();
 
             const feeRate = Number(signedTx.fee) / signedTx.vsize;
             if(feeRate < swap.btcFeeRate) throw {
