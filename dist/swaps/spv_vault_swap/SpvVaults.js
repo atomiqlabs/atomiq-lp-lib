@@ -310,7 +310,9 @@ class SpvVaults {
         });
         candidates.sort((a, b) => (0, Utils_1.bigIntSorter)(a.balances[0].scaledAmount, b.balances[0].scaledAmount));
         const pluginResponse = await PluginManager_1.PluginManager.onVaultSelection(chainIdentifier, { token, amount }, { token: gasToken, amount: gasTokenAmount }, candidates);
-        AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(pluginResponse);
+        if (pluginResponse != null) {
+            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(pluginResponse);
+        }
         const result = pluginResponse ?? candidates[0];
         if (result == null)
             throw {

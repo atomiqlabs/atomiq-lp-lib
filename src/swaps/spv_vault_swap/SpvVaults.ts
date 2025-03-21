@@ -376,7 +376,9 @@ export class SpvVaults {
         const pluginResponse = await PluginManager.onVaultSelection(
             chainIdentifier, {token, amount}, {token: gasToken, amount: gasTokenAmount}, candidates
         );
-        AmountAssertions.handlePluginErrorResponses(pluginResponse);
+        if(pluginResponse!=null) {
+            AmountAssertions.handlePluginErrorResponses(pluginResponse);
+        }
 
         const result = pluginResponse as SpvVault<SpvWithdrawalTransactionData> ?? candidates[0];
 
