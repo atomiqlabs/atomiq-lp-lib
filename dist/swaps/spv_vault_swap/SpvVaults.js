@@ -219,7 +219,7 @@ class SpvVaults {
                 for (let i = 0; i < vault.pendingWithdrawals.length; i++) {
                     const pendingWithdrawal = vault.pendingWithdrawals[i];
                     //Check all the pending withdrawals that were not finalized yet
-                    if (pendingWithdrawal.btcTx.confirmations < BTC_FINALIZATION_CONFIRMATIONS) {
+                    if (pendingWithdrawal.btcTx.confirmations == null || pendingWithdrawal.btcTx.confirmations < BTC_FINALIZATION_CONFIRMATIONS) {
                         const btcTx = await this.bitcoinRpc.getTransaction(pendingWithdrawal.btcTx.txid);
                         if (btcTx == null) {
                             //Probable double-spend, remove from pending withdrawals
