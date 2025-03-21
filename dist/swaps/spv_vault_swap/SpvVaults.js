@@ -169,6 +169,9 @@ class SpvVaults {
         const res = await this.bitcoin.signPsbt(psbt);
         const parsedTransaction = await this.bitcoinRpc.parseTransaction(res.raw);
         const withdrawalData = await spvVaultContract.getWithdrawalData(parsedTransaction);
+        if (withdrawalData.getSpentVaultUtxo() !== vault.getLatestUtxo()) {
+            throw new Error("Latest vault UTXO already spent! Please try again later.");
+        }
         vault.addWithdrawal(withdrawalData);
         await this.saveVault(vault);
         try {
