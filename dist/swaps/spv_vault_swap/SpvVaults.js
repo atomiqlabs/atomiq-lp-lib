@@ -234,8 +234,10 @@ class SpvVaults {
                         }
                         else {
                             //Update confirmations count
-                            if (pendingWithdrawal.btcTx.confirmations !== btcTx.confirmations) {
+                            if (pendingWithdrawal.btcTx.confirmations !== btcTx.confirmations ||
+                                pendingWithdrawal.btcTx.blockhash !== btcTx.blockhash) {
                                 pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
+                                pendingWithdrawal.btcTx.blockhash = btcTx.blockhash;
                                 changed = true;
                             }
                         }
