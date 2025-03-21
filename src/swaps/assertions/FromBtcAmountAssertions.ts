@@ -189,7 +189,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         const swapFeeInToken = await this.swapPricing.getFromBtcSwapAmount(swapFee, requestedAmount.token, chainIdentifier, true, requestedAmount.pricePrefetch);
         signal.throwIfAborted();
 
-        const gasSwapFee = amountBDgas * fees.feePPM / 1000000n;
+        const gasSwapFee = ((amountBDgas * fees.feePPM) + 999999n) / 1000000n;
         const gasSwapFeeInToken = gasTokenAmount==null ?
             0n :
             await this.swapPricing.getFromBtcSwapAmount(gasSwapFee, gasTokenAmount.token, chainIdentifier, true, gasTokenAmount.pricePrefetch);
