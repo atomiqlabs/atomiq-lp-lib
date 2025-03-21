@@ -165,6 +165,8 @@ class SpvVaults {
         psbt = await this.bitcoin.fundPsbt(psbt, feeRate);
         if (psbt.inputsLength < 2)
             throw new Error("PSBT needs at least 2 inputs!");
+        psbt.updateInput(0, { sequence: 0 });
+        psbt.updateInput(1, { sequence: 0 });
         psbt = await this.vaultSigner.signPsbt(vault.chainId, vault.data.getVaultId(), psbt, [0]);
         const res = await this.bitcoin.signPsbt(psbt);
         const parsedTransaction = await this.bitcoinRpc.parseTransaction(res.raw);
