@@ -317,21 +317,22 @@ export class SpvVaults {
         }
 
         for(let {vault, withdrawals} of claimWithdrawals) {
-            for(let withdrawal of withdrawals) {
-                if(!await this.claimWithdrawal(vault, withdrawal)) {
-                    this.logger.error("checkVaults(): Cannot process withdrawal "+withdrawal.btcTx.txid+" for vault: "+vault.data.getVaultId());
-                    break;
-                }
+
+            if(!await this.claimWithdrawals(vault, withdrawals)) {
+                this.logger.error("checkVaults(): Cannot process withdrawals "+withdrawals.map(val => val.btcTx.txid).join(", ")+" for vault: "+vault.data.getVaultId());
+                break;
             }
         }
     }
 
-    async claimWithdrawal(vault: SpvVault, withdrawal: SpvWithdrawalTransactionData): Promise<boolean> {
+    async claimWithdrawals(vault: SpvVault, withdrawal: SpvWithdrawalTransactionData[]): Promise<boolean> {
         const {signer, spvVaultContract} = this.getChain(vault.chainId);
 
         try {
-            const txId = await spvVaultContract.claim(signer, vault.data, withdrawal);
-            this.logger.info("claimWithdrawal(): Successfully claimed withdrawal, btcTxId: "+withdrawal.btcTx.txid+" smartChainTxId: "+txId);
+            const txId = await spvVaultContract.claim(signer, vault.data, withdrawal.map(tx => {
+                return {tx};
+            }));
+            this.logger.info("claimWithdrawal(): Successfully claimed withdrawals, btcTxIds: "+withdrawal.map(val => val.btcTx.txid).join(", ")+" smartChainTxId: "+txId);
             return true;
         } catch (e) {
             this.logger.error("claimWithdrawal(): Tried to claim but got error: ", e);
