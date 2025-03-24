@@ -330,7 +330,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             //Create abortController for parallel prefetches
             const responseStream = res.responseStream;
             const signedTx = await this.vaultSigner.signPsbt(swap.chainIdentifier, swap.vaultId, transaction, [0]);
-            signedTx.finalize();
+            if (!signedTx.isFinal)
+                throw {
+                    code: 20513,
+                    msg: "One or more PSBT inputs not finalized!"
+                };
             const feeRate = Number(signedTx.fee) / signedTx.vsize;
             if (feeRate < swap.btcFeeRate)
                 throw {
