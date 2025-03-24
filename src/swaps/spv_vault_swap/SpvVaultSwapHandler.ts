@@ -489,7 +489,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: "+swap.btcTxId);
 
             try {
-                await this.bitcoin.sendRawTransaction(Buffer.from(signedTx.toBytes()).toString("hex"));
+                await this.bitcoin.sendRawTransaction(Buffer.from(signedTx.toBytes(true, true)).toString("hex"));
                 await swap.setState(SpvVaultSwapState.SENT);
             } catch (e) {
                 this.swapLogger.error(swap, "REST: /postQuote: Failed to send BTC transaction: ", e);
