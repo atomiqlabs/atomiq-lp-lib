@@ -342,6 +342,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 msg: "Success",
                 data: {
                     quoteId,
+                    expiry,
 
                     address: signer.getAddress(),
                     vaultId: vault.data.getVaultId().toString(10),
@@ -381,14 +382,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             } = {request: {}, times: {}};
 
             metadata.times.requestReceived = Date.now();
-            /**
-             * address: string              smart chain address of the recipient
-             * amount: string               amount (in sats)
-             * token: string                Desired token to use
-             * gasAmount: string            Desired amount in gas token to also get
-             * gasToken: string
-             * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
-             */
+
             const parsedBody: SpvVaultPostQuote = await req.paramReader.getParams({
                 quoteId: FieldTypeEnum.String,
                 psbtHex: (val: string) => val!=null &&

@@ -233,6 +233,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 msg: "Success",
                 data: {
                     quoteId,
+                    expiry,
                     address: signer.getAddress(),
                     vaultId: vault.data.getVaultId().toString(10),
                     vaultBtcAddress: vault.btcAddress,
@@ -259,14 +260,6 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         restServer.post(this.path + "/postQuote", (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
             const metadata = { request: {}, times: {} };
             metadata.times.requestReceived = Date.now();
-            /**
-             * address: string              smart chain address of the recipient
-             * amount: string               amount (in sats)
-             * token: string                Desired token to use
-             * gasAmount: string            Desired amount in gas token to also get
-             * gasToken: string
-             * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
-             */
             const parsedBody = await req.paramReader.getParams({
                 quoteId: SchemaVerifier_1.FieldTypeEnum.String,
                 psbtHex: (val) => val != null &&
