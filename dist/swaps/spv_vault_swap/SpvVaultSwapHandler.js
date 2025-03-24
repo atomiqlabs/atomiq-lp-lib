@@ -210,8 +210,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const vault = await this.Vaults.findVaultForSwap(chainIdentifier, useToken, totalInToken, gasToken, totalInGasToken);
             metadata.times.vaultPicked = Date.now();
             //Create swap receive bitcoin address
-            const receiveAddress = await this.bitcoin.getAddress();
             const btcFeeRate = await this.bitcoin.getFeeRate();
+            const receiveAddress = await this.bitcoin.getAddress();
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
             //Calculate raw amounts
@@ -314,8 +314,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 data.getSpentVaultUtxo() !== swap.vaultUtxo ||
                 data.btcTx.outs[0].value !== SpvVaults_1.VAULT_DUST_AMOUNT ||
                 !Buffer.from(data.btcTx.outs[0].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.vaultAddress)) ||
-                BigInt(data.btcTx.outs[1].value) !== swap.amountBtc ||
-                !Buffer.from(data.btcTx.outs[1].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.btcAddress))) {
+                BigInt(data.btcTx.outs[2].value) !== swap.amountBtc ||
+                !Buffer.from(data.btcTx.outs[2].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.btcAddress))) {
                 throw {
                     code: 20509,
                     msg: "Invalid PSBT provided!"
