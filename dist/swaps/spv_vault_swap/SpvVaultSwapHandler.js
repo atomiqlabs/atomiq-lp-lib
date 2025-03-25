@@ -159,6 +159,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
              * gasAmount: string            Desired amount in gas token to also get
              * gasToken: string
              * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
+             * callerFeeRate: string        Caller/watchtower fee (in output token) to assign to the swap
+             * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
              */
             const parsedBody = await req.paramReader.getParams({
                 address: (val) => val != null &&
@@ -172,7 +174,9 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 gasToken: (val) => val != null &&
                     typeof (val) === "string" &&
                     chainInterface.isValidToken(val) ? val : null,
-                exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional
+                exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
+                callerFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                frontingFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
             });
             if (parsedBody == null)
                 throw {
@@ -185,8 +189,28 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     code: 20190,
                     msg: "Unsupported gas token"
                 };
-            const requestedAmount = { input: !parsedBody.exactOut, amount: parsedBody.amount, token: parsedBody.token };
-            const gasTokenAmount = { input: false, amount: parsedBody.gasAmount, token: parsedBody.gasToken };
+            if (parsedBody.callerFeeRate < 0n || parsedBody.callerFeeRate >= 2n ** 20n)
+                throw {
+                    code: 20191,
+                    msg: "Invalid caller fee rate"
+                };
+            if (parsedBody.frontingFeeRate < 0n || parsedBody.frontingFeeRate >= 2n ** 20n)
+                throw {
+                    code: 20192,
+                    msg: "Invalid fronting fee rate"
+                };
+            const requestedAmount = {
+                input: !parsedBody.exactOut,
+                amount: parsedBody.exactOut ?
+                    (parsedBody.amount * (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate) / 100000n) :
+                    parsedBody.amount,
+                token: parsedBody.token
+            };
+            const gasTokenAmount = {
+                input: false,
+                amount: parsedBody.gasAmount * (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate) / 100000n,
+                token: parsedBody.gasToken
+            };
             const request = {
                 chainIdentifier,
                 raw: req,
@@ -214,13 +238,16 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const receiveAddress = await this.bitcoin.getAddress();
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
+            //Adjust the amounts based on passed fees
+            totalInToken = (totalInToken * 100000n / (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
+            totalInGasToken = (totalInGasToken * 100000n / (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
             //Calculate raw amounts
             const [rawTokenAmount, rawGasTokenAmount] = vault.toRawAmounts([totalInToken, totalInGasToken]);
             [totalInToken, totalInGasToken] = vault.fromRawAmounts([rawTokenAmount, rawGasTokenAmount]);
             const expiry = Math.floor(Date.now() / 1000) + this.getInitAuthorizationTimeout(chainIdentifier);
             //Get PSBT data
-            const callerFeeShare = 0n;
-            const frontingFeeShare = 0n;
+            const callerFeeShare = parsedBody.callerFeeRate;
+            const frontingFeeShare = parsedBody.frontingFeeRate;
             const executionFeeShare = 0n;
             const utxo = vault.getLatestUtxo();
             const totalBtcOutput = amountBD + amountBDgas;

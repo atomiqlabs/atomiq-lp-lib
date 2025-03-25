@@ -22,6 +22,8 @@ export type SpvVaultSwapRequestType = {
     gasAmount: bigint;
     gasToken: string;
     exactOut?: boolean;
+    callerFeeRate: bigint;
+    frontingFeeRate: bigint;
 };
 export type SpvVaultPostQuote = {
     quoteId: string;
