@@ -106,6 +106,7 @@ class SpvVaults {
         return Object.keys(this.vaultStorage.data)
             .map(key => this.vaultStorage.data[key])
             .filter(val => chainId == null ? true : val.chainId === chainId)
+            .filter(val => val.data.getOwner() === this.getChain(val.chainId)?.signer?.getAddress())
             .filter(val => token == null ? true : val.data.getTokenData()[0].token === token);
     }
     async fundVault(vault, tokenAmounts) {
