@@ -545,7 +545,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amount) => {
                 metadata.times.amountsChecked = Date.now();
                 const resp = await this.checkAndGetNetworkFee(parsedBody.address, amount);
-                this.logger.debug("checkToBtcAmount(): network fee calculated, amount: " + amountBD.toString(10) + " fee: " + resp.networkFee.toString(10));
+                this.logger.debug("checkToBtcAmount(): network fee calculated, amount: " + amount.toString(10) + " fee: " + resp.networkFee.toString(10));
                 metadata.times.chainFeeCalculated = Date.now();
                 return resp;
             }, abortController.signal);
