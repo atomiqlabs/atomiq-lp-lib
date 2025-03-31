@@ -18,6 +18,7 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     constructor(chainIdentifierOrObj, quoteId, expiry, vault, vaultUtxo, btcAddress, btcFeeRate, recipient, amountBtc, amountToken, amountGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, token, gasToken) {
         if (typeof (chainIdentifierOrObj) === "string") {
             super(chainIdentifierOrObj, swapFee + gasSwapFee, swapFeeInToken * (swapFee + gasSwapFee) / swapFee);
+            this.state = SpvVaultSwapState.CREATED;
             this.quoteId = quoteId;
             this.expiry = expiry;
             this.vaultOwner = vault.data.getOwner();

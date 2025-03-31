@@ -67,6 +67,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     ) {
         if(typeof(chainIdentifierOrObj)==="string") {
             super(chainIdentifierOrObj, swapFee + gasSwapFee, swapFeeInToken * (swapFee + gasSwapFee) / swapFee);
+            this.state = SpvVaultSwapState.CREATED;
             this.quoteId = quoteId;
             this.expiry = expiry;
             this.vaultOwner = vault.data.getOwner();
