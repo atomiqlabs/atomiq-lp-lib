@@ -27,7 +27,7 @@ export class SpvVaults {
     readonly bitcoin: IBitcoinWallet;
     readonly vaultSigner: ISpvVaultSigner;
     readonly bitcoinRpc: BitcoinRpc<any>;
-    readonly config: {vaultsCheckInterval: number};
+    readonly config: {vaultsCheckInterval: number, maxUnclaimedWithdrawals?: number};
     readonly getChain: (chainId: string) => ChainData
 
     readonly logger = {
@@ -43,7 +43,7 @@ export class SpvVaults {
         vaultSigner: ISpvVaultSigner,
         bitcoinRpc: BitcoinRpc<any>,
         getChain: (chainId: string) => ChainData,
-        config: {vaultsCheckInterval: number}
+        config: {vaultsCheckInterval: number, maxUnclaimedWithdrawals?: number}
     ) {
         this.vaultStorage = vaultStorage;
         this.bitcoin = bitcoin;
@@ -297,6 +297,7 @@ export class SpvVaults {
                 let changed = false;
                 //Check if some of the pendingWithdrawals got confirmed
                 let latestOwnWithdrawalIndex = -1;
+                let latestConfirmedWithdrawalIndex = -1;
                 for(let i=0; i<vault.pendingWithdrawals.length; i++) {
                     const pendingWithdrawal = vault.pendingWithdrawals[i];
                     //Check all the pending withdrawals that were not finalized yet
@@ -323,10 +324,11 @@ export class SpvVaults {
                             }
                         }
                     }
-                    //Check if the pending withdrawals contain a withdrawal to our own address
-                    if(pendingWithdrawal.isRecipient(signer.getAddress())) {
-                        //Check it has enough confirmations
-                        if(pendingWithdrawal.btcTx.confirmations >= vault.data.getConfirmations()) {
+                    //Check it has enough confirmations
+                    if(pendingWithdrawal.btcTx.confirmations >= vault.data.getConfirmations()) {
+                        latestConfirmedWithdrawalIndex = i;
+                        //Check if the pending withdrawals contain a withdrawal to our own address
+                        if (pendingWithdrawal.isRecipient(signer.getAddress())) {
                             latestOwnWithdrawalIndex = i;
                         }
                     }
@@ -334,14 +336,16 @@ export class SpvVaults {
                 if(changed) {
                     await this.saveVault(vault);
                 }
-                if(latestOwnWithdrawalIndex!==-1) {
+                if(this.config.maxUnclaimedWithdrawals!=null && latestConfirmedWithdrawalIndex+1 >= this.config.maxUnclaimedWithdrawals) {
+                    this.logger.info("checkVaults(): Processing withdrawals by self, because a lot of them are unclaimed!");
+                    claimWithdrawals.push({vault, withdrawals: vault.pendingWithdrawals.slice(0, latestConfirmedWithdrawalIndex+1)});
+                } else if(latestOwnWithdrawalIndex!==-1) {
                     claimWithdrawals.push({vault, withdrawals: vault.pendingWithdrawals.slice(0, latestOwnWithdrawalIndex+1)});
                 }
             }
         }
 
         for(let {vault, withdrawals} of claimWithdrawals) {
-
             if(!await this.claimWithdrawals(vault, withdrawals)) {
                 this.logger.error("checkVaults(): Cannot process withdrawals "+withdrawals.map(val => val.btcTx.txid).join(", ")+" for vault: "+vault.data.getVaultId());
                 break;

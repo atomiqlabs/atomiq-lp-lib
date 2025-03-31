@@ -12,6 +12,7 @@ export declare class SpvVaults {
     readonly bitcoinRpc: BitcoinRpc<any>;
     readonly config: {
         vaultsCheckInterval: number;
+        maxUnclaimedWithdrawals?: number;
     };
     readonly getChain: (chainId: string) => ChainData;
     readonly logger: {
@@ -22,6 +23,7 @@ export declare class SpvVaults {
     };
     constructor(vaultStorage: IStorageManager<SpvVault>, bitcoin: IBitcoinWallet, vaultSigner: ISpvVaultSigner, bitcoinRpc: BitcoinRpc<any>, getChain: (chainId: string) => ChainData, config: {
         vaultsCheckInterval: number;
+        maxUnclaimedWithdrawals?: number;
     });
     processDepositEvent(vault: SpvVault, event: SpvVaultDepositEvent): Promise<void>;
     processOpenEvent(vault: SpvVault, event: SpvVaultOpenEvent): Promise<void>;

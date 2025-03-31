@@ -14,6 +14,7 @@ export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     gasTokenMax: {
         [chainId: string]: bigint;
     };
+    maxUnclaimedWithdrawals?: number;
 };
 export type SpvVaultSwapRequestType = {
     address: string;

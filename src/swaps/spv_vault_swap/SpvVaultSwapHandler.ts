@@ -32,7 +32,8 @@ import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
-    gasTokenMax: {[chainId: string]: bigint}
+    gasTokenMax: {[chainId: string]: bigint},
+    maxUnclaimedWithdrawals?: number
 };
 
 export type SpvVaultSwapRequestType = {
