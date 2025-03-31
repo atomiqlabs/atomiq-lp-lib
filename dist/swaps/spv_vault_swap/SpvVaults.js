@@ -191,7 +191,7 @@ class SpvVaults {
         const vaults = Object.keys(this.vaultStorage.data).map(key => this.vaultStorage.data[key]);
         const claimWithdrawals = [];
         for (let vault of vaults) {
-            const { signer, spvVaultContract } = this.getChain(vault.chainId);
+            const { signer, spvVaultContract, chainInterface } = this.getChain(vault.chainId);
             if (vault.data.getOwner() !== signer.getAddress())
                 continue;
             if (vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
@@ -208,9 +208,29 @@ class SpvVaults {
                 }
             }
             if (vault.state === SpvVault_1.SpvVaultState.BTC_CONFIRMED) {
-                //TODO: If we crash after open tx is sent (but not confirmed yet) we will be stuck in the loop here
-                const txId = await spvVaultContract.open(signer, vault.data, { waitForConfirmation: true });
-                this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " opened on " + vault.chainId + " txId: " + txId);
+                //Check if open txs were sent already
+                if (vault.scOpenTx != null) {
+                    //Check if confirmed
+                    const status = await chainInterface.getTxStatus(vault.scOpenTx.rawTx);
+                    if (status === "pending")
+                        return;
+                    if (status === "success") {
+                        vault.state = SpvVault_1.SpvVaultState.OPENED;
+                        await this.saveVault(vault);
+                        return;
+                    }
+                }
+                const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
+                let numTx = 0;
+                const txIds = await chainInterface.sendAndConfirm(signer, txs, true, undefined, false, async (txId, rawTx) => {
+                    numTx++;
+                    if (numTx === txs.length) {
+                        //Final tx
+                        vault.scOpenTx = { txId, rawTx };
+                        await this.saveVault(vault);
+                    }
+                });
+                this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " opened on " + vault.chainId + " txId: " + txIds.join(", "));
                 vault.state = SpvVault_1.SpvVaultState.OPENED;
                 await this.saveVault(vault);
             }
