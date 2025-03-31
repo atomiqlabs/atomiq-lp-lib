@@ -153,8 +153,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
     protected async processPastSwap(swap: SpvVaultSwap): Promise<void> {
         if(swap.state===SpvVaultSwapState.CREATED) {
             if(swap.expiry < Date.now()/1000) {
-                await this.bitcoin.addUnusedAddress(swap.btcAddress);
                 await this.removeSwapData(swap, SpvVaultSwapState.EXPIRED);
+                await this.bitcoin.addUnusedAddress(swap.btcAddress);
             }
         }
 

@@ -97,8 +97,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             }
 
             this.swapLogger.info(swap, "processPastSwap(state=CREATED): removing past swap due to authorization expiry, address: "+swap.address);
-            await this.bitcoin.addUnusedAddress(swap.address);
             await this.removeSwapData(swap, FromBtcSwapState.CANCELED);
+            await this.bitcoin.addUnusedAddress(swap.address);
             return false;
         }
 
@@ -182,8 +182,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         savedSwap.txIds.refund = (event as any).meta?.txId;
 
         this.swapLogger.info(event, "SC: RefundEvent: swap refunded, address: "+savedSwap.address);
-        await this.bitcoin.addUnusedAddress(savedSwap.address);
         await this.removeSwapData(savedSwap, FromBtcSwapState.REFUNDED);
+        await this.bitcoin.addUnusedAddress(savedSwap.address);
     }
 
     /**

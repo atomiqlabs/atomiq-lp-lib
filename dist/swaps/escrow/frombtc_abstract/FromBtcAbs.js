@@ -57,8 +57,8 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 return false;
             }
             this.swapLogger.info(swap, "processPastSwap(state=CREATED): removing past swap due to authorization expiry, address: " + swap.address);
-            await this.bitcoin.addUnusedAddress(swap.address);
             await this.removeSwapData(swap, FromBtcSwapAbs_1.FromBtcSwapState.CANCELED);
+            await this.bitcoin.addUnusedAddress(swap.address);
             return false;
         }
         //Check if commited swap expired by now
@@ -130,8 +130,8 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     async processRefundEvent(chainIdentifier, savedSwap, event) {
         savedSwap.txIds.refund = event.meta?.txId;
         this.swapLogger.info(event, "SC: RefundEvent: swap refunded, address: " + savedSwap.address);
-        await this.bitcoin.addUnusedAddress(savedSwap.address);
         await this.removeSwapData(savedSwap, FromBtcSwapAbs_1.FromBtcSwapState.REFUNDED);
+        await this.bitcoin.addUnusedAddress(savedSwap.address);
     }
     /**
      * Calculates the requested claimer bounty, based on client's request

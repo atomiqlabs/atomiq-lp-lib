@@ -88,8 +88,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     async processPastSwap(swap) {
         if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED) {
             if (swap.expiry < Date.now() / 1000) {
-                await this.bitcoin.addUnusedAddress(swap.btcAddress);
                 await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.EXPIRED);
+                await this.bitcoin.addUnusedAddress(swap.btcAddress);
             }
         }
         if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.SIGNED) {
