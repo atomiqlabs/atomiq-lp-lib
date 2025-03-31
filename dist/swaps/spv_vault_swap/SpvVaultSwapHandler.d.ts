@@ -34,7 +34,7 @@ export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVa
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
     readonly vaultSigner: ISpvVaultSigner;
-    readonly outstandingQuotes: Map<string, SpvVaultSwap>;
+    readonly btcTxIdIndex: Map<string, SpvVaultSwap>;
     readonly AmountAssertions: FromBtcAmountAssertions;
     readonly Vaults: SpvVaults;
     config: SpvVaultSwapHandlerConfig;
@@ -61,4 +61,7 @@ export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVa
     };
     startRestServer(restServer: Express): void;
     getInfoData(): any;
+    protected saveSwapData(swap: SpvVaultSwap): Promise<void>;
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
+    protected removeSwapData(swap: SpvVaultSwap, ultimateState?: SpvVaultSwapState): Promise<void>;
 }

@@ -59,7 +59,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
     readonly vaultSigner: ISpvVaultSigner;
 
-    readonly outstandingQuotes: Map<string, SpvVaultSwap> = new Map();
+    readonly btcTxIdIndex: Map<string, SpvVaultSwap> = new Map();
 
     readonly AmountAssertions: FromBtcAmountAssertions;
     readonly Vaults: SpvVaults;
@@ -111,7 +111,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             } else if(event instanceof SpvVaultCloseEvent) {
                 await this.Vaults.processCloseEvent(vault, event);
             } else if(event instanceof SpvVaultClaimEvent) {
-                const swap = await this.storageManager.getData(event.btcTxId, 0n);
+                const swap = this.btcTxIdIndex.get(event.btcTxId);
 
                 if(swap!=null) {
                     swap.txIds.claim = (event as any).meta?.txId;
@@ -151,6 +151,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
     }
 
     protected async processPastSwap(swap: SpvVaultSwap): Promise<void> {
+        if(swap.state===SpvVaultSwapState.CREATED) {
+            if(swap.expiry < Date.now()/1000) {
+                await this.bitcoin.addUnusedAddress(swap.btcAddress);
+                await this.removeSwapData(swap, SpvVaultSwapState.EXPIRED);
+            }
+        }
+
         if(swap.state===SpvVaultSwapState.SIGNED) {
             //Check if sent
             const tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
@@ -185,6 +192,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             {
                 key: "state",
                 value: [
+                    SpvVaultSwapState.CREATED, //Check if expired
                     SpvVaultSwapState.SIGNED, //Check if sent
                     SpvVaultSwapState.SENT //Check if confirmed or double-spent
                 ]
@@ -351,8 +359,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const utxo = vault.getLatestUtxo();
             const totalBtcOutput = amountBD + amountBDgas;
 
+            const quoteId = randomBytes(32).toString("hex");
             const swap = new SpvVaultSwap(
-                chainIdentifier, expiry,
+                chainIdentifier, quoteId, expiry,
                 vault, utxo,
                 receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken,
                 swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken,
@@ -360,9 +369,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 useToken, gasToken
             );
 
-            const quoteId = randomBytes(32).toString("hex");
-
-            this.outstandingQuotes.set(quoteId, swap);
+            await PluginManager.swapCreate(swap);
+            await this.saveSwapData(swap);
 
             this.swapLogger.info(swap, "REST: /getQuote: Created swap address: "+receiveAddress+" amount: "+amountBD.toString(10));
 
@@ -419,12 +427,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                     HEX_REGEX.test(val) ? val : null
             });
 
-            const swap = this.outstandingQuotes.get(parsedBody.quoteId);
-            if(swap==null || swap.expiry < Date.now()/1000) throw {
+            const swap = await this.storageManager.getData(parsedBody.quoteId, 0n);
+            if(swap==null || swap.state!==SpvVaultSwapState.CREATED || swap.expiry < Date.now()/1000) throw {
                 code: 20505,
                 msg: "Invalid quote ID, not found or expired!"
             };
-            this.outstandingQuotes.delete(parsedBody.quoteId);
 
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             if(vault==null || !vault.isReady()) {
@@ -510,9 +517,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             vault.addWithdrawal(data);
             await this.Vaults.saveVault(vault);
 
+            //Double-check the state to prevent race condition
+            if(swap.state!==SpvVaultSwapState.CREATED) throw {
+                code: 20505,
+                msg: "Invalid quote ID, not found or expired!"
+            };
             swap.btcTxId = signedTx.id;
             swap.state = SpvVaultSwapState.SIGNED;
-            await PluginManager.swapCreate(swap);
             await this.saveSwapData(swap);
 
             this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: "+swap.btcTxId);
@@ -552,6 +563,27 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         return {
             gasTokens: mappedDict
         };
+    }
+
+    protected async saveSwapData(swap: SpvVaultSwap): Promise<void> {
+        if(swap.btcTxId!=null) this.btcTxIdIndex.set(swap.btcTxId, swap);
+        return super.saveSwapData(swap);
+    }
+
+    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
+    protected removeSwapData(swap: SpvVaultSwap, ultimateState?: SpvVaultSwapState): Promise<void>;
+    protected async removeSwapData(hashOrSwap: string | SpvVaultSwap, sequenceOrUltimateState?: bigint | SpvVaultSwapState): Promise<void> {
+        let swap: SpvVaultSwap;
+        let state: SpvVaultSwapState;
+        if(typeof(hashOrSwap)==="string") {
+            if(typeof(sequenceOrUltimateState)!=="bigint") throw new Error("Sequence must be a BN instance!");
+            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
+        } else {
+            swap = hashOrSwap;
+            if(sequenceOrUltimateState!=null && typeof(sequenceOrUltimateState)!=="bigint") state = sequenceOrUltimateState;
+        }
+        if(swap.btcTxId!=null) this.btcTxIdIndex.delete(swap.btcTxId);
+        return super.removeSwapData(swap, state);
     }
 
 }

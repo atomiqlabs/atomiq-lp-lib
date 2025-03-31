@@ -11,6 +11,7 @@ export declare enum SpvVaultSwapState {
     CLAIMED = 4
 }
 export declare class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
+    readonly quoteId: string;
     readonly vaultOwner: string;
     readonly vaultId: bigint;
     readonly vaultUtxo: string;
@@ -34,7 +35,7 @@ export declare class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     readonly token: string;
     readonly gasToken: string;
     btcTxId: string;
-    constructor(chainIdentifier: string, expiry: number, vault: SpvVault, vaultUtxo: string, btcAddress: string, btcFeeRate: number, recipient: string, amountBtc: bigint, amountToken: bigint, amountGasToken: bigint, swapFee: bigint, swapFeeInToken: bigint, gasSwapFee: bigint, gasSwapFeeInToken: bigint, callerFeeShare: bigint, frontingFeeShare: bigint, executionFeeShare: bigint, token: string, gasToken: string);
+    constructor(chainIdentifier: string, quoteId: string, expiry: number, vault: SpvVault, vaultUtxo: string, btcAddress: string, btcFeeRate: number, recipient: string, amountBtc: bigint, amountToken: bigint, amountGasToken: bigint, swapFee: bigint, swapFeeInToken: bigint, gasSwapFee: bigint, gasSwapFeeInToken: bigint, callerFeeShare: bigint, frontingFeeShare: bigint, executionFeeShare: bigint, token: string, gasToken: string);
     constructor(data: any);
     serialize(): any;
     getIdentifierHash(): string;

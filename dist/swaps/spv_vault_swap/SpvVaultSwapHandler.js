@@ -16,7 +16,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config) {
         super(storageDirectory, path, chainsData, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_SPV;
-        this.outstandingQuotes = new Map();
+        this.btcTxIdIndex = new Map();
         this.bitcoinRpc = bitcoinRpc;
         this.bitcoin = bitcoin;
         this.vaultSigner = spvVaultSigner;
@@ -51,7 +51,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 await this.Vaults.processCloseEvent(vault, event);
             }
             else if (event instanceof base_1.SpvVaultClaimEvent) {
-                const swap = await this.storageManager.getData(event.btcTxId, 0n);
+                const swap = this.btcTxIdIndex.get(event.btcTxId);
                 if (swap != null) {
                     swap.txIds.claim = event.meta?.txId;
                     if (swap.metadata != null)
@@ -86,6 +86,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         await PluginManager_1.PluginManager.serviceInitialize(this);
     }
     async processPastSwap(swap) {
+        if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED) {
+            if (swap.expiry < Date.now() / 1000) {
+                await this.bitcoin.addUnusedAddress(swap.btcAddress);
+                await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.EXPIRED);
+            }
+        }
         if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.SIGNED) {
             //Check if sent
             const tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
@@ -121,6 +127,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             {
                 key: "state",
                 value: [
+                    SpvVaultSwap_1.SpvVaultSwapState.CREATED,
                     SpvVaultSwap_1.SpvVaultSwapState.SIGNED,
                     SpvVaultSwap_1.SpvVaultSwapState.SENT //Check if confirmed or double-spent
                 ]
@@ -251,9 +258,10 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const executionFeeShare = 0n;
             const utxo = vault.getLatestUtxo();
             const totalBtcOutput = amountBD + amountBDgas;
-            const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, expiry, vault, utxo, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, useToken, gasToken);
             const quoteId = (0, crypto_1.randomBytes)(32).toString("hex");
-            this.outstandingQuotes.set(quoteId, swap);
+            const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, quoteId, expiry, vault, utxo, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, useToken, gasToken);
+            await PluginManager_1.PluginManager.swapCreate(swap);
+            await this.saveSwapData(swap);
             this.swapLogger.info(swap, "REST: /getQuote: Created swap address: " + receiveAddress + " amount: " + amountBD.toString(10));
             await responseStream.writeParamsAndEnd({
                 code: 20000,
@@ -293,13 +301,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     typeof (val) === "string" &&
                     Utils_1.HEX_REGEX.test(val) ? val : null
             });
-            const swap = this.outstandingQuotes.get(parsedBody.quoteId);
-            if (swap == null || swap.expiry < Date.now() / 1000)
+            const swap = await this.storageManager.getData(parsedBody.quoteId, 0n);
+            if (swap == null || swap.state !== SpvVaultSwap_1.SpvVaultSwapState.CREATED || swap.expiry < Date.now() / 1000)
                 throw {
                     code: 20505,
                     msg: "Invalid quote ID, not found or expired!"
                 };
-            this.outstandingQuotes.delete(parsedBody.quoteId);
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             if (vault == null || !vault.isReady()) {
                 throw {
@@ -376,9 +383,14 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             }
             vault.addWithdrawal(data);
             await this.Vaults.saveVault(vault);
+            //Double-check the state to prevent race condition
+            if (swap.state !== SpvVaultSwap_1.SpvVaultSwapState.CREATED)
+                throw {
+                    code: 20505,
+                    msg: "Invalid quote ID, not found or expired!"
+                };
             swap.btcTxId = signedTx.id;
             swap.state = SpvVaultSwap_1.SpvVaultSwapState.SIGNED;
-            await PluginManager_1.PluginManager.swapCreate(swap);
             await this.saveSwapData(swap);
             this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: " + swap.btcTxId);
             try {
@@ -415,6 +427,28 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         return {
             gasTokens: mappedDict
         };
+    }
+    async saveSwapData(swap) {
+        if (swap.btcTxId != null)
+            this.btcTxIdIndex.set(swap.btcTxId, swap);
+        return super.saveSwapData(swap);
+    }
+    async removeSwapData(hashOrSwap, sequenceOrUltimateState) {
+        let swap;
+        let state;
+        if (typeof (hashOrSwap) === "string") {
+            if (typeof (sequenceOrUltimateState) !== "bigint")
+                throw new Error("Sequence must be a BN instance!");
+            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
+        }
+        else {
+            swap = hashOrSwap;
+            if (sequenceOrUltimateState != null && typeof (sequenceOrUltimateState) !== "bigint")
+                state = sequenceOrUltimateState;
+        }
+        if (swap.btcTxId != null)
+            this.btcTxIdIndex.delete(swap.btcTxId);
+        return super.removeSwapData(swap, state);
     }
 }
 exports.SpvVaultSwapHandler = SpvVaultSwapHandler;

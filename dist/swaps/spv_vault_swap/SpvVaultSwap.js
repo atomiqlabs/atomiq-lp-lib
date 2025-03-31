@@ -15,9 +15,10 @@ var SpvVaultSwapState;
     SpvVaultSwapState[SpvVaultSwapState["CLAIMED"] = 4] = "CLAIMED";
 })(SpvVaultSwapState = exports.SpvVaultSwapState || (exports.SpvVaultSwapState = {}));
 class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
-    constructor(chainIdentifierOrObj, expiry, vault, vaultUtxo, btcAddress, btcFeeRate, recipient, amountBtc, amountToken, amountGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, token, gasToken) {
+    constructor(chainIdentifierOrObj, quoteId, expiry, vault, vaultUtxo, btcAddress, btcFeeRate, recipient, amountBtc, amountToken, amountGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, token, gasToken) {
         if (typeof (chainIdentifierOrObj) === "string") {
             super(chainIdentifierOrObj, swapFee + gasSwapFee, swapFeeInToken * (swapFee + gasSwapFee) / swapFee);
+            this.quoteId = quoteId;
             this.expiry = expiry;
             this.vaultOwner = vault.data.getOwner();
             this.vaultId = vault.data.getVaultId();
@@ -44,6 +45,7 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
         }
         else {
             super(chainIdentifierOrObj);
+            this.quoteId = chainIdentifierOrObj.quoteId;
             this.expiry = chainIdentifierOrObj.expiry;
             this.vaultOwner = chainIdentifierOrObj.owner;
             this.vaultId = (0, Utils_1.deserializeBN)(chainIdentifierOrObj.vaultId);
@@ -72,6 +74,7 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     serialize() {
         return {
             ...super.serialize(),
+            quoteId: this.quoteId,
             owner: this.vaultOwner,
             vaultId: (0, Utils_1.serializeBN)(this.vaultId),
             vaultAddress: this.vaultAddress,
@@ -97,7 +100,7 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
         };
     }
     getIdentifierHash() {
-        return this.btcTxId ?? "OUTSTANDING";
+        return this.quoteId;
     }
     getOutputGasAmount() {
         return this.amountGasToken;

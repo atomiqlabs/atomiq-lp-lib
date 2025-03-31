@@ -15,6 +15,8 @@ export enum SpvVaultSwapState {
 
 export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
 
+    readonly quoteId: string;
+
     readonly vaultOwner: string;
     readonly vaultId: bigint;
     readonly vaultUtxo: string;
@@ -45,7 +47,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     btcTxId: string;
 
     constructor(
-        chainIdentifier: string, expiry: number,
+        chainIdentifier: string, quoteId: string, expiry: number,
         vault: SpvVault, vaultUtxo: string,
         btcAddress: string, btcFeeRate: number, recipient: string, amountBtc: bigint, amountToken: bigint, amountGasToken: bigint,
         swapFee: bigint, swapFeeInToken: bigint,
@@ -55,7 +57,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     );
     constructor(data: any);
     constructor(
-        chainIdentifierOrObj: string | any, expiry?: number,
+        chainIdentifierOrObj: string | any, quoteId?: string, expiry?: number,
         vault?: SpvVault, vaultUtxo?: string,
         btcAddress?: string, btcFeeRate?: number, recipient?: string, amountBtc?: bigint, amountToken?: bigint, amountGasToken?: bigint,
         swapFee?: bigint, swapFeeInToken?: bigint,
@@ -65,6 +67,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     ) {
         if(typeof(chainIdentifierOrObj)==="string") {
             super(chainIdentifierOrObj, swapFee + gasSwapFee, swapFeeInToken * (swapFee + gasSwapFee) / swapFee);
+            this.quoteId = quoteId;
             this.expiry = expiry;
             this.vaultOwner = vault.data.getOwner();
             this.vaultId = vault.data.getVaultId();
@@ -90,6 +93,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             this.gasToken = gasToken;
         } else {
             super(chainIdentifierOrObj);
+            this.quoteId = chainIdentifierOrObj.quoteId;
             this.expiry = chainIdentifierOrObj.expiry;
             this.vaultOwner = chainIdentifierOrObj.owner;
             this.vaultId = deserializeBN(chainIdentifierOrObj.vaultId);
@@ -119,6 +123,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     serialize(): any {
         return {
             ...super.serialize(),
+            quoteId: this.quoteId,
             owner: this.vaultOwner,
             vaultId: serializeBN(this.vaultId),
             vaultAddress: this.vaultAddress,
@@ -145,7 +150,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     }
 
     getIdentifierHash(): string {
-        return this.btcTxId ?? "OUTSTANDING";
+        return this.quoteId;
     }
 
     getOutputGasAmount(): bigint {

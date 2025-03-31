@@ -208,6 +208,7 @@ class SpvVaults {
                 }
             }
             if (vault.state === SpvVault_1.SpvVaultState.BTC_CONFIRMED) {
+                //TODO: If we crash after open tx is sent (but not confirmed yet) we will be stuck in the loop here
                 const txId = await spvVaultContract.open(signer, vault.data, { waitForConfirmation: true });
                 this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " opened on " + vault.chainId + " txId: " + txId);
                 vault.state = SpvVault_1.SpvVaultState.OPENED;
