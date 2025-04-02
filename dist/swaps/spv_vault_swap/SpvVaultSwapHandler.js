@@ -327,6 +327,13 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 };
             }
             //Check correct psbt
+            for (let i = 1; i < transaction.inputsLength; i++) { //Skip first vault input
+                if ((0, btc_signer_1.getInputType)(transaction.getInput(i)).txType === "legacy")
+                    throw {
+                        code: 20514,
+                        msg: "Legacy (pre-segwit) inputs in tx are not allowed!"
+                    };
+            }
             const { spvVaultContract } = this.getChain(swap.chainIdentifier);
             let data;
             try {

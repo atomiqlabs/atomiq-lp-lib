@@ -27,7 +27,7 @@ import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEnco
 import {FieldTypeEnum} from "../../utils/paramcoders/SchemaVerifier";
 import {FromBtcAmountAssertions} from "../assertions/FromBtcAmountAssertions";
 import {randomBytes} from "crypto";
-import {Transaction} from "@scure/btc-signer";
+import {getInputType, OutScript, Transaction} from "@scure/btc-signer";
 import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
@@ -455,6 +455,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             }
 
             //Check correct psbt
+            for(let i=1;i<transaction.inputsLength;i++) { //Skip first vault input
+                if(getInputType(transaction.getInput(i)).txType==="legacy") throw {
+                    code: 20514,
+                    msg: "Legacy (pre-segwit) inputs in tx are not allowed!"
+                }
+            }
+
             const {spvVaultContract} = this.getChain(swap.chainIdentifier);
 
             let data: SpvWithdrawalTransactionData;
