@@ -32,12 +32,18 @@ class SpvVault extends base_1.Lockable {
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
     update(event) {
+        if (event instanceof base_1.SpvVaultClaimEvent || event instanceof base_1.SpvVaultCloseEvent) {
+            const processedWithdrawalIndex = this.pendingWithdrawals.findIndex(val => val.btcTx.txid === event.btcTxId);
+            if (processedWithdrawalIndex !== -1)
+                this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
+        }
         this.data.updateState(event);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
     addWithdrawal(withdrawalData) {
+        //Make sure this is a valid state transition before adding the tx to pending withdrawals
+        this.balances = this.data.calculateStateAfter([...this.pendingWithdrawals, withdrawalData]).balances;
         this.pendingWithdrawals.push(withdrawalData);
-        this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
     removeWithdrawal(withdrawalData) {
         const index = this.pendingWithdrawals.indexOf(withdrawalData);
