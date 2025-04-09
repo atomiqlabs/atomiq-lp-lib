@@ -314,14 +314,20 @@ class SpvVaults {
      * Returns a ready-to-use vault for a specific request
      *
      * @param chainIdentifier
+     * @param totalSats
      * @param token
      * @param amount
      * @param gasToken
      * @param gasTokenAmount
      * @protected
      */
-    async findVaultForSwap(chainIdentifier, token, amount, gasToken, gasTokenAmount) {
+    async findVaultForSwap(chainIdentifier, totalSats, token, amount, gasToken, gasTokenAmount) {
         const { signer } = this.getChain(chainIdentifier);
+        const pluginResponse = await PluginManager_1.PluginManager.onVaultSelection(chainIdentifier, totalSats, { token, amount }, { token: gasToken, amount: gasTokenAmount });
+        if (pluginResponse != null) {
+            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(pluginResponse);
+            return pluginResponse;
+        }
         const candidates = Object.keys(this.vaultStorage.data)
             .map(key => this.vaultStorage.data[key])
             .filter(vault => vault.chainId === chainIdentifier && vault.data.getOwner() === signer.getAddress() && vault.isReady())
@@ -337,11 +343,7 @@ class SpvVaults {
             return true;
         });
         candidates.sort((a, b) => (0, Utils_1.bigIntSorter)(a.balances[0].scaledAmount, b.balances[0].scaledAmount));
-        const pluginResponse = await PluginManager_1.PluginManager.onVaultSelection(chainIdentifier, { token, amount }, { token: gasToken, amount: gasTokenAmount }, candidates);
-        if (pluginResponse != null) {
-            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(pluginResponse);
-        }
-        const result = pluginResponse ?? candidates[0];
+        const result = candidates[0];
         if (result == null)
             throw {
                 code: 20301,

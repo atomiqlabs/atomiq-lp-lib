@@ -214,11 +214,11 @@ class PluginManager {
         }
         return null;
     }
-    static async onVaultSelection(chainIdentifier, requestedAmount, gasAmount, candidates) {
+    static async onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount) {
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onVaultSelection != null) {
-                    const result = await plugin.onVaultSelection(chainIdentifier, requestedAmount, gasAmount, candidates);
+                    const result = await plugin.onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount);
                     if (result != null) {
                         if ((0, IPlugin_1.isQuoteThrow)(result))
                             return result;

@@ -43,13 +43,14 @@ export declare class SpvVaults {
      * Returns a ready-to-use vault for a specific request
      *
      * @param chainIdentifier
+     * @param totalSats
      * @param token
      * @param amount
      * @param gasToken
      * @param gasTokenAmount
      * @protected
      */
-    findVaultForSwap(chainIdentifier: string, token: string, amount: bigint, gasToken: string, gasTokenAmount: bigint): Promise<SpvVault<SpvWithdrawalTransactionData> | null>;
+    findVaultForSwap(chainIdentifier: string, totalSats: bigint, token: string, amount: bigint, gasToken: string, gasTokenAmount: bigint): Promise<SpvVault | null>;
     saveVault(vault: SpvVault): Promise<void>;
     startVaultsWatchdog(): Promise<void>;
     init(): Promise<void>;

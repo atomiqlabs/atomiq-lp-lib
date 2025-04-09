@@ -293,14 +293,14 @@ export class PluginManager {
 
     static async onVaultSelection(
         chainIdentifier: string,
+        totalSats: bigint,
         requestedAmount: {amount: bigint, token: string},
-        gasAmount: {amount: bigint, token: string},
-        candidates: SpvVault[]
+        gasAmount: {amount: bigint, token: string}
     ): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onVaultSelection!=null) {
-                    const result = await plugin.onVaultSelection(chainIdentifier, requestedAmount, gasAmount, candidates);
+                    const result = await plugin.onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount);
                     if(result!=null) {
                         if(isQuoteThrow(result)) return result;
                         if(isQuoteAmountTooHigh(result)) return result;

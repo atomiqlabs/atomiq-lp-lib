@@ -101,12 +101,12 @@ export declare class PluginManager {
         baseFeeInBtc: bigint;
         feePPM: bigint;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
-    static onVaultSelection(chainIdentifier: string, requestedAmount: {
+    static onVaultSelection(chainIdentifier: string, totalSats: bigint, requestedAmount: {
         amount: bigint;
         token: string;
     }, gasAmount: {
         amount: bigint;
         token: string;
-    }, candidates: SpvVault[]): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow>;
+    }): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow>;
     static getWhitelistedTxIds(): Set<string>;
 }

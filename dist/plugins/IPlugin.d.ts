@@ -1,4 +1,4 @@
-import { BitcoinRpc, SpvWithdrawalTransactionData } from "@atomiqlabs/base";
+import { BitcoinRpc } from "@atomiqlabs/base";
 import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { Command } from "@atomiqlabs/server-base";
@@ -128,13 +128,13 @@ export interface IPlugin {
         feePPM: bigint;
         networkFeeGetter: (amount: bigint) => Promise<bigint>;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
-    onVaultSelection?(chainIdentifier: string, requestedAmount: {
+    onVaultSelection?(chainIdentifier: string, totalSats: bigint, requestedAmount: {
         amount: bigint;
         token: string;
     }, gasAmount: {
         amount: bigint;
         token: string;
-    }, candidates: SpvVault<SpvWithdrawalTransactionData>[]): Promise<SpvVault<SpvWithdrawalTransactionData> | null>;
+    }): Promise<SpvVault | null>;
     /**
      * Returns whitelisted bitcoin txIds that are OK to spend even with 0-confs
      */

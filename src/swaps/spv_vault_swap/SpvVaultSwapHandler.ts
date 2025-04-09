@@ -334,8 +334,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             );
             metadata.times.priceCalculated = Date.now();
 
+            const totalBtcOutput = amountBD + amountBDgas;
+
             //Check if we have enough funds to honor the request
-            const vault = await this.Vaults.findVaultForSwap(chainIdentifier, useToken, totalInToken, gasToken, totalInGasToken);
+            const vault = await this.Vaults.findVaultForSwap(chainIdentifier, totalBtcOutput, useToken, totalInToken, gasToken, totalInGasToken);
             metadata.times.vaultPicked = Date.now();
 
             //Create swap receive bitcoin address
@@ -359,7 +361,6 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const frontingFeeShare = parsedBody.frontingFeeRate;
             const executionFeeShare = 0n;
             const utxo = vault.getLatestUtxo();
-            const totalBtcOutput = amountBD + amountBDgas;
 
             const quoteId = randomBytes(32).toString("hex");
             const swap = new SpvVaultSwap(
@@ -374,7 +375,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             await PluginManager.swapCreate(swap);
             await this.saveSwapData(swap);
 
-            this.swapLogger.info(swap, "REST: /getQuote: Created swap address: "+receiveAddress+" amount: "+amountBD.toString(10));
+            this.swapLogger.info(swap, "REST: /getQuote: Created swap address: "+receiveAddress+" amount: "+totalBtcOutput.toString(10));
 
             await responseStream.writeParamsAndEnd({
                 code: 20000,

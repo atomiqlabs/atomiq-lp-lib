@@ -153,10 +153,10 @@ export interface IPlugin {
 
     onVaultSelection?(
         chainIdentifier: string,
+        totalSats: bigint,
         requestedAmount: {amount: bigint, token: string},
-        gasAmount: {amount: bigint, token: string},
-        candidates: SpvVault<SpvWithdrawalTransactionData>[]
-    ): Promise<SpvVault<SpvWithdrawalTransactionData> | null>;
+        gasAmount: {amount: bigint, token: string}
+    ): Promise<SpvVault | null>;
 
     /**
      * Returns whitelisted bitcoin txIds that are OK to spend even with 0-confs
