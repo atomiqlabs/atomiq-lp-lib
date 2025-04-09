@@ -24,6 +24,10 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
     removeWithdrawal(withdrawalData: D): boolean;
     toRawAmounts(amounts: bigint[]): bigint[];
     fromRawAmounts(rawAmounts: bigint[]): bigint[];
+    /**
+     * Returns the vault balance after processing all currently confirmed (at least 1 btc confirmation) withdrawals
+     */
+    getConfirmedBalance(): SpvVaultTokenBalance[];
     serialize(): any;
     getIdentifier(): string;
     /**

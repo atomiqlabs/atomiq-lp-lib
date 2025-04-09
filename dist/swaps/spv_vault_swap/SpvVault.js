@@ -69,6 +69,12 @@ class SpvVault extends base_1.Lockable {
             return amt * tokenData.multiplier;
         });
     }
+    /**
+     * Returns the vault balance after processing all currently confirmed (at least 1 btc confirmation) withdrawals
+     */
+    getConfirmedBalance() {
+        return this.data.calculateStateAfter(this.pendingWithdrawals.filter(val => val.btcTx.confirmations >= 1)).balances;
+    }
     serialize() {
         return {
             state: this.state,
