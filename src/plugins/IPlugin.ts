@@ -156,7 +156,7 @@ export interface IPlugin {
         totalSats: bigint,
         requestedAmount: {amount: bigint, token: string},
         gasAmount: {amount: bigint, token: string}
-    ): Promise<SpvVault | null>;
+    ): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow | null>;
 
     /**
      * Returns whitelisted bitcoin txIds that are OK to spend even with 0-confs
