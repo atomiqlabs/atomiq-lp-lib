@@ -328,10 +328,17 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             }
             //Check correct psbt
             for (let i = 1; i < transaction.inputsLength; i++) { //Skip first vault input
-                if ((0, btc_signer_1.getInputType)(transaction.getInput(i)).txType === "legacy")
+                const txIn = transaction.getInput(i);
+                if ((0, btc_signer_1.getInputType)(txIn).txType === "legacy")
                     throw {
                         code: 20514,
                         msg: "Legacy (pre-segwit) inputs in tx are not allowed!"
+                    };
+                //Check UTXOs exist and are unspent
+                if (await this.bitcoinRpc.isSpent(Buffer.from(txIn.txid).toString("hex") + ":" + txIn.index.toString(10)))
+                    throw {
+                        code: 20515,
+                        msg: "Spent UTXO in inputs!"
                     };
             }
             const { spvVaultContract } = this.getChain(swap.chainIdentifier);
