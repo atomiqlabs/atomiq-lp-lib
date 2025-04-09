@@ -1,5 +1,5 @@
 import { BitcoinRpc, SpvWithdrawalTransactionData } from "@atomiqlabs/base";
-import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
+import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { Command } from "@atomiqlabs/server-base";
 import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
@@ -72,7 +72,7 @@ export interface IPlugin {
     onSwapStateChange?(swap: SwapHandlerSwap): Promise<void>;
     onSwapCreate?(swap: SwapHandlerSwap): Promise<void>;
     onSwapRemove?(swap: SwapHandlerSwap): Promise<void>;
-    onHandlePreFromBtcQuote?(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    onHandlePreFromBtcQuote?(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -87,7 +87,7 @@ export interface IPlugin {
         amount: bigint;
         token: string;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
-    onHandlePostFromBtcQuote?(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    onHandlePostFromBtcQuote?(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -104,7 +104,7 @@ export interface IPlugin {
         token: string;
         pricePrefetch?: Promise<bigint>;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
-    onHandlePreToBtcQuote?(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    onHandlePreToBtcQuote?(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -115,7 +115,7 @@ export interface IPlugin {
         baseFeeInBtc: bigint;
         feePPM: bigint;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
-    onHandlePostToBtcQuote?(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    onHandlePostToBtcQuote?(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;

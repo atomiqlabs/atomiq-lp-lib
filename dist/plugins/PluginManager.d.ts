@@ -1,6 +1,6 @@
-import { BitcoinRpc, SpvWithdrawalTransactionData, SwapData } from "@atomiqlabs/base";
+import { BitcoinRpc, SwapData } from "@atomiqlabs/base";
 import { IPlugin, PluginQuote, QuoteAmountTooHigh, QuoteAmountTooLow, QuoteSetFees, QuoteThrow, ToBtcPluginQuote } from "./IPlugin";
-import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
+import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
@@ -41,7 +41,7 @@ export declare class PluginManager {
     static swapStateChange(swap: SwapHandlerSwap, oldState?: any): Promise<void>;
     static swapCreate(swap: SwapHandlerSwap): Promise<void>;
     static swapRemove(swap: SwapHandlerSwap): Promise<void>;
-    static onHandlePostFromBtcQuote(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    static onHandlePostFromBtcQuote(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -58,7 +58,7 @@ export declare class PluginManager {
         token: string;
         pricePrefetch?: Promise<bigint>;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
-    static onHandlePreFromBtcQuote(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    static onHandlePreFromBtcQuote(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -75,7 +75,7 @@ export declare class PluginManager {
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     static onHandlePostToBtcQuote<T extends {
         networkFee: bigint;
-    }>(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    }>(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -90,7 +90,7 @@ export declare class PluginManager {
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | (ToBtcPluginQuote & {
         networkFeeData: T;
     })>;
-    static onHandlePreToBtcQuote(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    static onHandlePreToBtcQuote(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -107,6 +107,6 @@ export declare class PluginManager {
     }, gasAmount: {
         amount: bigint;
         token: string;
-    }, candidates: SpvVault<SpvWithdrawalTransactionData>[]): Promise<SpvVault<SpvWithdrawalTransactionData> | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow>;
+    }, candidates: SpvVault[]): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow>;
     static getWhitelistedTxIds(): Set<string>;
 }

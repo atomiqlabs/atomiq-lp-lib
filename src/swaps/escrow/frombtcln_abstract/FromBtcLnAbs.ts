@@ -596,7 +596,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
 
             //Check request params
             this.checkDescriptionHash(parsedBody.descriptionHash);
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -631,7 +631,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 totalInToken,
                 securityDepositApyPPM,
                 securityDepositBaseMultiplierPPM
-            } = await this.AmountAssertions.checkFromBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
+            } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             if(securityDepositApyPPM!=null) fees.securityDepositApyPPM = securityDepositApyPPM;

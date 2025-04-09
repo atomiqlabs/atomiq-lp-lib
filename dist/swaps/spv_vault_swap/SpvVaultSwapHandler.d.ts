@@ -31,7 +31,7 @@ export type SpvVaultPostQuote = {
     psbtHex: string;
 };
 export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
-    readonly type: SwapHandlerType;
+    readonly type = SwapHandlerType.FROM_BTC_SPV;
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
     readonly vaultSigner: ISpvVaultSigner;

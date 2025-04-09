@@ -19,7 +19,7 @@ export type FromBtcTrustedRequestType = {
     token?: string;
 };
 export declare class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
-    readonly type: SwapHandlerType;
+    readonly type = SwapHandlerType.FROM_BTC_TRUSTED;
     readonly config: FromBtcTrustedConfig;
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;

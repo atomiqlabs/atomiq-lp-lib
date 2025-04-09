@@ -1,9 +1,9 @@
 import {BitcoinRpc, SpvWithdrawalTransactionData, SwapData} from "@atomiqlabs/base";
 import {
     FromBtcLnRequestType,
-    FromBtcRequestType,
-    ISwapPrice, MultichainData, RequestData,
-    SwapHandler,
+    FromBtcRequestType, FromBtcTrustedRequestType,
+    ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType,
+    SwapHandler, SwapHandlerType,
     ToBtcLnRequestType,
     ToBtcRequestType
 } from "..";
@@ -116,7 +116,8 @@ export interface IPlugin {
     onSwapRemove?(swap: SwapHandlerSwap): Promise<void>;
 
     onHandlePreFromBtcQuote?(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string},
         chainIdentifier: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
@@ -124,7 +125,8 @@ export interface IPlugin {
         gasTokenAmount?: {input: false, amount: bigint, token: string}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostFromBtcQuote?(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         chainIdentifier: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
@@ -133,6 +135,7 @@ export interface IPlugin {
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
 
     onHandlePreToBtcQuote?(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string},
         chainIdentifier: string,
@@ -140,6 +143,7 @@ export interface IPlugin {
         fees: {baseFeeInBtc: bigint, feePPM: bigint}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     onHandlePostToBtcQuote?(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         chainIdentifier: string,

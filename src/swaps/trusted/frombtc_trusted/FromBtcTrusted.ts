@@ -1,10 +1,5 @@
 import {FromBtcTrustedSwap, FromBtcTrustedSwapState} from "./FromBtcTrustedSwap";
-import {
-    BitcoinRpc,
-    BtcBlock,
-    BtcTx,
-    BtcVout
-} from "@atomiqlabs/base";
+import {BitcoinRpc, BtcBlock, BtcTx, BtcVout} from "@atomiqlabs/base";
 import {Express, Request, Response} from "express";
 import {MultichainData, SwapBaseConfig, SwapHandler, SwapHandlerType} from "../../SwapHandler";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
@@ -32,7 +27,7 @@ export type FromBtcTrustedRequestType = {
 };
 
 export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
-    readonly type: SwapHandlerType = SwapHandlerType.FROM_BTC_TRUSTED;
+    readonly type = SwapHandlerType.FROM_BTC_TRUSTED;
 
     readonly config: FromBtcTrustedConfig;
     readonly bitcoin: IBitcoinWallet;
@@ -441,7 +436,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
             const useToken = parsedBody.token;
 
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -466,7 +461,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                 swapFee,
                 swapFeeInToken,
                 totalInToken
-            } = await this.AmountAssertions.checkFromBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
+            } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             //Make sure we have MORE THAN ENOUGH to honor the swap request

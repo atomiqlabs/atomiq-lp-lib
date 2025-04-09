@@ -12,13 +12,14 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param gasAmount
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    async preCheckFromBtcAmounts(request, requestedAmount, gasAmount) {
-        const res = await PluginManager_1.PluginManager.onHandlePreFromBtcQuote(request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM }, gasAmount);
+    async preCheckFromBtcAmounts(swapType, request, requestedAmount, gasAmount) {
+        const res = await PluginManager_1.PluginManager.onHandlePreFromBtcQuote(swapType, request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM }, gasAmount);
         if (res != null) {
             AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
@@ -51,6 +52,7 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param fees
@@ -58,11 +60,11 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
      * @param gasTokenAmount
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    async checkFromBtcAmount(request, requestedAmount, fees, signal, gasTokenAmount) {
+    async checkFromBtcAmount(swapType, request, requestedAmount, fees, signal, gasTokenAmount) {
         const chainIdentifier = request.chainIdentifier;
         let securityDepositApyPPM;
         let securityDepositBaseMultiplierPPM;
-        const res = await PluginManager_1.PluginManager.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM }, gasTokenAmount);
+        const res = await PluginManager_1.PluginManager.onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM }, gasTokenAmount);
         signal.throwIfAborted();
         if (res != null) {
             AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);

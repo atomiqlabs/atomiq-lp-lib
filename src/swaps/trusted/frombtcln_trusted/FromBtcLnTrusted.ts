@@ -35,7 +35,7 @@ export type FromBtcLnTrustedRequestType = {
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
 export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState> {
-    readonly type: SwapHandlerType = SwapHandlerType.FROM_BTCLN_TRUSTED;
+    readonly type = SwapHandlerType.FROM_BTCLN_TRUSTED;
 
     activeSubscriptions: Map<string, AbortController> = new Map<string, AbortController>();
     processedTxIds: Map<string, string> = new Map<string, string>();
@@ -407,7 +407,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             const useToken = parsedBody.token;
 
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -433,7 +433,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 swapFee,
                 swapFeeInToken,
                 totalInToken
-            } = await this.AmountAssertions.checkFromBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
+            } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
 
             //Check if we have enough funds to honor the request

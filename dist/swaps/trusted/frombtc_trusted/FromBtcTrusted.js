@@ -374,7 +374,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
             };
             const useToken = parsedBody.token;
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
             //Create abortController for parallel prefetches
             const responseStream = res.responseStream;
@@ -391,7 +391,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                 return null;
             });
             //Check valid amount specified (min/max)
-            const { amountBD, swapFee, swapFeeInToken, totalInToken } = await this.AmountAssertions.checkFromBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal);
+            const { amountBD, swapFee, swapFeeInToken, totalInToken } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();
             //Make sure we have MORE THAN ENOUGH to honor the swap request
             await this.checkBalance(totalInToken * 4n, balancePrefetch, abortController.signal);

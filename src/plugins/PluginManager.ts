@@ -9,9 +9,9 @@ import {
 } from "./IPlugin";
 import {
     FromBtcLnRequestType,
-    FromBtcRequestType,
-    ISwapPrice, MultichainData, RequestData,
-    SwapHandler,
+    FromBtcRequestType, FromBtcTrustedRequestType,
+    ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType,
+    SwapHandler, SwapHandlerType,
     ToBtcLnRequestType,
     ToBtcRequestType
 } from "..";
@@ -167,7 +167,8 @@ export class PluginManager {
     }
 
     static async onHandlePostFromBtcQuote(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         chainIdentifier: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
@@ -177,7 +178,7 @@ export class PluginManager {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePostFromBtcQuote!=null) {
-                    const result = await plugin.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
+                    const result = await plugin.onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if(result!=null) {
                         if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
@@ -197,7 +198,8 @@ export class PluginManager {
     }
 
     static async onHandlePreFromBtcQuote(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string},
         chainIdentifier: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
@@ -207,7 +209,7 @@ export class PluginManager {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePreFromBtcQuote!=null) {
-                    const result = await plugin.onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
+                    const result = await plugin.onHandlePreFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if(result!=null) {
                         if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
@@ -223,6 +225,7 @@ export class PluginManager {
     }
 
     static async onHandlePostToBtcQuote<T extends {networkFee: bigint}>(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         chainIdentifier: string,
@@ -233,7 +236,7 @@ export class PluginManager {
             try {
                 if(plugin.onHandlePostToBtcQuote!=null) {
                     let networkFeeData: T;
-                    const result = await plugin.onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, constraints, {
+                    const result = await plugin.onHandlePostToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, {
                         baseFeeInBtc: fees.baseFeeInBtc,
                         feePPM: fees.feePPM,
                         networkFeeGetter: async (amount: bigint) => {
@@ -263,6 +266,7 @@ export class PluginManager {
     }
 
     static async onHandlePreToBtcQuote(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string},
         chainIdentifier: string,
@@ -272,7 +276,7 @@ export class PluginManager {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePreToBtcQuote!=null) {
-                    const result = await plugin.onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, constraints, fees);
+                    const result = await plugin.onHandlePreToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees);
                     if(result!=null) {
                         if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
@@ -291,8 +295,8 @@ export class PluginManager {
         chainIdentifier: string,
         requestedAmount: {amount: bigint, token: string},
         gasAmount: {amount: bigint, token: string},
-        candidates: SpvVault<SpvWithdrawalTransactionData>[]
-    ): Promise<SpvVault<SpvWithdrawalTransactionData> | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow> {
+        candidates: SpvVault[]
+    ): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onVaultSelection!=null) {

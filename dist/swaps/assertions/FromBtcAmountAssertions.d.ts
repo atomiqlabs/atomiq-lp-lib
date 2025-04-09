@@ -1,9 +1,11 @@
 import { FromBtcLnRequestType } from "../escrow/frombtcln_abstract/FromBtcLnAbs";
 import { FromBtcRequestType } from "../escrow/frombtc_abstract/FromBtcAbs";
 import { FromBtcLnTrustedRequestType } from "../trusted/frombtcln_trusted/FromBtcLnTrusted";
-import { RequestData } from "../SwapHandler";
+import { RequestData, SwapHandlerType } from "../SwapHandler";
 import { AmountAssertions, AmountAssertionsConfig } from "./AmountAssertions";
 import { ISwapPrice } from "../../prices/ISwapPrice";
+import { FromBtcTrustedRequestType } from "../trusted/frombtc_trusted/FromBtcTrusted";
+import { SpvVaultSwapRequestType } from "../spv_vault_swap/SpvVaultSwapHandler";
 export type FromBtcAmountAssertionsConfig = AmountAssertionsConfig & {
     gasTokenMax?: {
         [chainId: string]: bigint;
@@ -15,12 +17,13 @@ export declare class FromBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param gasAmount
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    preCheckFromBtcAmounts(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    preCheckFromBtcAmounts(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -37,6 +40,7 @@ export declare class FromBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param fees
@@ -44,7 +48,7 @@ export declare class FromBtcAmountAssertions extends AmountAssertions {
      * @param gasTokenAmount
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    checkFromBtcAmount(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    checkFromBtcAmount(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;

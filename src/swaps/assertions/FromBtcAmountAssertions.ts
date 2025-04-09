@@ -3,9 +3,11 @@ import {FromBtcRequestType} from "../escrow/frombtc_abstract/FromBtcAbs";
 import {FromBtcLnTrustedRequestType} from "../trusted/frombtcln_trusted/FromBtcLnTrusted";
 import {PluginManager} from "../../plugins/PluginManager";
 import {isPluginQuote, isQuoteSetFees} from "../../plugins/IPlugin";
-import {RequestData} from "../SwapHandler";
+import {RequestData, SwapHandlerType} from "../SwapHandler";
 import {AmountAssertions, AmountAssertionsConfig} from "./AmountAssertions";
 import {ISwapPrice} from "../../prices/ISwapPrice";
+import {FromBtcTrustedRequestType} from "../trusted/frombtc_trusted/FromBtcTrusted";
+import {SpvVaultSwapRequestType} from "../spv_vault_swap/SpvVaultSwapHandler";
 
 export type FromBtcAmountAssertionsConfig = AmountAssertionsConfig & {
     gasTokenMax?: {[chainId: string]: bigint}
@@ -23,13 +25,15 @@ export class FromBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param gasAmount
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     async preCheckFromBtcAmounts(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string},
         gasAmount?: {input: false, amount: bigint, token: string}
     ): Promise<{
@@ -39,6 +43,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         securityDepositBaseMultiplierPPM?: bigint,
     }> {
         const res = await PluginManager.onHandlePreFromBtcQuote(
+            swapType,
             request,
             requestedAmount,
             request.chainIdentifier,
@@ -80,6 +85,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param fees
@@ -88,7 +94,8 @@ export class FromBtcAmountAssertions extends AmountAssertions {
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     async checkFromBtcAmount(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         fees: {baseFee: bigint, feePPM: bigint},
         signal: AbortSignal,
@@ -111,6 +118,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         let securityDepositBaseMultiplierPPM: bigint;
 
         const res = await PluginManager.onHandlePostFromBtcQuote(
+            swapType,
             request,
             requestedAmount,
             chainIdentifier,

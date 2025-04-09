@@ -654,7 +654,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 amount: !!parsedBody.exactIn ? parsedBody.amount : (parsedPR.mtokens + 999n) / 1000n,
                 token: useToken
             };
-            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckToBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
             //Create abort controller for parallel pre-fetches
             const abortController = (0, Utils_1.getAbortController)(responseStream);
@@ -664,7 +664,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             await this.LightningAssertions.checkPriorPayment(parsedPR.id, abortController.signal);
             metadata.times.priorPaymentChecked = Date.now();
             //Check amounts
-            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amountBD) => {
+            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amountBD) => {
                 //Check if we have enough liquidity to process the swap
                 await this.LightningAssertions.checkLiquidity(amountBD, abortController.signal, true);
                 metadata.times.liquidityChecked = Date.now();

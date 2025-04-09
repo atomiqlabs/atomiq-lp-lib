@@ -1,17 +1,17 @@
 import { AmountAssertions } from "./AmountAssertions";
 import { ToBtcLnRequestType } from "../escrow/tobtcln_abstract/ToBtcLnAbs";
 import { ToBtcRequestType } from "../escrow/tobtc_abstract/ToBtcAbs";
-import { RequestData } from "../SwapHandler";
+import { RequestData, SwapHandlerType } from "../SwapHandler";
 export declare class ToBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
-     * @param useToken
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    preCheckToBtcAmounts(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    preCheckToBtcAmounts(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;
@@ -22,6 +22,7 @@ export declare class ToBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates network fee (based on the callback passed), swap fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param fees
@@ -32,7 +33,7 @@ export declare class ToBtcAmountAssertions extends AmountAssertions {
      */
     checkToBtcAmount<T extends {
         networkFee: bigint;
-    }>(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    }>(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
         token: string;

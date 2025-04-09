@@ -3,7 +3,7 @@ import {ToBtcLnRequestType} from "../escrow/tobtcln_abstract/ToBtcLnAbs";
 import {ToBtcRequestType} from "../escrow/tobtc_abstract/ToBtcAbs";
 import {PluginManager} from "../../plugins/PluginManager";
 import {isQuoteSetFees, isToBtcPluginQuote} from "../../plugins/IPlugin";
-import {RequestData} from "../SwapHandler";
+import {RequestData, SwapHandlerType} from "../SwapHandler";
 
 
 export class ToBtcAmountAssertions extends AmountAssertions {
@@ -11,16 +11,18 @@ export class ToBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
-     * @param useToken
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     async preCheckToBtcAmounts(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string}
     ): Promise<{baseFee: bigint, feePPM: bigint}> {
         const res = await PluginManager.onHandlePreToBtcQuote(
+            swapType,
             request,
             requestedAmount,
             request.chainIdentifier,
@@ -48,6 +50,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
     /**
      * Checks minimums/maximums, calculates network fee (based on the callback passed), swap fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param fees
@@ -57,6 +60,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
      *  or if we don't have enough funds (getNetworkFee callback throws)
      */
     async checkToBtcAmount<T extends {networkFee: bigint}>(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         fees: {baseFee: bigint, feePPM: bigint},
@@ -74,6 +78,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
         const chainIdentifier = request.chainIdentifier;
 
         const res = await PluginManager.onHandlePostToBtcQuote<T>(
+            swapType,
             request,
             requestedAmount,
             request.chainIdentifier,

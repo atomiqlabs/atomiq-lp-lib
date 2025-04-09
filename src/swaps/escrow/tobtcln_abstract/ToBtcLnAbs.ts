@@ -841,7 +841,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 amount: !!parsedBody.exactIn ? parsedBody.amount : (parsedPR.mtokens + 999n) / 1000n,
                 token: useToken
             };
-            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckToBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abort controller for parallel pre-fetches
@@ -862,7 +862,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 swapFee,
                 swapFeeInToken,
                 networkFeeInToken
-            } = await this.AmountAssertions.checkToBtcAmount(request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, async (amountBD: bigint) => {
+            } = await this.AmountAssertions.checkToBtcAmount(this.type, request, {...requestedAmount, pricePrefetch: pricePrefetchPromise}, fees, async (amountBD: bigint) => {
                 //Check if we have enough liquidity to process the swap
                 await this.LightningAssertions.checkLiquidity(amountBD, abortController.signal, true);
                 metadata.times.liquidityChecked = Date.now();

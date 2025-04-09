@@ -227,7 +227,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const useToken = parsedBody.token;
             const gasToken = parsedBody.gasToken;
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
             //Create abortController for parallel prefetches
             const responseStream = res.responseStream;
@@ -235,7 +235,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             //Pre-fetch data
             const { pricePrefetchPromise, gasTokenPricePrefetchPromise } = this.getPricePrefetches(chainIdentifier, useToken, gasToken, abortController);
             //Check valid amount specified (min/max)
-            let { amountBD, swapFee, swapFeeInToken, totalInToken, amountBDgas, gasSwapFee, gasSwapFeeInToken, totalInGasToken } = await this.AmountAssertions.checkFromBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal, { ...gasTokenAmount, pricePrefetch: gasTokenPricePrefetchPromise });
+            let { amountBD, swapFee, swapFeeInToken, totalInToken, amountBDgas, gasSwapFee, gasSwapFeeInToken, totalInGasToken } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal, { ...gasTokenAmount, pricePrefetch: gasTokenPricePrefetchPromise });
             metadata.times.priceCalculated = Date.now();
             //Check if we have enough funds to honor the request
             const vault = await this.Vaults.findVaultForSwap(chainIdentifier, useToken, totalInToken, gasToken, totalInGasToken);

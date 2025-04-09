@@ -537,12 +537,12 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             this.checkRequiredConfirmations(parsedBody.confirmations);
             this.checkAddress(parsedBody.address);
             await this.checkVaultInitialized(chainIdentifier, parsedBody.token);
-            const fees = await this.AmountAssertions.preCheckToBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckToBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
             //Initialize abort controller for the parallel async operations
             const abortController = (0, Utils_1.getAbortController)(responseStream);
             const { pricePrefetchPromise, signDataPrefetchPromise } = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
-            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amount) => {
+            const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amount) => {
                 metadata.times.amountsChecked = Date.now();
                 const resp = await this.checkAndGetNetworkFee(parsedBody.address, amount);
                 this.logger.debug("checkToBtcAmount(): network fee calculated, amount: " + amount.toString(10) + " fee: " + resp.networkFee.toString(10));

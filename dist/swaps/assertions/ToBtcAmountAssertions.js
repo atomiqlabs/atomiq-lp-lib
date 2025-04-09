@@ -8,13 +8,13 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
     /**
      * Checks minimums/maximums, calculates the fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
-     * @param useToken
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    async preCheckToBtcAmounts(request, requestedAmount) {
-        const res = await PluginManager_1.PluginManager.onHandlePreToBtcQuote(request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM });
+    async preCheckToBtcAmounts(swapType, request, requestedAmount) {
+        const res = await PluginManager_1.PluginManager.onHandlePreToBtcQuote(swapType, request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM });
         if (res != null) {
             AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
@@ -35,6 +35,7 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
     /**
      * Checks minimums/maximums, calculates network fee (based on the callback passed), swap fee & total amount
      *
+     * @param swapType
      * @param request
      * @param requestedAmount
      * @param fees
@@ -43,9 +44,9 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds,
      *  or if we don't have enough funds (getNetworkFee callback throws)
      */
-    async checkToBtcAmount(request, requestedAmount, fees, getNetworkFee, signal) {
+    async checkToBtcAmount(swapType, request, requestedAmount, fees, getNetworkFee, signal) {
         const chainIdentifier = request.chainIdentifier;
-        const res = await PluginManager_1.PluginManager.onHandlePostToBtcQuote(request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM, networkFeeGetter: getNetworkFee });
+        const res = await PluginManager_1.PluginManager.onHandlePostToBtcQuote(swapType, request, requestedAmount, request.chainIdentifier, { minInBtc: this.config.min, maxInBtc: this.config.max }, { baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM, networkFeeGetter: getNetworkFee });
         signal.throwIfAborted();
         if (res != null) {
             AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);

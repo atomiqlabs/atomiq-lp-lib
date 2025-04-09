@@ -54,7 +54,7 @@ export type SpvVaultPostQuote = {
 
 export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
 
-    readonly type: SwapHandlerType = SwapHandlerType.FROM_BTC_SPV;
+    readonly type = SwapHandlerType.FROM_BTC_SPV;
 
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
@@ -301,7 +301,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const gasToken = parsedBody.gasToken;
 
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -325,6 +325,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 gasSwapFeeInToken,
                 totalInGasToken
             } = await this.AmountAssertions.checkFromBtcAmount(
+                this.type,
                 request,
                 {...requestedAmount, pricePrefetch: pricePrefetchPromise},
                 fees,
