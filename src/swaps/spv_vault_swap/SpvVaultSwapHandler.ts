@@ -301,7 +301,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const gasToken = parsedBody.gasToken;
 
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
             metadata.times.requestChecked = Date.now();
 
             //Create abortController for parallel prefetches
@@ -371,6 +371,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 callerFeeShare, frontingFeeShare, executionFeeShare,
                 useToken, gasToken
             );
+            swap.metadata = metadata;
 
             await PluginManager.swapCreate(swap);
             await this.saveSwapData(swap);

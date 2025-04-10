@@ -227,7 +227,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const useToken = parsedBody.token;
             const gasToken = parsedBody.gasToken;
             //Check request params
-            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
+            const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
             metadata.times.requestChecked = Date.now();
             //Create abortController for parallel prefetches
             const responseStream = res.responseStream;
@@ -260,6 +260,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const utxo = vault.getLatestUtxo();
             const quoteId = (0, crypto_1.randomBytes)(32).toString("hex");
             const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, quoteId, expiry, vault, utxo, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, useToken, gasToken);
+            swap.metadata = metadata;
             await PluginManager_1.PluginManager.swapCreate(swap);
             await this.saveSwapData(swap);
             this.swapLogger.info(swap, "REST: /getQuote: Created swap address: " + receiveAddress + " amount: " + totalBtcOutput.toString(10));
