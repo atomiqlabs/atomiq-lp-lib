@@ -12,11 +12,11 @@ function objectBigIntsToString(obj: Object) {
 }
 
 export abstract class SwapHandlerSwap<S = any> extends Lockable implements StorageObject {
+    type: SwapHandlerType;
 
     chainIdentifier: string;
     state: S;
 
-    type: SwapHandlerType;
     metadata: {
         request: any,
         times: {[key: string]: number},

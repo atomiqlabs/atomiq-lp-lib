@@ -2,6 +2,7 @@ import {BigIntBufferUtils, BtcTx, SwapData} from "@atomiqlabs/base";
 import {deserializeBN, serializeBN} from "../../../utils/Utils";
 import {createHash, randomBytes} from "crypto";
 import {SwapHandlerSwap} from "../../SwapHandlerSwap";
+import {SwapHandlerType} from "../../SwapHandler";
 
 
 export enum FromBtcTrustedSwapState {
@@ -117,6 +118,7 @@ export class FromBtcTrustedSwap extends SwapHandlerSwap<FromBtcTrustedSwapState>
             this.refundTxId = objOrChainIdentifier.refundTxId;
             this.token = objOrChainIdentifier.token;
         }
+        this.type = SwapHandlerType.FROM_BTC_TRUSTED;
     }
 
     serialize(): any {

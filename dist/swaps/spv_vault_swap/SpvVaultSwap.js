@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SpvVaultSwap = exports.SpvVaultSwapState = void 0;
 const SwapHandlerSwap_1 = require("../SwapHandlerSwap");
 const Utils_1 = require("../../utils/Utils");
+const SwapHandler_1 = require("../SwapHandler");
 var SpvVaultSwapState;
 (function (SpvVaultSwapState) {
     SpvVaultSwapState[SpvVaultSwapState["FAILED"] = -3] = "FAILED";
@@ -71,6 +72,7 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.gasToken = chainIdentifierOrObj.gasToken;
             this.btcTxId = chainIdentifierOrObj.btcTxId;
         }
+        this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_SPV;
     }
     serialize() {
         return {

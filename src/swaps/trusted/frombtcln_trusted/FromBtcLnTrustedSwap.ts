@@ -1,8 +1,7 @@
-import {SwapData} from "@atomiqlabs/base";
 import {createHash} from "crypto";
-import {FromBtcBaseSwap} from "../../escrow/FromBtcBaseSwap";
 import {deserializeBN, serializeBN} from "../../../utils/Utils";
 import {SwapHandlerSwap} from "../../SwapHandlerSwap";
+import {SwapHandlerType} from "../../SwapHandler";
 
 export enum FromBtcLnTrustedSwapState {
     REFUNDED = -2,
@@ -68,7 +67,7 @@ export class FromBtcLnTrustedSwap extends SwapHandlerSwap<FromBtcLnTrustedSwapSt
             this.token = chainIdOrObj.token;
             this.scRawTx = chainIdOrObj.scRawTx;
         }
-        this.type = null;
+        this.type = SwapHandlerType.FROM_BTCLN_TRUSTED;
     }
 
     getToken(): string {

@@ -4,6 +4,7 @@ exports.FromBtcLnTrustedSwap = exports.FromBtcLnTrustedSwapState = void 0;
 const crypto_1 = require("crypto");
 const Utils_1 = require("../../../utils/Utils");
 const SwapHandlerSwap_1 = require("../../SwapHandlerSwap");
+const SwapHandler_1 = require("../../SwapHandler");
 var FromBtcLnTrustedSwapState;
 (function (FromBtcLnTrustedSwapState) {
     FromBtcLnTrustedSwapState[FromBtcLnTrustedSwapState["REFUNDED"] = -2] = "REFUNDED";
@@ -36,7 +37,7 @@ class FromBtcLnTrustedSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.token = chainIdOrObj.token;
             this.scRawTx = chainIdOrObj.scRawTx;
         }
-        this.type = null;
+        this.type = SwapHandler_1.SwapHandlerType.FROM_BTCLN_TRUSTED;
     }
     getToken() {
         return this.token;

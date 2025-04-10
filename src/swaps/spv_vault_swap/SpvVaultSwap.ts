@@ -1,6 +1,7 @@
 import {SwapHandlerSwap} from "../SwapHandlerSwap";
 import {SpvVault} from "./SpvVault";
 import {deserializeBN, serializeBN} from "../../utils/Utils";
+import {SwapHandlerType} from "../SwapHandler";
 
 export enum SpvVaultSwapState {
     FAILED = -3,
@@ -119,6 +120,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             this.gasToken = chainIdentifierOrObj.gasToken;
             this.btcTxId = chainIdentifierOrObj.btcTxId;
         }
+        this.type = SwapHandlerType.FROM_BTC_SPV;
     }
 
     serialize(): any {

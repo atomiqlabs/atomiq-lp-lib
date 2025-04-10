@@ -5,6 +5,7 @@ const base_1 = require("@atomiqlabs/base");
 const Utils_1 = require("../../../utils/Utils");
 const crypto_1 = require("crypto");
 const SwapHandlerSwap_1 = require("../../SwapHandlerSwap");
+const SwapHandler_1 = require("../../SwapHandler");
 var FromBtcTrustedSwapState;
 (function (FromBtcTrustedSwapState) {
     FromBtcTrustedSwapState[FromBtcTrustedSwapState["DOUBLE_SPENT"] = -4] = "DOUBLE_SPENT";
@@ -59,6 +60,7 @@ class FromBtcTrustedSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.refundTxId = objOrChainIdentifier.refundTxId;
             this.token = objOrChainIdentifier.token;
         }
+        this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_TRUSTED;
     }
     serialize() {
         const partialSerialized = super.serialize();

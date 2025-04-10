@@ -1,9 +1,9 @@
 import { Lockable, StorageObject } from "@atomiqlabs/base";
 import { SwapHandlerType } from "./SwapHandler";
 export declare abstract class SwapHandlerSwap<S = any> extends Lockable implements StorageObject {
+    type: SwapHandlerType;
     chainIdentifier: string;
     state: S;
-    type: SwapHandlerType;
     metadata: {
         request: any;
         times: {
