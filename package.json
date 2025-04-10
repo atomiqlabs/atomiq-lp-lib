@@ -1,6 +1,6 @@
 {
   "name": "@atomiqlabs/lp-lib",
-  "version": "13.0.0-dev.38",
+  "version": "13.0.0-dev.39",
   "description": "Main functionality implementation for atomiq LP node",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",

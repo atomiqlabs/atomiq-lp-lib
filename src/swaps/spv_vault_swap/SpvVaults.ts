@@ -359,7 +359,7 @@ export class SpvVaults {
         try {
             const txId = await spvVaultContract.claim(signer, vault.data, withdrawal.map(tx => {
                 return {tx};
-            }));
+            }), undefined, true, {waitForConfirmation: true});
             this.logger.info("claimWithdrawal(): Successfully claimed withdrawals, btcTxIds: "+withdrawal.map(val => val.btcTx.txid).join(", ")+" smartChainTxId: "+txId);
             return true;
         } catch (e) {
