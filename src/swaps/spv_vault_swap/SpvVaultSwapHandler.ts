@@ -3,7 +3,7 @@ import {Express, Request, Response} from "express";
 import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 import {
     BitcoinRpc,
-    BtcBlock,
+    BtcBlock, BtcTx,
     ChainEvent,
     IStorageManager,
     SpvVaultClaimEvent,
@@ -519,10 +519,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 msg: "One or more PSBT inputs not finalized!"
             };
 
-            const feeRate = Number(signedTx.fee) / signedTx.vsize;
-            if(feeRate < swap.btcFeeRate) throw {
+            const effectiveFeeRate = await this.bitcoinRpc.getEffectiveFeeRate(await this.bitcoin.parsePsbt(signedTx));
+            if(effectiveFeeRate.feeRate < swap.btcFeeRate) throw {
                 code: 20511,
-                msg: "Bitcoin transaction fee too low, expected minimum: "+swap.btcFeeRate
+                msg: "Bitcoin transaction fee too low, expected minimum: "+swap.btcFeeRate+" adjusted effective fee rate: "+effectiveFeeRate.feeRate
             }
 
             if(swap.vaultUtxo!==vault.getLatestUtxo()) {
