@@ -70,7 +70,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
         token?: string, gasToken?: string
     ) {
         if(typeof(chainIdentifierOrObj)==="string") {
-            super(chainIdentifierOrObj, swapFee + gasSwapFee, swapFeeInToken * (swapFee + gasSwapFee) / swapFee);
+            super(chainIdentifierOrObj, swapFee + gasSwapFee, swapFeeInToken);
             this.state = SpvVaultSwapState.CREATED;
             this.quoteId = quoteId;
             this.expiry = expiry;
