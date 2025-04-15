@@ -126,8 +126,18 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             }
         }
         else {
+            this.checkBtcAmountInBounds(requestedAmount.amount);
             amountBD = requestedAmount.amount - amountBDgas;
-            this.checkBtcAmountInBounds(amountBD);
+            if (amountBD < 0n) {
+                throw {
+                    code: 20003,
+                    msg: "Amount too low!",
+                    data: {
+                        min: this.config.min.toString(10),
+                        max: this.config.max.toString(10)
+                    }
+                };
+            }
         }
         const swapFee = fees.baseFee + (amountBD * fees.feePPM / 1000000n);
         const swapFeeInToken = await this.swapPricing.getFromBtcSwapAmount(swapFee, requestedAmount.token, chainIdentifier, true, requestedAmount.pricePrefetch);
