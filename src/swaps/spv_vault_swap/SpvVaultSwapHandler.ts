@@ -146,6 +146,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
     async init(): Promise<void> {
         await this.storageManager.loadData(SpvVaultSwap);
+        for(let {obj: swap, hash, sequence} of await this.storageManager.query([])) {
+            if(swap.btcTxId!=null) this.btcTxIdIndex.set(swap.btcTxId, swap);
+        }
         await this.Vaults.init();
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
