@@ -134,6 +134,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
         return {
             ...super.serialize(),
             quoteId: this.quoteId,
+            expiry: this.expiry,
             owner: this.vaultOwner,
             vaultId: serializeBN(this.vaultId),
             vaultAddress: this.vaultAddress,
