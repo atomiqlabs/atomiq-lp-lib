@@ -350,7 +350,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             metadata.times.addressCreated = Date.now();
 
             //Adjust the amounts based on passed fees
-            totalInToken = (totalInToken * 100_000n / (100_000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
+            if(parsedBody.exactOut) {
+                totalInToken = parsedBody.amount;
+            } else {
+                totalInToken = (totalInToken * 100_000n / (100_000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
+            }
             totalInGasToken = (totalInGasToken * 100_000n / (100_000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
 
             //Calculate raw amounts

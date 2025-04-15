@@ -251,7 +251,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
             //Adjust the amounts based on passed fees
-            totalInToken = (totalInToken * 100000n / (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
+            if (parsedBody.exactOut) {
+                totalInToken = parsedBody.amount;
+            }
+            else {
+                totalInToken = (totalInToken * 100000n / (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
+            }
             totalInGasToken = (totalInGasToken * 100000n / (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
             //Calculate raw amounts
             const [rawTokenAmount, rawGasTokenAmount] = vault.toRawAmounts([totalInToken, totalInGasToken]);
