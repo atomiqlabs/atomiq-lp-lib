@@ -89,6 +89,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
         const abortController = new AbortController();
         this.lightning.waitForInvoice(hash, abortController.signal).then(invoice => {
             this.swapLogger.debug(invoiceData, "subscribeToInvoice(): invoice_updated: ", invoice);
+            if(invoice.status!=="held") return;
             this.htlcReceived(invoiceData, invoice).catch(e => console.error(e));
             this.activeSubscriptions.delete(hash);
         });
