@@ -43,7 +43,9 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.frontingFeeShare = frontingFeeShare;
             this.executionFeeShare = executionFeeShare;
             this.token = token;
+            this.tokenMultiplier = vault.data.getTokenData()[0].multiplier;
             this.gasToken = gasToken;
+            this.gasTokenMultiplier = vault.data.getTokenData()[1].multiplier;
         }
         else {
             super(chainIdentifierOrObj);
@@ -70,6 +72,8 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.executionFeeShare = (0, Utils_1.deserializeBN)(chainIdentifierOrObj.executionFeeShare);
             this.token = chainIdentifierOrObj.token;
             this.gasToken = chainIdentifierOrObj.gasToken;
+            this.tokenMultiplier = (0, Utils_1.deserializeBN)(chainIdentifierOrObj.tokenMultiplier);
+            this.gasTokenMultiplier = (0, Utils_1.deserializeBN)(chainIdentifierOrObj.gasTokenMultiplier);
             this.btcTxId = chainIdentifierOrObj.btcTxId;
         }
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_SPV;
@@ -99,6 +103,8 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             executionFeeShare: (0, Utils_1.serializeBN)(this.executionFeeShare),
             token: this.token,
             gasToken: this.gasToken,
+            tokenMultiplier: (0, Utils_1.serializeBN)(this.tokenMultiplier),
+            gasTokenMultiplier: (0, Utils_1.serializeBN)(this.gasTokenMultiplier),
             btcTxId: this.btcTxId
         };
     }
@@ -110,6 +116,12 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     }
     getOutputAmount() {
         return this.amountToken;
+    }
+    getTotalOutputAmount() {
+        return this.rawAmountToken * (100000n + this.callerFeeShare + this.frontingFeeShare + this.executionFeeShare) / 100000n * this.tokenMultiplier;
+    }
+    getTotalOutputGasAmount() {
+        return this.rawAmountGasToken * (100000n + this.callerFeeShare + this.frontingFeeShare) / 100000n * this.gasTokenMultiplier;
     }
     getSequence() {
         return 0n;

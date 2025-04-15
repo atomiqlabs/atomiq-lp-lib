@@ -17,6 +17,8 @@ export declare class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     readonly vaultUtxo: string;
     readonly vaultAddress: string;
     readonly expiry: number;
+    readonly tokenMultiplier: bigint;
+    readonly gasTokenMultiplier: bigint;
     readonly tokenSwapFee: bigint;
     readonly tokenSwapFeeInToken: bigint;
     readonly gasSwapFee: bigint;
@@ -41,6 +43,8 @@ export declare class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     getIdentifierHash(): string;
     getOutputGasAmount(): bigint;
     getOutputAmount(): bigint;
+    getTotalOutputAmount(): bigint;
+    getTotalOutputGasAmount(): bigint;
     getSequence(): bigint | null;
     getSwapFee(): {
         inInputToken: bigint;

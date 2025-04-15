@@ -25,6 +25,9 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
 
     readonly expiry: number;
 
+    readonly tokenMultiplier: bigint;
+    readonly gasTokenMultiplier: bigint;
+
     readonly tokenSwapFee: bigint;
     readonly tokenSwapFeeInToken: bigint;
     readonly gasSwapFee: bigint;
@@ -92,7 +95,9 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             this.frontingFeeShare = frontingFeeShare;
             this.executionFeeShare = executionFeeShare;
             this.token = token;
+            this.tokenMultiplier = vault.data.getTokenData()[0].multiplier;
             this.gasToken = gasToken;
+            this.gasTokenMultiplier = vault.data.getTokenData()[1].multiplier;
         } else {
             super(chainIdentifierOrObj);
             this.quoteId = chainIdentifierOrObj.quoteId;
@@ -118,6 +123,8 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             this.executionFeeShare = deserializeBN(chainIdentifierOrObj.executionFeeShare);
             this.token = chainIdentifierOrObj.token;
             this.gasToken = chainIdentifierOrObj.gasToken;
+            this.tokenMultiplier = deserializeBN(chainIdentifierOrObj.tokenMultiplier);
+            this.gasTokenMultiplier = deserializeBN(chainIdentifierOrObj.gasTokenMultiplier);
             this.btcTxId = chainIdentifierOrObj.btcTxId;
         }
         this.type = SwapHandlerType.FROM_BTC_SPV;
@@ -148,6 +155,8 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             executionFeeShare: serializeBN(this.executionFeeShare),
             token: this.token,
             gasToken: this.gasToken,
+            tokenMultiplier: serializeBN(this.tokenMultiplier),
+            gasTokenMultiplier: serializeBN(this.gasTokenMultiplier),
             btcTxId: this.btcTxId
         };
     }
@@ -162,6 +171,14 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
 
     getOutputAmount(): bigint {
         return this.amountToken;
+    }
+
+    getTotalOutputAmount(): bigint {
+        return this.rawAmountToken * (100_000n + this.callerFeeShare + this.frontingFeeShare + this.executionFeeShare) / 100_000n * this.tokenMultiplier;
+    }
+
+    getTotalOutputGasAmount(): bigint {
+        return this.rawAmountGasToken * (100_000n + this.callerFeeShare + this.frontingFeeShare) / 100_000n * this.gasTokenMultiplier;
     }
 
     getSequence(): bigint | null {
