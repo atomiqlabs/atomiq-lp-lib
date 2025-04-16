@@ -82,6 +82,7 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             }
         }
         let amountBD;
+        let tooHigh = false;
         let tooLow = false;
         if (requestedAmount.input) {
             amountBD = await this.swapPricing.getToBtcSwapAmount(requestedAmount.amount, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
@@ -89,9 +90,14 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             //Decrease by base fee
             amountBD = amountBD - fees.baseFee;
             //If it's already smaller than minimum, set it to minimum so we can calculate the network fee
-            if (amountBD < this.config.min) {
+            if (amountBD < (this.config.min * 95n / 100n)) {
                 amountBD = this.config.min;
                 tooLow = true;
+            }
+            //If it's already larger than maximum, set it to maximum so we can calculate the network fee
+            if (amountBD > (this.config.max * 105n / 100n)) {
+                amountBD = this.config.max;
+                tooHigh = true;
             }
         }
         else {
@@ -105,7 +111,7 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             amountBD = amountBD - resp.networkFee;
             //Decrease by percentage fee
             amountBD = amountBD * 1000000n / (fees.feePPM + 1000000n);
-            const tooHigh = amountBD > (this.config.max * 105n / 100n);
+            tooHigh || (tooHigh = amountBD > (this.config.max * 105n / 100n));
             tooLow || (tooLow = amountBD < (this.config.min * 95n / 100n));
             if (tooLow || tooHigh) {
                 //Compute min/max
