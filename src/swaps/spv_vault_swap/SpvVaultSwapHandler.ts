@@ -424,12 +424,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
         restServer.use(this.path+"/postQuote", serverParamDecoder(10*1000));
         restServer.post(this.path+"/postQuote", expressHandlerWrapper(async (req: Request & {paramReader: IParamReader}, res: Response & {responseStream: ServerParamEncoder}) => {
-            const metadata: {
-                request: any,
-                times: {[key: string]: number},
-            } = {request: {}, times: {}};
-
-            metadata.times.requestReceived = Date.now();
+            let requestReceived = Date.now();
 
             const parsedBody: SpvVaultPostQuote = await req.paramReader.getParams({
                 quoteId: FieldTypeEnum.String,
@@ -443,6 +438,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 code: 20505,
                 msg: "Invalid quote ID, not found or expired!"
             };
+
+            const metadata: {
+                times: {[key: string]: number},
+                error?: any
+            } = swap.metadata;
+            metadata.times ??= {};
+            metadata.times.requestReceived = requestReceived;
 
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             if(vault==null || !vault.isReady()) {
@@ -504,6 +506,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 BigInt(data.btcTx.outs[2].value)!==swap.amountBtc ||
                 !Buffer.from(data.btcTx.outs[2].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.btcAddress))
             ) {
+                this.swapLogger.error(swap, "REST: /postQuote: Invalid psbt data submitted, raw psbt hex: ", parsedBody.psbtHex);
                 throw {
                     code: 20509,
                     msg: "Invalid PSBT provided!"
