@@ -122,7 +122,7 @@ class ToBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
                 const minIn = await this.swapPricing.getFromBtcSwapAmount(adjustedMin, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
                 const maxIn = await this.swapPricing.getFromBtcSwapAmount(adjustedMax, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
                 throw {
-                    code: tooLow ? 20003 : 2004,
+                    code: tooLow ? 20003 : 20004,
                     msg: tooLow ? "Amount too low!" : "Amount too high!",
                     data: {
                         min: minIn.toString(10),

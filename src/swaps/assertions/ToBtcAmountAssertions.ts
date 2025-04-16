@@ -167,7 +167,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
                     adjustedMax, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch
                 );
                 throw {
-                    code: tooLow ? 20003 : 2004,
+                    code: tooLow ? 20003 : 20004,
                     msg: tooLow ? "Amount too low!" : "Amount too high!",
                     data: {
                         min: minIn.toString(10),
