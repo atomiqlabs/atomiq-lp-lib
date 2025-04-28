@@ -12,6 +12,7 @@ const FromBtcAmountAssertions_1 = require("../assertions/FromBtcAmountAssertions
 const crypto_1 = require("crypto");
 const btc_signer_1 = require("@scure/btc-signer");
 const SpvVaults_1 = require("./SpvVaults");
+const TX_MAX_VSIZE = 16 * 1024;
 class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config) {
         super(storageDirectory, path, chainsData, swapPricing);
@@ -401,6 +402,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 throw {
                     code: 20511,
                     msg: "Bitcoin transaction fee too low, expected minimum: " + swap.btcFeeRate + " adjusted effective fee rate: " + effectiveFeeRate.feeRate
+                };
+            const txVsize = signedTx.vsize;
+            if (txVsize > TX_MAX_VSIZE)
+                throw {
+                    code: 20516,
+                    msg: "Bitcoin transaction size too large, maximum: " + TX_MAX_VSIZE + " actual: " + txVsize
                 };
             if (swap.vaultUtxo !== vault.getLatestUtxo()) {
                 throw {

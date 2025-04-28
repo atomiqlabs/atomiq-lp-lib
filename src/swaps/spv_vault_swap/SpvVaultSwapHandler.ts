@@ -52,6 +52,8 @@ export type SpvVaultPostQuote = {
     psbtHex: string
 }
 
+const TX_MAX_VSIZE = 16*1024;
+
 export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
 
     readonly type = SwapHandlerType.FROM_BTC_SPV;
@@ -534,6 +536,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 code: 20511,
                 msg: "Bitcoin transaction fee too low, expected minimum: "+swap.btcFeeRate+" adjusted effective fee rate: "+effectiveFeeRate.feeRate
             }
+
+            const txVsize = signedTx.vsize;
+            if(txVsize>TX_MAX_VSIZE) throw {
+                code: 20516,
+                msg: "Bitcoin transaction size too large, maximum: "+TX_MAX_VSIZE+" actual: "+txVsize
+            };
 
             if(swap.vaultUtxo!==vault.getLatestUtxo()) {
                 throw {
