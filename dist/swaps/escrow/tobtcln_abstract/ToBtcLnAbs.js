@@ -573,7 +573,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             createdSwap.signature = sigData.signature;
             createdSwap.feeRate = sigData.feeRate;
             await PluginManager_1.PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(parsedPR.id, sequence, createdSwap);
+            await this.saveSwapData(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /payInvoiceExactIn: created exact in swap," +
                 " reqId: " + parsedBody.reqId +
                 " mtokens: " + parsedPR.mtokens.toString(10) +
