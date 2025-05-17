@@ -1,10 +1,11 @@
 import { BitcoinRpc, SwapData } from "@atomiqlabs/base";
 import { IPlugin, PluginQuote, QuoteAmountTooHigh, QuoteAmountTooLow, QuoteSetFees, QuoteThrow, ToBtcPluginQuote } from "./IPlugin";
-import { FromBtcLnRequestType, FromBtcRequestType, ISwapPrice, MultichainData, RequestData, SwapHandler, ToBtcLnRequestType, ToBtcRequestType } from "..";
+import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
-import { FromBtcLnTrustedRequestType } from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
 import { ILightningWallet } from "../wallets/ILightningWallet";
+import { SpvVault } from "../swaps/spv_vault_swap/SpvVault";
 export type FailSwapResponse = {
     type: "fail";
     code?: number;
@@ -37,53 +38,75 @@ export declare class PluginManager {
     static disable(): Promise<void>;
     static serviceInitialize(handler: SwapHandler<any>): Promise<void>;
     static onHttpServerStarted(httpServer: any): Promise<void>;
-    static swapStateChange<T extends SwapData>(swap: SwapHandlerSwap<T>, oldState?: any): Promise<void>;
-    static swapCreate<T extends SwapData>(swap: SwapHandlerSwap<T>): Promise<void>;
-    static swapRemove<T extends SwapData>(swap: SwapHandlerSwap<T>): Promise<void>;
-    static onHandlePostFromBtcQuote(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    static swapStateChange(swap: SwapHandlerSwap, oldState?: any): Promise<void>;
+    static swapCreate(swap: SwapHandlerSwap): Promise<void>;
+    static swapRemove(swap: SwapHandlerSwap): Promise<void>;
+    static onHandlePostFromBtcQuote(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+        pricePrefetch?: Promise<bigint>;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
         baseFeeInBtc: bigint;
         feePPM: bigint;
-    }, pricePrefetchPromise?: Promise<bigint> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
-    static onHandlePreFromBtcQuote(request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>, requestedAmount: {
+    }, gasTokenAmount?: {
+        input: false;
+        amount: bigint;
+        token: string;
+        pricePrefetch?: Promise<bigint>;
+    }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
+    static onHandlePreFromBtcQuote(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV, request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
         baseFeeInBtc: bigint;
         feePPM: bigint;
+    }, gasTokenAmount?: {
+        input: false;
+        amount: bigint;
+        token: string;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
     static onHandlePostToBtcQuote<T extends {
         networkFee: bigint;
-    }>(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    }>(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+        pricePrefetch?: Promise<bigint>;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
         baseFeeInBtc: bigint;
         feePPM: bigint;
         networkFeeGetter: (amount: bigint) => Promise<T>;
-    }, pricePrefetchPromise?: Promise<bigint> | null): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | (ToBtcPluginQuote & {
+    }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | (ToBtcPluginQuote & {
         networkFeeData: T;
     })>;
-    static onHandlePreToBtcQuote(request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
+    static onHandlePreToBtcQuote(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
-    }, chainIdentifier: string, token: string, constraints: {
+        token: string;
+    }, chainIdentifier: string, constraints: {
         minInBtc: bigint;
         maxInBtc: bigint;
     }, fees: {
         baseFeeInBtc: bigint;
         feePPM: bigint;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
+    static onVaultSelection(chainIdentifier: string, totalSats: bigint, requestedAmount: {
+        amount: bigint;
+        token: string;
+    }, gasAmount: {
+        amount: bigint;
+        token: string;
+    }): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow>;
     static getWhitelistedTxIds(): Set<string>;
 }

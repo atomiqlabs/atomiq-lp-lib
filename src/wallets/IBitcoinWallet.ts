@@ -52,12 +52,16 @@ export interface IBitcoinWallet {
     getWalletTransaction(txId: string): Promise<BtcTx | null>;
     subscribeToWalletTransactions(callback: (tx: BtcTx) => void, abortSignal?: AbortSignal): void;
 
+    fundPsbt(psbt: Transaction, feeRate?: number): Promise<Transaction>;
     signPsbt(psbt: Transaction): Promise<SignPsbtResponse>;
     sendRawTransaction(tx: string): Promise<void>;
     getSignedTransaction(destination: string, amount: number, feeRate?: number, nonce?: bigint, maxAllowedFeeRate?: number): Promise<SignPsbtResponse>;
+    getSignedMultiTransaction(destinations: {address: string, amount: number}[], feeRate?: number, nonce?: bigint, maxAllowedFeeRate?: number): Promise<SignPsbtResponse>;
     estimateFee(destination: string, amount: number, feeRate?: number, feeRateMultiplier?: number): Promise<{satsPerVbyte: number, networkFee: number}>;
     drainAll(destination: string | Buffer, inputs: Omit<BitcoinUtxo, "address">[], feeRate?: number): Promise<SignPsbtResponse>;
     burnAll(inputs: Omit<BitcoinUtxo, "address">[]): Promise<SignPsbtResponse>;
+
+    parsePsbt(psbt: Transaction): Promise<BtcTx>;
 
     getBlockheight(): Promise<number>;
     getFeeRate(): Promise<number>;

@@ -10,12 +10,20 @@ export declare function isDefinedRuntimeError(obj: any): obj is DefinedRuntimeEr
 export declare function expressHandlerWrapper(func: (req: Request, res: Response) => Promise<void>): ((req: Request, res: Response & {
     responseStream: ServerParamEncoder;
 }) => void);
-export declare function getLogger(prefix: string): {
-    debug: (msg: any, ...args: any[]) => void;
-    info: (msg: any, ...args: any[]) => void;
-    warn: (msg: any, ...args: any[]) => void;
-    error: (msg: any, ...args: any[]) => void;
+export type LoggerType = {
+    debug: (msg: string, ...args: any[]) => void;
+    info: (msg: string, ...args: any[]) => void;
+    warn: (msg: string, ...args: any[]) => void;
+    error: (msg: string, ...args: any[]) => void;
 };
+export declare function getLogger(prefix: string): LoggerType;
 export declare const HEX_REGEX: RegExp;
 export declare function serializeBN(bn: bigint | null): string | null;
 export declare function deserializeBN(str: string | null): bigint | null;
+export declare function bigIntSorter(a: bigint, b: bigint): -1 | 0 | 1;
+/**
+ * Creates an abort controller that extends the responseStream's abort signal
+ *
+ * @param responseStream
+ */
+export declare function getAbortController(responseStream: ServerParamEncoder): AbortController;

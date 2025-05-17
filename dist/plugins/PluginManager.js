@@ -4,6 +4,7 @@ exports.PluginManager = void 0;
 const IPlugin_1 = require("./IPlugin");
 const fs = require("fs");
 const Utils_1 = require("../utils/Utils");
+const SpvVault_1 = require("../swaps/spv_vault_swap/SpvVault");
 const logger = (0, Utils_1.getLogger)("PluginManager: ");
 const pluginLogger = {
     debug: (plugin, msg, ...args) => logger.debug(plugin.name + ": " + msg, ...args),
@@ -100,11 +101,11 @@ class PluginManager {
             }
         }
     }
-    static async onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise) {
+    static async onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount) {
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePostFromBtcQuote != null) {
-                    const result = await plugin.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise);
+                    const result = await plugin.onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if (result != null) {
                         if ((0, IPlugin_1.isQuoteSetFees)(result))
                             return result;
@@ -128,11 +129,11 @@ class PluginManager {
         }
         return null;
     }
-    static async onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees) {
+    static async onHandlePreFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount) {
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePreFromBtcQuote != null) {
-                    const result = await plugin.onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
+                    const result = await plugin.onHandlePreFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if (result != null) {
                         if ((0, IPlugin_1.isQuoteSetFees)(result))
                             return result;
@@ -151,19 +152,19 @@ class PluginManager {
         }
         return null;
     }
-    static async onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise) {
+    static async onHandlePostToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees) {
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePostToBtcQuote != null) {
                     let networkFeeData;
-                    const result = await plugin.onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, {
+                    const result = await plugin.onHandlePostToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, {
                         baseFeeInBtc: fees.baseFeeInBtc,
                         feePPM: fees.feePPM,
                         networkFeeGetter: async (amount) => {
                             networkFeeData = await fees.networkFeeGetter(amount);
                             return networkFeeData.networkFee;
                         }
-                    }, pricePrefetchPromise);
+                    });
                     if (result != null) {
                         if ((0, IPlugin_1.isQuoteSetFees)(result))
                             return result;
@@ -190,11 +191,11 @@ class PluginManager {
         }
         return null;
     }
-    static async onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees) {
+    static async onHandlePreToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees) {
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePreToBtcQuote != null) {
-                    const result = await plugin.onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
+                    const result = await plugin.onHandlePreToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees);
                     if (result != null) {
                         if ((0, IPlugin_1.isQuoteSetFees)(result))
                             return result;
@@ -209,6 +210,29 @@ class PluginManager {
             }
             catch (e) {
                 pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
+    }
+    static async onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onVaultSelection != null) {
+                    const result = await plugin.onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount);
+                    if (result != null) {
+                        if ((0, IPlugin_1.isQuoteThrow)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
+                            return result;
+                        if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
+                            return result;
+                        if (result instanceof SpvVault_1.SpvVault)
+                            return result;
+                    }
+                }
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "onVaultSelection(): plugin error", e);
             }
         }
         return null;

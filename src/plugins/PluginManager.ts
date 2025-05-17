@@ -1,4 +1,4 @@
-import {BitcoinRpc, SwapData} from "@atomiqlabs/base";
+import {BitcoinRpc, SpvWithdrawalTransactionData, SwapData} from "@atomiqlabs/base";
 import {
     IPlugin, isPluginQuote, isQuoteAmountTooHigh, isQuoteAmountTooLow, isQuoteSetFees,
     isQuoteThrow, isToBtcPluginQuote, PluginQuote,
@@ -9,18 +9,19 @@ import {
 } from "./IPlugin";
 import {
     FromBtcLnRequestType,
-    FromBtcRequestType,
-    ISwapPrice, MultichainData, RequestData,
-    SwapHandler,
+    FromBtcRequestType, FromBtcTrustedRequestType,
+    ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType,
+    SwapHandler, SwapHandlerType,
     ToBtcLnRequestType,
     ToBtcRequestType
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
 import * as fs from "fs";
 import {getLogger} from "../utils/Utils";
-import {FromBtcLnTrustedRequestType} from "../swaps/frombtcln_trusted/FromBtcLnTrusted";
+import {FromBtcLnTrustedRequestType} from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
 import {ILightningWallet} from "../wallets/ILightningWallet";
+import {SpvVault} from "../swaps/spv_vault_swap/SpvVault";
 
 export type FailSwapResponse = {
     type: "fail",
@@ -135,7 +136,7 @@ export class PluginManager {
         }
     }
 
-    static async swapStateChange<T extends SwapData>(swap: SwapHandlerSwap<T>, oldState?: any) {
+    static async swapStateChange(swap: SwapHandlerSwap, oldState?: any) {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onSwapStateChange!=null) await plugin.onSwapStateChange(swap);
@@ -145,7 +146,7 @@ export class PluginManager {
         }
     }
 
-    static async swapCreate<T extends SwapData>(swap: SwapHandlerSwap<T>) {
+    static async swapCreate(swap: SwapHandlerSwap) {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onSwapCreate!=null) await plugin.onSwapCreate(swap);
@@ -155,7 +156,7 @@ export class PluginManager {
         }
     }
 
-    static async swapRemove<T extends SwapData>(swap: SwapHandlerSwap<T>) {
+    static async swapRemove(swap: SwapHandlerSwap) {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onSwapRemove!=null) await plugin.onSwapRemove(swap);
@@ -166,18 +167,18 @@ export class PluginManager {
     }
 
     static async onHandlePostFromBtcQuote(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
-        requestedAmount: {input: boolean, amount: bigint},
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
+        requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         chainIdentifier: string,
-        token: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
         fees: {baseFeeInBtc: bigint, feePPM: bigint},
-        pricePrefetchPromise?: Promise<bigint> | null
+        gasTokenAmount?: {input: false, amount: bigint, token: string, pricePrefetch?: Promise<bigint>}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePostFromBtcQuote!=null) {
-                    const result = await plugin.onHandlePostFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees, pricePrefetchPromise);
+                    const result = await plugin.onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if(result!=null) {
                         if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
@@ -197,17 +198,18 @@ export class PluginManager {
     }
 
     static async onHandlePreFromBtcQuote(
-        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType>,
-        requestedAmount: {input: boolean, amount: bigint},
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
+        requestedAmount: {input: boolean, amount: bigint, token: string},
         chainIdentifier: string,
-        token: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
-        fees: {baseFeeInBtc: bigint, feePPM: bigint}
+        fees: {baseFeeInBtc: bigint, feePPM: bigint},
+        gasTokenAmount?: {input: false, amount: bigint, token: string}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePreFromBtcQuote!=null) {
-                    const result = await plugin.onHandlePreFromBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
+                    const result = await plugin.onHandlePreFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if(result!=null) {
                         if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
@@ -223,26 +225,25 @@ export class PluginManager {
     }
 
     static async onHandlePostToBtcQuote<T extends {networkFee: bigint}>(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: bigint},
+        requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         chainIdentifier: string,
-        token: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
         fees: {baseFeeInBtc: bigint, feePPM: bigint, networkFeeGetter: (amount: bigint) => Promise<T>},
-        pricePrefetchPromise?: Promise<bigint> | null
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | (ToBtcPluginQuote & {networkFeeData: T})> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePostToBtcQuote!=null) {
                     let networkFeeData: T;
-                    const result = await plugin.onHandlePostToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, {
+                    const result = await plugin.onHandlePostToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, {
                         baseFeeInBtc: fees.baseFeeInBtc,
                         feePPM: fees.feePPM,
                         networkFeeGetter: async (amount: bigint) => {
                             networkFeeData = await fees.networkFeeGetter(amount);
                             return networkFeeData.networkFee;
                         }
-                    }, pricePrefetchPromise);
+                    });
                     if(result!=null) {
                         if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
@@ -265,17 +266,17 @@ export class PluginManager {
     }
 
     static async onHandlePreToBtcQuote(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
-        requestedAmount: {input: boolean, amount: bigint},
+        requestedAmount: {input: boolean, amount: bigint, token: string},
         chainIdentifier: string,
-        token: string,
         constraints: {minInBtc: bigint, maxInBtc: bigint},
         fees: {baseFeeInBtc: bigint, feePPM: bigint}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh> {
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePreToBtcQuote!=null) {
-                    const result = await plugin.onHandlePreToBtcQuote(request, requestedAmount, chainIdentifier, token, constraints, fees);
+                    const result = await plugin.onHandlePreToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees);
                     if(result!=null) {
                         if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
@@ -285,6 +286,30 @@ export class PluginManager {
                 }
             } catch (e) {
                 pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
+    }
+
+    static async onVaultSelection(
+        chainIdentifier: string,
+        totalSats: bigint,
+        requestedAmount: {amount: bigint, token: string},
+        gasAmount: {amount: bigint, token: string}
+    ): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow> {
+        for(let plugin of PluginManager.plugins.values()) {
+            try {
+                if(plugin.onVaultSelection!=null) {
+                    const result = await plugin.onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount);
+                    if(result!=null) {
+                        if(isQuoteThrow(result)) return result;
+                        if(isQuoteAmountTooHigh(result)) return result;
+                        if(isQuoteAmountTooLow(result)) return result;
+                        if(result instanceof SpvVault) return result;
+                    }
+                }
+            } catch (e) {
+                pluginLogger.error(plugin, "onVaultSelection(): plugin error", e);
             }
         }
         return null;
