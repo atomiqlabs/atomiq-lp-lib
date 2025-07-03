@@ -100,14 +100,18 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const isCommited = await swapContract.isCommited(swap.data);
             if (!isCommited) {
                 const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
-                if (status === base_1.SwapCommitStatus.PAID) {
+                if (status.type === base_1.SwapCommitStateType.PAID) {
                     this.swapLogger.info(swap, "processPastSwap(state=BTC_SENT): swap claimed (detected from processPastSwap), address: " + swap.address);
                     this.unsubscribePayment(swap);
+                    swap.txIds ?? (swap.txIds = {});
+                    swap.txIds.claim = await status.getClaimTxId();
                     await this.removeSwapData(swap, ToBtcSwapAbs_1.ToBtcSwapState.CLAIMED);
                 }
-                else if (status === base_1.SwapCommitStatus.EXPIRED) {
+                else if (status.type === base_1.SwapCommitStateType.EXPIRED) {
                     this.swapLogger.warn(swap, "processPastSwap(state=BTC_SENT): swap expired, but bitcoin was probably already sent, txId: " + swap.txId + " address: " + swap.address);
                     this.unsubscribePayment(swap);
+                    swap.txIds ?? (swap.txIds = {});
+                    swap.txIds.refund = status.getRefundTxId == null ? null : await status.getRefundTxId();
                     await this.removeSwapData(swap, ToBtcSwapAbs_1.ToBtcSwapState.REFUNDED);
                 }
                 return;

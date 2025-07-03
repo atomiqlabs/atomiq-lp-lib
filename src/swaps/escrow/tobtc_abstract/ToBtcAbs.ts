@@ -8,10 +8,9 @@ import {
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
-    SwapCommitStatus,
     SwapData,
     BitcoinRpc,
-    BtcBlock, BigIntBufferUtils
+    BtcBlock, BigIntBufferUtils, SwapCommitStateType
 } from "@atomiqlabs/base";
 import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
 import {PluginManager} from "../../../plugins/PluginManager";
@@ -169,13 +168,17 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             const isCommited = await swapContract.isCommited(swap.data);
             if(!isCommited) {
                 const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
-                if(status===SwapCommitStatus.PAID) {
+                if(status.type===SwapCommitStateType.PAID) {
                     this.swapLogger.info(swap, "processPastSwap(state=BTC_SENT): swap claimed (detected from processPastSwap), address: "+swap.address);
                     this.unsubscribePayment(swap);
+                    swap.txIds ??= {};
+                    swap.txIds.claim = await status.getClaimTxId();
                     await this.removeSwapData(swap, ToBtcSwapState.CLAIMED);
-                } else if(status===SwapCommitStatus.EXPIRED) {
+                } else if(status.type===SwapCommitStateType.EXPIRED) {
                     this.swapLogger.warn(swap, "processPastSwap(state=BTC_SENT): swap expired, but bitcoin was probably already sent, txId: "+swap.txId+" address: "+swap.address);
                     this.unsubscribePayment(swap);
+                    swap.txIds ??= {};
+                    swap.txIds.refund = status.getRefundTxId==null ? null : await status.getRefundTxId();
                     await this.removeSwapData(swap, ToBtcSwapState.REFUNDED);
                 }
                 return;

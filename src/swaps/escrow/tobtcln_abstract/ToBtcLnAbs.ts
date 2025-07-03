@@ -7,8 +7,7 @@ import {
     ChainSwapType,
     ClaimEvent,
     InitializeEvent,
-    RefundEvent,
-    SwapCommitStatus,
+    RefundEvent, SwapCommitStateType,
     SwapData
 } from "@atomiqlabs/base";
 import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
@@ -218,12 +217,16 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         const isCommited = await swapContract.isCommited(swap.data);
         if(!isCommited) {
             const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
-            if(status===SwapCommitStatus.PAID) {
+            if(status?.type===SwapCommitStateType.PAID) {
                 //This is alright, we got the money
+                swap.txIds ??= {};
+                swap.txIds.claim = await status.getClaimTxId();
                 await this.removeSwapData(swap, ToBtcLnSwapState.CLAIMED);
                 return true;
-            } else if(status===SwapCommitStatus.EXPIRED) {
+            } else if(status?.type===SwapCommitStateType.EXPIRED) {
                 //This means the user was able to refund before we were able to claim, no good
+                swap.txIds ??= {};
+                swap.txIds.refund = status.getRefundTxId==null ? null : await status.getRefundTxId();
                 await this.removeSwapData(swap, ToBtcLnSwapState.REFUNDED);
             }
             this.swapLogger.warn(swap, "processPaymentResult(): tried to claim but escrow doesn't exist anymore,"+
