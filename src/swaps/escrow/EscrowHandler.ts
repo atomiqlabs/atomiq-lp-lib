@@ -46,7 +46,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if(swap==null) continue;
 
-                swap.txIds.init = (event as any).meta?.txId;
+                swap.txIds.init = event.meta?.txId;
                 if(swap.metadata!=null) swap.metadata.times.initTxReceived = Date.now();
 
                 await this.processInitializeEvent(chainIdentifier, swap, event);
@@ -54,7 +54,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if(swap==null) continue;
 
-                swap.txIds.claim = (event as any).meta?.txId;
+                swap.txIds.claim = event.meta?.txId;
                 if(swap.metadata!=null) swap.metadata.times.claimTxReceived = Date.now();
 
                 await this.processClaimEvent(chainIdentifier, swap, event);
@@ -62,7 +62,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if(swap==null) continue;
 
-                swap.txIds.refund = (event as any).meta?.txId;
+                swap.txIds.refund = event.meta?.txId;
                 if(swap.metadata!=null) swap.metadata.times.refundTxReceived = Date.now();
 
                 await this.processRefundEvent(chainIdentifier, swap, event);

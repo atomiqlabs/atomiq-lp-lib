@@ -120,13 +120,17 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         const isCommited = await swapContract.isCommited(swap.data);
         if (!isCommited) {
             const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
-            if (status === base_1.SwapCommitStatus.PAID) {
+            if (status?.type === base_1.SwapCommitStateType.PAID) {
                 //This is alright, we got the money
+                swap.txIds ?? (swap.txIds = {});
+                swap.txIds.claim = await status.getClaimTxId();
                 await this.removeSwapData(swap, ToBtcLnSwapAbs_1.ToBtcLnSwapState.CLAIMED);
                 return true;
             }
-            else if (status === base_1.SwapCommitStatus.EXPIRED) {
+            else if (status?.type === base_1.SwapCommitStateType.EXPIRED) {
                 //This means the user was able to refund before we were able to claim, no good
+                swap.txIds ?? (swap.txIds = {});
+                swap.txIds.refund = status.getRefundTxId == null ? null : await status.getRefundTxId();
                 await this.removeSwapData(swap, ToBtcLnSwapAbs_1.ToBtcLnSwapState.REFUNDED);
             }
             this.swapLogger.warn(swap, "processPaymentResult(): tried to claim but escrow doesn't exist anymore," +
