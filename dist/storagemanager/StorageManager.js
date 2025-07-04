@@ -2,10 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StorageManager = void 0;
 const fs = require("fs/promises");
+const Utils_1 = require("../utils/Utils");
 class StorageManager {
     constructor(directory) {
         this.data = {};
         this.directory = directory;
+        this.logger = (0, Utils_1.getLogger)("StorageManager(" + directory + "): ");
     }
     async init() {
         try {
@@ -30,7 +32,7 @@ class StorageManager {
             await fs.rm(this.directory + "/" + paymentHash + ".json");
         }
         catch (e) {
-            console.error(e);
+            this.logger.error("removeData(): Error when removing data: ", e);
         }
     }
     async loadData(type) {
@@ -39,7 +41,7 @@ class StorageManager {
             files = await fs.readdir(this.directory);
         }
         catch (e) {
-            console.error(e);
+            this.logger.error("loadData(): Error when checking directory: ", e);
             return [];
         }
         const arr = [];

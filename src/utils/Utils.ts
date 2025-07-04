@@ -1,6 +1,22 @@
 import {Request, Response} from "express";
 import {ServerParamEncoder} from "./paramcoders/server/ServerParamEncoder";
 
+export type LoggerType = {
+    debug: (msg: string, ...args: any[]) => void,
+    info: (msg: string, ...args: any[]) => void,
+    warn: (msg: string, ...args: any[]) => void,
+    error: (msg: string, ...args: any[]) => void
+};
+
+export function getLogger(prefix: string | (() => string)): LoggerType {
+    return {
+        debug: (msg, ...args) => global.atomiqLogLevel >= 3 && console.debug((typeof(prefix)==="function" ? prefix() : prefix)+msg, ...args),
+        info: (msg, ...args) => global.atomiqLogLevel >= 2 && console.info((typeof(prefix)==="function" ? prefix() : prefix)+msg, ...args),
+        warn: (msg, ...args) => (global.atomiqLogLevel==null || global.atomiqLogLevel >= 1) && console.warn((typeof(prefix)==="function" ? prefix() : prefix)+msg, ...args),
+        error: (msg, ...args) => (global.atomiqLogLevel==null || global.atomiqLogLevel >= 0) && console.error((typeof(prefix)==="function" ? prefix() : prefix)+msg, ...args)
+    };
+}
+
 export type DefinedRuntimeError = {
     code: number;
     msg?: string;
@@ -17,6 +33,8 @@ export function isDefinedRuntimeError(obj: any): obj is DefinedRuntimeError {
     return false;
 }
 
+const expressHandlerWrapperLogger = getLogger("ExpressHandlerWrapper: ");
+
 export function expressHandlerWrapper(func: (
     req: Request,
     res: Response
@@ -32,7 +50,7 @@ export function expressHandlerWrapper(func: (
             try {
                 await func(req, res);
             } catch (e) {
-                console.error(e);
+                expressHandlerWrapperLogger.error("Error in called function "+req.path+": ", e);
                 let statusCode = 500;
                 const obj: {code: number, msg: string, data?: any} = {
                     code: 0,
@@ -54,22 +72,6 @@ export function expressHandlerWrapper(func: (
             }
         })();
     }
-}
-
-export type LoggerType = {
-    debug: (msg: string, ...args: any[]) => void,
-    info: (msg: string, ...args: any[]) => void,
-    warn: (msg: string, ...args: any[]) => void,
-    error: (msg: string, ...args: any[]) => void
-};
-
-export function getLogger(prefix: string): LoggerType {
-    return {
-        debug: (msg, ...args) => console.debug(prefix+msg, ...args),
-        info: (msg, ...args) => console.info(prefix+msg, ...args),
-        warn: (msg, ...args) => console.warn(prefix+msg, ...args),
-        error: (msg, ...args) => console.error(prefix+msg, ...args)
-    };
 }
 
 export const HEX_REGEX = /[0-9a-fA-F]+/;

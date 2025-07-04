@@ -8,6 +8,7 @@ import {SwapHandlerSwap} from "./SwapHandlerSwap";
 import {PluginManager} from "../plugins/PluginManager";
 import {IIntermediaryStorage} from "../storage/IIntermediaryStorage";
 import {IParamReader} from "../utils/paramcoders/IParamReader";
+import {getLogger, LoggerType} from "../utils/Utils";
 
 export enum SwapHandlerType {
     TO_BTC = "TO_BTC",
@@ -83,12 +84,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
 
     abstract config: SwapBaseConfig;
 
-    logger = {
-        debug: (msg: string, ...args: any) => console.debug("SwapHandler("+this.type+"): "+msg, ...args),
-        info: (msg: string, ...args: any) => console.info("SwapHandler("+this.type+"): "+msg, ...args),
-        warn: (msg: string, ...args: any) => console.warn("SwapHandler("+this.type+"): "+msg, ...args),
-        error: (msg: string, ...args: any) => console.error("SwapHandler("+this.type+"): "+msg, ...args)
-    };
+    logger: LoggerType = getLogger(() => "SwapHandler("+this.type+"): ");
 
     protected swapLogger = {
         debug: (swap: SwapHandlerSwap, msg: string, ...args: any) => this.logger.debug(swap.getIdentifier()+": "+msg, ...args),
@@ -130,7 +126,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     async startWatchdog() {
         let rerun: () => Promise<void>;
         rerun = async () => {
-            await this.processPastSwaps().catch( e => console.error(e));
+            await this.processPastSwaps().catch( e => this.logger.error("startWatchdog(): Error when processing past swaps: ", e));
             setTimeout(rerun, this.config.swapCheckInterval);
         };
         await rerun();

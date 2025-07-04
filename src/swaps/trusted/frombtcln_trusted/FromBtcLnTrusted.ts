@@ -90,7 +90,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
         this.lightning.waitForInvoice(hash, abortController.signal).then(invoice => {
             this.swapLogger.debug(invoiceData, "subscribeToInvoice(): invoice_updated: ", invoice);
             if(invoice.status!=="held") return;
-            this.htlcReceived(invoiceData, invoice).catch(e => console.error(e));
+            this.htlcReceived(invoiceData, invoice).catch(e => this.swapLogger.error(invoiceData, "subscribeToInvoice(): Error calling htlcReceived(): ", e));
             this.activeSubscriptions.delete(hash);
         });
 
@@ -117,7 +117,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                     await this.htlcReceived(swap, invoice);
                     //Result is either FromBtcLnTrustedSwapState.RECEIVED or FromBtcLnTrustedSwapState.CANCELED
                 } catch (e) {
-                    console.error(e);
+                    this.swapLogger.error(swap, "processPastSwap(): Error calling htlcReceived(): ", e);
                 }
                 return false;
             case "confirmed":
@@ -226,7 +226,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                     await invoiceData.setState(FromBtcLnTrustedSwapState.SENT);
                     await this.storageManager.saveData(invoice.id, null, invoiceData);
                 }
-            }).catch(e => console.error(e));
+            }).catch(e => this.swapLogger.error(invoiceData, "htlcReceived(): Error sending transfer txns", e));
 
             if(result==null) {
                 //Cancel invoice
@@ -457,8 +457,6 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             abortController.signal.throwIfAborted();
             metadata.times.invoiceCreated = Date.now();
             metadata.invoiceResponse = {...hodlInvoice};
-
-            console.log("[From BTC-LN: REST.CreateInvoice] hodl invoice created: ", hodlInvoice);
 
             const createdSwap = new FromBtcLnTrustedSwap(
                 chainIdentifier,

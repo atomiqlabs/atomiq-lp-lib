@@ -8,7 +8,7 @@ import {
     SpvVaultOpenEvent, SpvWithdrawalTransactionData
 } from "@atomiqlabs/base";
 import {SpvVaultSwap} from "./SpvVaultSwap";
-import {bigIntSorter} from "../../utils/Utils";
+import {bigIntSorter, getLogger} from "../../utils/Utils";
 import {PluginManager} from "../../plugins/PluginManager";
 import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 import {ISpvVaultSigner} from "../../wallets/ISpvVaultSigner";
@@ -30,12 +30,7 @@ export class SpvVaults {
     readonly config: {vaultsCheckInterval: number, maxUnclaimedWithdrawals?: number};
     readonly getChain: (chainId: string) => ChainData
 
-    readonly logger = {
-        debug: (msg: string, ...args: any) => console.debug("SpvVaults: "+msg, ...args),
-        info: (msg: string, ...args: any) => console.info("SpvVaults: "+msg, ...args),
-        warn: (msg: string, ...args: any) => console.warn("SpvVaults: "+msg, ...args),
-        error: (msg: string, ...args: any) => console.error("SpvVaults: "+msg, ...args)
-    };
+    readonly logger = getLogger("SpvVaults: ");
 
     constructor(
         vaultStorage: IStorageManager<SpvVault>,
@@ -514,7 +509,7 @@ export class SpvVaults {
     async startVaultsWatchdog() {
         let rerun: () => Promise<void>;
         rerun = async () => {
-            await this.checkVaults().catch( e => console.error(e));
+            await this.checkVaults().catch( e => this.logger.error("startVaultsWatchdog(): Error when periodically checking SPV vaults: ", e));
             setTimeout(rerun, this.config.vaultsCheckInterval);
         };
         await rerun();
