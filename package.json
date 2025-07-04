@@ -1,6 +1,6 @@
 {
   "name": "@atomiqlabs/lp-lib",
-  "version": "15.0.16",
+  "version": "14.0.0-dev.1",
   "description": "Main functionality implementation for atomiq LP node",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
@@ -22,7 +22,7 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/base": "^11.0.0",
+    "@atomiqlabs/base": "github:atomiqlabs/atomiq-base#add-evm",
     "@atomiqlabs/server-base": "^3.0.0",
     "@scure/btc-signer": "1.6.0",
     "express": "4.21.1",
