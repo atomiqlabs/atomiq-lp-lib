@@ -506,7 +506,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 data.btcTx.outs[0].value!==VAULT_DUST_AMOUNT ||
                 !Buffer.from(data.btcTx.outs[0].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.vaultAddress)) ||
                 BigInt(data.btcTx.outs[2].value)!==swap.amountBtc ||
-                !Buffer.from(data.btcTx.outs[2].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.btcAddress))
+                !Buffer.from(data.btcTx.outs[2].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.btcAddress)) ||
+                (data.btcTx.locktime > 0 && data.btcTx.locktime < 500_000_000) ||
+                data.btcTx.locktime > Math.floor(Date.now()/1000) - 1_000_000
             ) {
                 this.swapLogger.error(swap, "REST: /postQuote: Invalid psbt data submitted, raw psbt hex: ", parsedBody.psbtHex);
                 throw {
