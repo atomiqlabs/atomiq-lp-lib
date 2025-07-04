@@ -522,7 +522,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             }
 
             if(
-                data.recipient!==swap.recipient ||
+                data.isRecipient(swap.recipient) ||
                 data.callerFeeRate!==swap.callerFeeShare ||
                 data.frontingFeeRate!==swap.frontingFeeShare ||
                 data.executionFeeRate!==swap.executionFeeShare ||
