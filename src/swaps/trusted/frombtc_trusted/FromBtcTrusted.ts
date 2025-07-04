@@ -713,7 +713,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
     private async startDoubleSpendWatchdog() {
         let rerun: () => Promise<void>;
         rerun = async () => {
-            await this.checkDoubleSpends().catch( e => console.error(e));
+            await this.checkDoubleSpends().catch( e => this.logger.error("startDoubleSpendWatchdog(): Error when checking double spends: ", e));
             setTimeout(rerun, this.config.doubleSpendCheckInterval);
         };
         await rerun();
