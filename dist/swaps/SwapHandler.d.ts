@@ -4,6 +4,7 @@ import { ChainType } from "@atomiqlabs/base";
 import { SwapHandlerSwap } from "./SwapHandlerSwap";
 import { IIntermediaryStorage } from "../storage/IIntermediaryStorage";
 import { IParamReader } from "../utils/paramcoders/IParamReader";
+import { LoggerType } from "../utils/Utils";
 export declare enum SwapHandlerType {
     TO_BTC = "TO_BTC",
     FROM_BTC = "FROM_BTC",
@@ -75,12 +76,7 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHan
     };
     readonly swapPricing: ISwapPrice;
     abstract config: SwapBaseConfig;
-    logger: {
-        debug: (msg: string, ...args: any) => void;
-        info: (msg: string, ...args: any) => void;
-        warn: (msg: string, ...args: any) => void;
-        error: (msg: string, ...args: any) => void;
-    };
+    logger: LoggerType;
     protected swapLogger: {
         debug: (swap: SwapHandlerSwap, msg: string, ...args: any) => void;
         info: (swap: SwapHandlerSwap, msg: string, ...args: any) => void;

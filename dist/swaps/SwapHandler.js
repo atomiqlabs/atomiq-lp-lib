@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapHandler = exports.SwapHandlerType = void 0;
 const PluginManager_1 = require("../plugins/PluginManager");
+const Utils_1 = require("../utils/Utils");
 var SwapHandlerType;
 (function (SwapHandlerType) {
     SwapHandlerType["TO_BTC"] = "TO_BTC";
@@ -17,12 +18,7 @@ var SwapHandlerType;
  */
 class SwapHandler {
     constructor(storageDirectory, path, chainsData, swapPricing) {
-        this.logger = {
-            debug: (msg, ...args) => console.debug("SwapHandler(" + this.type + "): " + msg, ...args),
-            info: (msg, ...args) => console.info("SwapHandler(" + this.type + "): " + msg, ...args),
-            warn: (msg, ...args) => console.warn("SwapHandler(" + this.type + "): " + msg, ...args),
-            error: (msg, ...args) => console.error("SwapHandler(" + this.type + "): " + msg, ...args)
-        };
+        this.logger = (0, Utils_1.getLogger)(() => "SwapHandler(" + this.type + "): ");
         this.swapLogger = {
             debug: (swap, msg, ...args) => this.logger.debug(swap.getIdentifier() + ": " + msg, ...args),
             info: (swap, msg, ...args) => this.logger.info(swap.getIdentifier() + ": " + msg, ...args),
@@ -52,7 +48,7 @@ class SwapHandler {
     async startWatchdog() {
         let rerun;
         rerun = async () => {
-            await this.processPastSwaps().catch(e => console.error(e));
+            await this.processPastSwaps().catch(e => this.logger.error("startWatchdog(): Error when processing past swaps: ", e));
             setTimeout(rerun, this.config.swapCheckInterval);
         };
         await rerun();
