@@ -4,6 +4,7 @@ export declare class IntermediaryStorageManager<T extends StorageObject> impleme
     private readonly directory;
     private type;
     private data;
+    private logger;
     constructor(directory: string);
     init(): Promise<void>;
     query(params: StorageQueryParam[]): Promise<{
