@@ -4,6 +4,7 @@ exports.serverParamDecoder = exports.RequestParsingError = exports.RequestTimeou
 const SchemaVerifier_1 = require("../SchemaVerifier");
 const ParamDecoder_1 = require("../ParamDecoder");
 const ServerParamEncoder_1 = require("./ServerParamEncoder");
+const Utils_1 = require("../../Utils");
 class RequestTimeoutError extends Error {
     constructor() {
         super("Request timed out");
@@ -20,6 +21,7 @@ class RequestParsingError extends Error {
     }
 }
 exports.RequestParsingError = RequestParsingError;
+const logger = (0, Utils_1.getLogger)("ServerParamDecoder: ");
 const serverParamDecoder = (timeoutMillis) => (req, res, next) => {
     let timeout;
     res.responseStream = new ServerParamEncoder_1.ServerParamEncoder(res, 200, req);
@@ -43,14 +45,14 @@ const serverParamDecoder = (timeoutMillis) => (req, res, next) => {
                 next();
             }
             catch (e) {
-                console.error("ServerParamDecoder: error reading legacy (non-streaming) http request", e);
+                logger.error("error reading legacy (non-streaming) http request", e);
                 req.destroy(new RequestParsingError());
                 res.destroy(new RequestParsingError());
             }
             clearTimeout(timeout);
         });
         req.on("error", (e) => {
-            console.error("ServerParamDecoder: error reading legacy (non-streaming) http request", e);
+            logger.error("error reading legacy (non-streaming) http request", e);
         });
         timeout = setTimeout(() => {
             req.destroy(new RequestTimeoutError());
@@ -64,7 +66,7 @@ const serverParamDecoder = (timeoutMillis) => (req, res, next) => {
             decoder.onData(data);
         }
         catch (e) {
-            console.error("ServerParamDecoder: error reading streaming http request: on(\"data\")", e);
+            logger.error("error reading streaming http request: on(\"data\")", e);
             req.destroy(new RequestParsingError());
             res.destroy(new RequestParsingError());
         }
@@ -74,7 +76,7 @@ const serverParamDecoder = (timeoutMillis) => (req, res, next) => {
             decoder.onEnd();
         }
         catch (e) {
-            console.error("ServerParamDecoder: error reading streaming http request: on(\"end\")", e);
+            logger.error("error reading streaming http request: on(\"end\")", e);
             req.destroy(new RequestParsingError());
             res.destroy(new RequestParsingError());
         }
@@ -85,7 +87,7 @@ const serverParamDecoder = (timeoutMillis) => (req, res, next) => {
             decoder.onError(e);
         }
         catch (e) {
-            console.error("ServerParamDecoder: error reading streaming http request: on(\"error\")", e);
+            logger.error("error reading streaming http request: on(\"error\")", e);
         }
     });
     timeout = setTimeout(() => {
@@ -93,7 +95,7 @@ const serverParamDecoder = (timeoutMillis) => (req, res, next) => {
             decoder.onEnd();
         }
         catch (e) {
-            console.error("ServerParamDecoder: error reading streaming http request: timeout", e);
+            logger.error("error reading streaming http request: timeout", e);
         }
         req.destroy(new RequestTimeoutError());
         res.destroy(new RequestTimeoutError());

@@ -11,12 +11,7 @@ exports.VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
 class SpvVaults {
     constructor(vaultStorage, bitcoin, vaultSigner, bitcoinRpc, getChain, config) {
-        this.logger = {
-            debug: (msg, ...args) => console.debug("SpvVaults: " + msg, ...args),
-            info: (msg, ...args) => console.info("SpvVaults: " + msg, ...args),
-            warn: (msg, ...args) => console.warn("SpvVaults: " + msg, ...args),
-            error: (msg, ...args) => console.error("SpvVaults: " + msg, ...args)
-        };
+        this.logger = (0, Utils_1.getLogger)("SpvVaults: ");
         this.vaultStorage = vaultStorage;
         this.bitcoin = bitcoin;
         this.vaultSigner = vaultSigner;
@@ -442,7 +437,7 @@ class SpvVaults {
     async startVaultsWatchdog() {
         let rerun;
         rerun = async () => {
-            await this.checkVaults().catch(e => console.error(e));
+            await this.checkVaults().catch(e => this.logger.error("startVaultsWatchdog(): Error when periodically checking SPV vaults: ", e));
             setTimeout(rerun, this.config.vaultsCheckInterval);
         };
         await rerun();

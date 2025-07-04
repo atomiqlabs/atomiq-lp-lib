@@ -1,6 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.getLogger = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = void 0;
+exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = exports.getLogger = void 0;
+function getLogger(prefix) {
+    return {
+        debug: (msg, ...args) => global.atomiqLogLevel >= 3 && console.debug((typeof (prefix) === "function" ? prefix() : prefix) + msg, ...args),
+        info: (msg, ...args) => global.atomiqLogLevel >= 2 && console.info((typeof (prefix) === "function" ? prefix() : prefix) + msg, ...args),
+        warn: (msg, ...args) => (global.atomiqLogLevel == null || global.atomiqLogLevel >= 1) && console.warn((typeof (prefix) === "function" ? prefix() : prefix) + msg, ...args),
+        error: (msg, ...args) => (global.atomiqLogLevel == null || global.atomiqLogLevel >= 0) && console.error((typeof (prefix) === "function" ? prefix() : prefix) + msg, ...args)
+    };
+}
+exports.getLogger = getLogger;
 function isDefinedRuntimeError(obj) {
     if (obj.code != null && typeof (obj.code) === "number") {
         if (obj.msg != null && typeof (obj.msg) !== "string")
@@ -12,6 +21,7 @@ function isDefinedRuntimeError(obj) {
     return false;
 }
 exports.isDefinedRuntimeError = isDefinedRuntimeError;
+const expressHandlerWrapperLogger = getLogger("ExpressHandlerWrapper: ");
 function expressHandlerWrapper(func) {
     return (req, res) => {
         (async () => {
@@ -19,7 +29,7 @@ function expressHandlerWrapper(func) {
                 await func(req, res);
             }
             catch (e) {
-                console.error(e);
+                expressHandlerWrapperLogger.error("Error in called function " + req.path + ": ", e);
                 let statusCode = 500;
                 const obj = {
                     code: 0,
@@ -46,15 +56,6 @@ function expressHandlerWrapper(func) {
     };
 }
 exports.expressHandlerWrapper = expressHandlerWrapper;
-function getLogger(prefix) {
-    return {
-        debug: (msg, ...args) => console.debug(prefix + msg, ...args),
-        info: (msg, ...args) => console.info(prefix + msg, ...args),
-        warn: (msg, ...args) => console.warn(prefix + msg, ...args),
-        error: (msg, ...args) => console.error(prefix + msg, ...args)
-    };
-}
-exports.getLogger = getLogger;
 exports.HEX_REGEX = /[0-9a-fA-F]+/;
 function serializeBN(bn) {
     return bn == null ? null : bn.toString(10);
