@@ -1,6 +1,7 @@
 import {StorageObject} from "@atomiqlabs/base";
 import * as fs from "fs/promises";
 import {IIntermediaryStorage, StorageQueryParam} from "../storage/IIntermediaryStorage";
+import {getLogger, LoggerType} from "../utils/Utils";
 
 export class IntermediaryStorageManager<T extends StorageObject> implements IIntermediaryStorage<T> {
 
@@ -9,9 +10,11 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
     private data: {
         [key: string]: T
     } = {};
+    private logger: LoggerType;
 
     constructor(directory: string) {
         this.directory = directory;
+        this.logger = getLogger("IntermediaryStorageManager("+directory+"): ");
     }
 
     async init(): Promise<void> {
@@ -82,7 +85,7 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
             if(this.data[identifier]!=null) delete this.data[identifier];
             await fs.rm(this.directory+"/"+identifier+".json");
         } catch (e) {
-            console.error(e);
+            this.logger.error("removeData(): Error when removing data: ", e);
         }
     }
 
@@ -93,7 +96,7 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
         try {
             files = await fs.readdir(this.directory);
         } catch (e) {
-            console.error(e);
+            this.logger.error("loadData(): Error when checking directory: ", e);
             return;
         }
 
