@@ -378,7 +378,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "PSBT transaction cannot be parsed!"
                 };
             }
-            if (data.isRecipient(swap.recipient) ||
+            if (!data.isRecipient(swap.recipient) ||
                 data.callerFeeRate !== swap.callerFeeShare ||
                 data.frontingFeeRate !== swap.frontingFeeShare ||
                 data.executionFeeRate !== swap.executionFeeShare ||
