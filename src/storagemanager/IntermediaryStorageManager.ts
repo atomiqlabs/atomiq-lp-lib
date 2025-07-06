@@ -1,5 +1,6 @@
 import {StorageObject} from "@atomiqlabs/base";
 import * as fs from "fs/promises";
+import * as fsSync from "fs";
 import {IIntermediaryStorage, StorageQueryParam} from "../storage/IIntermediaryStorage";
 import {getLogger, LoggerType} from "../utils/Utils";
 
@@ -91,6 +92,11 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
 
     async loadData(type: new(data: any) => T): Promise<void> {
         this.type = type;
+
+        if(!fsSync.existsSync(this.directory)) {
+            this.logger.debug("loadData(): Data directory not found!");
+            return;
+        }
 
         let files: string[];
         try {

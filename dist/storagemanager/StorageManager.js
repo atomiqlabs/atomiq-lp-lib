@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.StorageManager = void 0;
 const fs = require("fs/promises");
 const Utils_1 = require("../utils/Utils");
+const fsSync = require("fs");
 class StorageManager {
     constructor(directory) {
         this.data = {};
@@ -36,6 +37,10 @@ class StorageManager {
         }
     }
     async loadData(type) {
+        if (!fsSync.existsSync(this.directory)) {
+            this.logger.debug("loadData(): Data directory not found!");
+            return;
+        }
         let files;
         try {
             files = await fs.readdir(this.directory);
