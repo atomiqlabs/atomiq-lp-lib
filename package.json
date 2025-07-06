@@ -22,7 +22,7 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/base": "^10.0.0-dev.1",
+    "@atomiqlabs/base": "^10.0.0-dev.2",
     "@atomiqlabs/server-base": "^3.0.0",
     "@scure/btc-signer": "1.6.0",
     "express": "4.21.1",

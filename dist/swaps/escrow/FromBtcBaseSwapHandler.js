@@ -53,12 +53,12 @@ class FromBtcBaseSwapHandler extends EscrowHandler_1.EscrowHandler {
      */
     async getBaseSecurityDepositPrefetch(chainIdentifier, dummySwapData, depositToken, gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise, abortController) {
         //Solana workaround
-        const { swapContract, chainInterface } = this.getChain(chainIdentifier);
+        const { swapContract, chainInterface, signer } = this.getChain(chainIdentifier);
         let feeResult;
         const gasToken = chainInterface.getNativeCurrencyAddress();
         if (swapContract.getRawRefundFee != null) {
             try {
-                feeResult = await swapContract.getRawRefundFee(dummySwapData);
+                feeResult = await swapContract.getRawRefundFee(signer.getAddress(), dummySwapData);
             }
             catch (e) {
                 this.logger.error("getBaseSecurityDepositPrefetch(): pre-fetch error: ", e);
@@ -68,7 +68,7 @@ class FromBtcBaseSwapHandler extends EscrowHandler_1.EscrowHandler {
         }
         else {
             try {
-                feeResult = await swapContract.getRefundFee(dummySwapData);
+                feeResult = await swapContract.getRefundFee(signer.getAddress(), dummySwapData);
             }
             catch (e1) {
                 this.logger.error("getBaseSecurityDepositPrefetch(): pre-fetch error: ", e1);
