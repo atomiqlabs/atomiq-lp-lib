@@ -1,6 +1,7 @@
 import {StorageObject, IStorageManager} from "@atomiqlabs/base";
 import * as fs from "fs/promises";
 import {getLogger, LoggerType} from "../utils/Utils";
+import * as fsSync from "fs";
 
 export class StorageManager<T extends StorageObject> implements IStorageManager<T> {
 
@@ -47,6 +48,11 @@ export class StorageManager<T extends StorageObject> implements IStorageManager<
     }
 
     async loadData(type: new(data: any) => T): Promise<T[]> {
+        if(!fsSync.existsSync(this.directory)) {
+            this.logger.debug("loadData(): Data directory not found!");
+            return;
+        }
+
         let files;
         try {
             files = await fs.readdir(this.directory);
