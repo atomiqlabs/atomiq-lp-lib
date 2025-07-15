@@ -17,7 +17,8 @@ export enum SwapHandlerType {
     FROM_BTCLN = "FROM_BTCLN",
     FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED",
     FROM_BTC_TRUSTED = "FROM_BTC_TRUSTED",
-    FROM_BTC_SPV = "FROM_BTC_SPV"
+    FROM_BTC_SPV = "FROM_BTC_SPV",
+    FROM_BTCLN_AUTO = "FROM_BTCLN_AUTO"
 }
 
 export type SwapHandlerInfoType = {

@@ -9,6 +9,8 @@ export * from "./swaps/escrow/frombtc_abstract/FromBtcAbs";
 export * from "./swaps/escrow/frombtc_abstract/FromBtcSwapAbs";
 export * from "./swaps/escrow/frombtcln_abstract/FromBtcLnAbs";
 export * from "./swaps/escrow/frombtcln_abstract/FromBtcLnSwapAbs";
+export * from "./swaps/escrow/frombtcln_autoinit/FromBtcLnAuto";
+export * from "./swaps/escrow/frombtcln_autoinit/FromBtcLnAutoSwap";
 export * from "./swaps/escrow/tobtc_abstract/ToBtcAbs";
 export * from "./swaps/escrow/tobtc_abstract/ToBtcSwapAbs";
 export * from "./swaps/escrow/tobtcln_abstract/ToBtcLnAbs";
