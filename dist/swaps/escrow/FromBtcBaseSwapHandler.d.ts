@@ -44,8 +44,9 @@ export declare abstract class FromBtcBaseSwapHandler<V extends FromBtcBaseSwap<S
      * @param chainIdentifier
      * @param useToken
      * @param abortController
+     * @param inContract
      */
-    protected getBalancePrefetch(chainIdentifier: string, useToken: string, abortController: AbortController): Promise<bigint>;
+    protected getBalancePrefetch(chainIdentifier: string, useToken: string, abortController: AbortController, inContract?: boolean): Promise<bigint>;
     /**
      * Checks if we have enough balance of the token in the swap vault
      *
