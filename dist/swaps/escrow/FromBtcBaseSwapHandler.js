@@ -88,11 +88,12 @@ class FromBtcBaseSwapHandler extends EscrowHandler_1.EscrowHandler {
      * @param chainIdentifier
      * @param useToken
      * @param abortController
+     * @param inContract
      */
-    async getBalancePrefetch(chainIdentifier, useToken, abortController) {
+    async getBalancePrefetch(chainIdentifier, useToken, abortController, inContract = true) {
         const { swapContract, signer } = this.getChain(chainIdentifier);
         try {
-            return await swapContract.getBalance(signer.getAddress(), useToken, true);
+            return await swapContract.getBalance(signer.getAddress(), useToken, inContract);
         }
         catch (e) {
             this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
@@ -109,6 +110,8 @@ class FromBtcBaseSwapHandler extends EscrowHandler_1.EscrowHandler {
      * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
      */
     async checkBalance(totalInToken, balancePrefetch, signal) {
+        if (totalInToken === 0n)
+            return;
         const balance = await balancePrefetch;
         if (signal != null)
             signal.throwIfAborted();
