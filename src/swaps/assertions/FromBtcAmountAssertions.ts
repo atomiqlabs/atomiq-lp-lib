@@ -3,7 +3,7 @@ import {FromBtcRequestType} from "../escrow/frombtc_abstract/FromBtcAbs";
 import {FromBtcLnTrustedRequestType} from "../trusted/frombtcln_trusted/FromBtcLnTrusted";
 import {PluginManager} from "../../plugins/PluginManager";
 import {isPluginQuote, isQuoteSetFees} from "../../plugins/IPlugin";
-import {RequestData, SwapHandlerType} from "../SwapHandler";
+import {RequestData, SwapHandler, SwapHandlerType} from "../SwapHandler";
 import {AmountAssertions, AmountAssertionsConfig} from "./AmountAssertions";
 import {ISwapPrice} from "../../prices/ISwapPrice";
 import {FromBtcTrustedRequestType} from "../trusted/frombtc_trusted/FromBtcTrusted";
@@ -32,7 +32,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     async preCheckFromBtcAmounts(
-        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV | SwapHandlerType.FROM_BTCLN_AUTO,
         request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string},
         gasAmount?: {input: false, amount: bigint, token: string}
@@ -94,7 +94,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
     async checkFromBtcAmount(
-        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV,
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV | SwapHandlerType.FROM_BTCLN_AUTO,
         request: RequestData<FromBtcLnRequestType | FromBtcRequestType | FromBtcLnTrustedRequestType | FromBtcTrustedRequestType | SpvVaultSwapRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string, pricePrefetch?: Promise<bigint>},
         fees: {baseFee: bigint, feePPM: bigint},

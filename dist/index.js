@@ -25,6 +25,8 @@ __exportStar(require("./swaps/escrow/frombtc_abstract/FromBtcAbs"), exports);
 __exportStar(require("./swaps/escrow/frombtc_abstract/FromBtcSwapAbs"), exports);
 __exportStar(require("./swaps/escrow/frombtcln_abstract/FromBtcLnAbs"), exports);
 __exportStar(require("./swaps/escrow/frombtcln_abstract/FromBtcLnSwapAbs"), exports);
+__exportStar(require("./swaps/escrow/frombtcln_autoinit/FromBtcLnAuto"), exports);
+__exportStar(require("./swaps/escrow/frombtcln_autoinit/FromBtcLnAutoSwap"), exports);
 __exportStar(require("./swaps/escrow/tobtc_abstract/ToBtcAbs"), exports);
 __exportStar(require("./swaps/escrow/tobtc_abstract/ToBtcSwapAbs"), exports);
 __exportStar(require("./swaps/escrow/tobtcln_abstract/ToBtcLnAbs"), exports);

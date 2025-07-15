@@ -116,11 +116,12 @@ export abstract class FromBtcBaseSwapHandler<V extends FromBtcBaseSwap<SwapData,
      * @param chainIdentifier
      * @param useToken
      * @param abortController
+     * @param inContract
      */
-    protected async getBalancePrefetch(chainIdentifier: string, useToken: string, abortController: AbortController): Promise<bigint> {
+    protected async getBalancePrefetch(chainIdentifier: string, useToken: string, abortController: AbortController, inContract: boolean = true): Promise<bigint> {
         const {swapContract, signer} = this.getChain(chainIdentifier);
         try {
-            return await swapContract.getBalance(signer.getAddress(), useToken, true);
+            return await swapContract.getBalance(signer.getAddress(), useToken, inContract);
         } catch (e) {
             this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
             abortController.abort(e);
@@ -137,6 +138,8 @@ export abstract class FromBtcBaseSwapHandler<V extends FromBtcBaseSwap<SwapData,
      * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
      */
     protected async checkBalance(totalInToken: bigint, balancePrefetch: Promise<bigint>, signal: AbortSignal | null): Promise<void> {
+        if(totalInToken===0n) return;
+
         const balance = await balancePrefetch;
         if(signal!=null) signal.throwIfAborted();
 
