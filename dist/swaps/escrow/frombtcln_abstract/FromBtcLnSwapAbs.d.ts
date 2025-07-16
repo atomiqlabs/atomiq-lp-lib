@@ -24,6 +24,7 @@ export declare class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends Fro
     serialize(): any;
     getToken(): string;
     getOutputAmount(): bigint;
+    getClaimHash(): string;
     getIdentifierHash(): string;
     getSequence(): bigint;
     isInitiated(): boolean;

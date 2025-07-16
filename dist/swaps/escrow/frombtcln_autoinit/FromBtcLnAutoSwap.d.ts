@@ -28,6 +28,7 @@ export declare class FromBtcLnAutoSwap<T extends SwapData = SwapData> extends Fr
     constructor(chainIdentifier: string, pr: string, lnPaymentHash: string, claimHash: string, amountMtokens: bigint, claimer: string, token: string, gasToken: string, amountToken: bigint, amountGasToken: bigint, tokenSwapFee: bigint, tokenSwapFeeInToken: bigint, gasSwapFee: bigint, gasSwapFeeInToken: bigint, claimerBounty: bigint);
     constructor(obj: any);
     serialize(): any;
+    getClaimHash(): string;
     getIdentifierHash(): string;
     getOutputGasAmount(): bigint;
     getOutputAmount(): bigint;
