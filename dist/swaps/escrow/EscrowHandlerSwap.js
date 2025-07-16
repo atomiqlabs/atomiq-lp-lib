@@ -41,13 +41,13 @@ class EscrowHandlerSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
      * Returns the escrow hash - i.e. hash of the escrow data
      */
     getEscrowHash() {
-        return this.data.getEscrowHash();
+        return this.data?.getEscrowHash();
     }
     /**
      * Returns the claim data hash - i.e. hash passed to the claim handler
      */
     getClaimHash() {
-        return this.data.getClaimHash();
+        return this.data?.getClaimHash();
     }
     /**
      * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
