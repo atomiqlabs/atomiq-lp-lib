@@ -114,6 +114,10 @@ export class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends FromBtcBase
         return this.totalTokens;
     }
 
+    getClaimHash(): string {
+        return this.claimHash;
+    }
+
     getIdentifierHash(): string {
         return this.lnPaymentHash;
     }

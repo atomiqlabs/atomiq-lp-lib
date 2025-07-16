@@ -51,7 +51,7 @@ class FromBtcLnAutoSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
             this.claimerBounty = (0, Utils_1.deserializeBN)(chainIdOrObj.claimerBounty);
             this.secret = chainIdOrObj.secret;
         }
-        this.type = index_1.SwapHandlerType.FROM_BTCLN;
+        this.type = index_1.SwapHandlerType.FROM_BTCLN_AUTO;
     }
     serialize() {
         const partialSerialized = super.serialize();
@@ -70,6 +70,9 @@ class FromBtcLnAutoSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
         partialSerialized.gasSwapFeeInToken = (0, Utils_1.serializeBN)(this.gasSwapFeeInToken);
         partialSerialized.claimerBounty = (0, Utils_1.serializeBN)(this.claimerBounty);
         return partialSerialized;
+    }
+    getClaimHash() {
+        return this.claimHash;
     }
     getIdentifierHash() {
         return this.lnPaymentHash;

@@ -111,7 +111,7 @@ export class FromBtcLnAutoSwap<T extends SwapData = SwapData> extends FromBtcBas
             this.claimerBounty = deserializeBN(chainIdOrObj.claimerBounty);
             this.secret = chainIdOrObj.secret;
         }
-        this.type = SwapHandlerType.FROM_BTCLN;
+        this.type = SwapHandlerType.FROM_BTCLN_AUTO;
     }
 
     serialize(): any {
@@ -131,6 +131,10 @@ export class FromBtcLnAutoSwap<T extends SwapData = SwapData> extends FromBtcBas
         partialSerialized.gasSwapFeeInToken = serializeBN(this.gasSwapFeeInToken);
         partialSerialized.claimerBounty = serializeBN(this.claimerBounty);
         return partialSerialized;
+    }
+
+    getClaimHash(): string {
+        return this.claimHash;
     }
 
     getIdentifierHash(): string {
