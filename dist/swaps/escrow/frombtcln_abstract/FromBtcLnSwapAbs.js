@@ -69,6 +69,9 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     getOutputAmount() {
         return this.totalTokens;
     }
+    getClaimHash() {
+        return this.claimHash;
+    }
     getIdentifierHash() {
         return this.lnPaymentHash;
     }
