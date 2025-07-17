@@ -51,9 +51,14 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             return null;
         }
         if (swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED) {
-            //Adjust the state of the swap and expiry
             try {
-                await this.offerHtlc(swap);
+                if (!await this.offerHtlc(swap)) {
+                    //Expired
+                    if (swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED) {
+                        this.swapLogger.info(swap, "processPastSwap(state=RECEIVED): offer HTLC expired, cancelling invoice: " + swap.pr);
+                        await this.cancelSwapAndInvoice(swap);
+                    }
+                }
             }
             catch (e) {
                 this.swapLogger.error(swap, "processPastSwap(state=RECEIVED): offerHtlc error", e);
@@ -244,11 +249,11 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         const balancePrefetch = this.getBalancePrefetch(invoiceData.chainIdentifier, useToken, abortController);
         const gasTokenBalancePrefetch = invoiceData.getTotalOutputGasAmount() === 0n || useToken === gasToken ?
             null : this.getBalancePrefetch(invoiceData.chainIdentifier, gasToken, abortController);
-        if (await swapContract.isInitAuthorizationExpired(invoiceData.data, invoiceData)) {
-            if (invoiceData.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED && !await swapContract.isCommited(invoiceData.data)) {
+        if (await swapContract.getInitAuthorizationExpiry(invoiceData.data, invoiceData) < Date.now()) {
+            if (invoiceData.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED) {
                 await this.cancelSwapAndInvoice(invoiceData);
             }
-            return;
+            return false;
         }
         try {
             //Check if we have enough liquidity to proceed
@@ -281,6 +286,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             await this.saveSwapData(invoiceData);
             await chainInterface.sendAndConfirm(signer, [...txWithdraw, ...txInit], true);
         }
+        return true;
     }
     /**
      * Checks invoice description hash
@@ -354,8 +360,6 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
      * @param invoiceData
      */
     async cancelSwapAndInvoice(invoiceData) {
-        if (invoiceData.state !== FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CREATED)
-            return;
         await invoiceData.setState(FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CANCELED);
         await this.lightning.cancelHodlInvoice(invoiceData.lnPaymentHash);
         await this.removeSwapData(invoiceData);
