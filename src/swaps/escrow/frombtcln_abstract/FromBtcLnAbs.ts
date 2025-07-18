@@ -9,6 +9,7 @@ import {
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
+    SwapCommitStateType,
     SwapData
 } from "@atomiqlabs/base";
 import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
@@ -25,7 +26,7 @@ import {
     LightningNetworkChannel,
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
-import { LightningAssertions } from "../../assertions/LightningAssertions";
+import {LightningAssertions} from "../../assertions/LightningAssertions";
 
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -103,34 +104,61 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             return null;
         }
 
-        if(swap.state===FromBtcLnSwapState.RECEIVED) {
-            const isAuthorizationExpired = await swapContract.isInitAuthorizationExpired(swap.data, swap);
-            if(isAuthorizationExpired) {
-                const isCommited = await swapContract.isCommited(swap.data);
-
-                if(!isCommited) {
-                    this.swapLogger.info(swap, "processPastSwap(state=RECEIVED): swap not committed before authorization expiry, cancelling the LN invoice, invoice: "+swap.pr);
-                    await swap.setState(FromBtcLnSwapState.CANCELED);
-                    return "CANCEL";
-                }
-
-                this.swapLogger.info(swap, "processPastSwap(state=RECEIVED): swap committed (detected from processPastSwap), invoice: "+swap.pr);
-                await swap.setState(FromBtcLnSwapState.COMMITED);
-                await this.saveSwapData(swap);
-            }
-        }
-
         if(swap.state===FromBtcLnSwapState.RECEIVED || swap.state===FromBtcLnSwapState.COMMITED) {
-            if(!await swapContract.isExpired(signer.getAddress(), swap.data)) return null;
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state: FromBtcLnSwapState = swap.state as FromBtcLnSwapState;
+            if(onchainStatus.type===SwapCommitStateType.PAID) {
+                //Extract the swap secret
+                if(state!==FromBtcLnSwapState.CLAIMED && state!==FromBtcLnSwapState.SETTLED) {
+                    const secretHex = await onchainStatus.getClaimResult();
+                    const secret: Buffer = Buffer.from(secretHex, "hex");
+                    const paymentHash: Buffer = createHash("sha256").update(secret).digest();
+                    const paymentHashHex = paymentHash.toString("hex");
 
-            const isCommited = await swapContract.isCommited(swap.data);
-            if(isCommited) {
-                this.swapLogger.info(swap, "processPastSwap(state=COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
+                    if (swap.lnPaymentHash!==paymentHashHex) {
+                        //TODO: Possibly fatal failure
+                        this.swapLogger.error(swap, "processPastSwap(state=RECEIVED|COMMITED): onchainStatus=PAID, Invalid swap secret specified: "+secretHex+" for paymentHash: "+paymentHashHex);
+                        return null;
+                    }
+
+                    swap.secret = secretHex;
+                    await swap.setState(FromBtcLnSwapState.CLAIMED);
+                    await this.saveSwapData(swap);
+
+                    this.swapLogger.warn(swap, "processPastSwap(state=RECEIVED|COMMITED): swap settled (detected from processPastSwap), invoice: "+swap.pr);
+
+                    return "SETTLE";
+                }
+                return null;
+            }
+            if(onchainStatus.type===SwapCommitStateType.COMMITED) {
+                if(state===FromBtcLnSwapState.RECEIVED) {
+                    await swap.setState(FromBtcLnSwapState.COMMITED);
+                    await this.saveSwapData(swap);
+
+                    this.swapLogger.info(swap, "processPastSwap(state=RECEIVED|COMMITED): swap committed (detected from processPastSwap), invoice: "+swap.pr);
+                }
+                return null;
+            }
+            if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
+                if(swap.state===FromBtcLnSwapState.RECEIVED) {
+                    const isAuthorizationExpired = await swapContract.isInitAuthorizationExpired(swap.data, swap);
+                    if(isAuthorizationExpired) {
+                        this.swapLogger.info(swap, "processPastSwap(state=RECEIVED|COMMITED): swap not committed before authorization expiry, cancelling the LN invoice, invoice: "+swap.pr);
+                        await swap.setState(FromBtcLnSwapState.CANCELED);
+                        return "CANCEL";
+                    }
+                } else {
+                    if(await swapContract.isExpired(signer.getAddress(), swap.data)) {
+                        this.swapLogger.info(swap, "processPastSwap(state=RECEIVED|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
+                        return "REFUND";
+                    }
+                }
+            }
+            if(onchainStatus.type===SwapCommitStateType.REFUNDABLE) {
+                this.swapLogger.info(swap, "processPastSwap(state=RECEIVED|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
                 return "REFUND";
             }
-
-            this.swapLogger.info(swap, "processPastSwap(state=RECEIVED): swap timed out, cancelling the LN invoice, invoice: "+swap.pr);
-            return "CANCEL";
         }
 
         if(swap.state===FromBtcLnSwapState.CLAIMED) return "SETTLE";
