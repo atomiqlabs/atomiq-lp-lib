@@ -502,6 +502,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 data.executionFeeRate!==swap.executionFeeShare ||
                 data.rawAmounts[0]!==swap.rawAmountToken ||
                 data.rawAmounts[1]!==swap.rawAmountGasToken ||
+                data.getExecutionData()!=null ||
                 data.getSpentVaultUtxo()!==swap.vaultUtxo ||
                 data.btcTx.outs[0].value!==VAULT_DUST_AMOUNT ||
                 !Buffer.from(data.btcTx.outs[0].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.vaultAddress)) ||
