@@ -3,7 +3,7 @@ import {createHash} from "crypto";
 import {FromBtcLnAutoSwap, FromBtcLnAutoSwapState} from "./FromBtcLnAutoSwap";
 import {MultichainData, SwapHandlerType} from "../../SwapHandler";
 import {ISwapPrice} from "../../../prices/ISwapPrice";
-import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData} from "@atomiqlabs/base";
+import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
 import {expressHandlerWrapper, getAbortController, HEX_REGEX} from "../../../utils/Utils";
 import {PluginManager} from "../../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
@@ -19,6 +19,7 @@ import {
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
+import {FromBtcLnSwapState} from "../frombtcln_abstract/FromBtcLnSwapAbs";
 
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -110,35 +111,61 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             return null;
         }
 
-        if(swap.state===FromBtcLnAutoSwapState.TXS_SENT) {
-            const isAuthorizationExpired = await swapContract.isInitAuthorizationExpired(swap.data, swap);
-            if(isAuthorizationExpired) {
-                const isCommited = await swapContract.isCommited(swap.data);
-
-                if(!isCommited) {
-                    this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT): swap not committed before authorization expiry, cancelling the LN invoice, invoice: "+swap.pr);
-                    await this.cancelSwapAndInvoice(swap);
-                    return null;
-                }
-
-                this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT): swap committed (detected from processPastSwap), invoice: "+swap.pr);
-                await swap.setState(FromBtcLnAutoSwapState.COMMITED);
-                await this.saveSwapData(swap);
-            }
-        }
-
         if(swap.state===FromBtcLnAutoSwapState.TXS_SENT || swap.state===FromBtcLnAutoSwapState.COMMITED) {
-            if(!await swapContract.isExpired(signer.getAddress(), swap.data)) return null;
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state: FromBtcLnAutoSwapState = swap.state as FromBtcLnAutoSwapState;
+            if(onchainStatus.type===SwapCommitStateType.PAID) {
+                //Extract the swap secret
+                if(state!==FromBtcLnAutoSwapState.CLAIMED && state!==FromBtcLnAutoSwapState.SETTLED) {
+                    const secretHex = await onchainStatus.getClaimResult();
+                    const secret: Buffer = Buffer.from(secretHex, "hex");
+                    const paymentHash: Buffer = createHash("sha256").update(secret).digest();
+                    const paymentHashHex = paymentHash.toString("hex");
 
-            const isCommited = await swapContract.isCommited(swap.data);
-            if(isCommited) {
-                this.swapLogger.info(swap, "processPastSwap(state=COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
+                    if (swap.lnPaymentHash!==paymentHashHex) {
+                        //TODO: Possibly fatal failure
+                        this.swapLogger.error(swap, "processPastSwap(state=TXS_SENT|COMMITED): onchainStatus=PAID, Invalid swap secret specified: "+secretHex+" for paymentHash: "+paymentHashHex);
+                        return null;
+                    }
+
+                    swap.secret = secretHex;
+                    await swap.setState(FromBtcLnAutoSwapState.CLAIMED);
+                    await this.saveSwapData(swap);
+
+                    this.swapLogger.warn(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap settled (detected from processPastSwap), invoice: "+swap.pr);
+
+                    return "SETTLE";
+                }
+                return null;
+            }
+            if(onchainStatus.type===SwapCommitStateType.COMMITED) {
+                if(state===FromBtcLnAutoSwapState.TXS_SENT) {
+                    await swap.setState(FromBtcLnAutoSwapState.COMMITED);
+                    await this.saveSwapData(swap);
+
+                    this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap committed (detected from processPastSwap), invoice: "+swap.pr);
+                }
+                return null;
+            }
+            if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
+                if(swap.state===FromBtcLnAutoSwapState.TXS_SENT) {
+                    const isAuthorizationExpired = await swapContract.isInitAuthorizationExpired(swap.data, swap);
+                    if(isAuthorizationExpired) {
+                        this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap not committed before authorization expiry, cancelling the LN invoice, invoice: "+swap.pr);
+                        await this.cancelSwapAndInvoice(swap);
+                        return null;
+                    }
+                } else {
+                    if(await swapContract.isExpired(signer.getAddress(), swap.data)) {
+                        this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
+                        return "REFUND";
+                    }
+                }
+            }
+            if(onchainStatus.type===SwapCommitStateType.REFUNDABLE) {
+                this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
                 return "REFUND";
             }
-
-            this.swapLogger.info(swap, "processPastSwap(state=COMMITED): swap timed out, cancelling the LN invoice, invoice: "+swap.pr);
-            await this.cancelSwapAndInvoice(swap);
-            return null;
         }
 
         if(swap.state===FromBtcLnAutoSwapState.CLAIMED) return "SETTLE";
