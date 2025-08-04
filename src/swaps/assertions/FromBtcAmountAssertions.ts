@@ -155,18 +155,27 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         }
 
         let amountBDgas: bigint = 0n;
+        let gasSwapFee: bigint = 0n;
         if(gasTokenAmount!=null) {
             amountBDgas = await this.swapPricing.getToBtcSwapAmount(gasTokenAmount.amount, gasTokenAmount.token, chainIdentifier, true, gasTokenAmount.pricePrefetch);
+            signal.throwIfAborted();
+            const denominator = (1000000n - fees.feePPM);
+            const _amountBDgas = (amountBDgas * 1000000n + denominator - 1n) / denominator;
+            gasSwapFee = _amountBDgas - amountBDgas;
+            amountBDgas = _amountBDgas;
         }
 
         let amountBD: bigint;
+        let swapFee: bigint;
         if(!requestedAmount.input) {
             amountBD = await this.swapPricing.getToBtcSwapAmount(requestedAmount.amount, requestedAmount.token, chainIdentifier, true, requestedAmount.pricePrefetch);
             signal.throwIfAborted();
 
             // amt = (amt+base_fee)/(1-fee)
-            amountBD = (amountBD + fees.baseFee) * 1000000n / (1000000n - fees.feePPM);
-            amountBDgas = amountBDgas * 1000000n / (1000000n - fees.feePPM);
+            const denominator = (1000000n - fees.feePPM);
+            const _amountBD = ((amountBD + fees.baseFee) * 1000000n + denominator - 1n) / denominator;
+            swapFee = _amountBD - amountBD;
+            amountBD = _amountBD;
 
             const tooLow = amountBD < (this.config.min * 95n / 100n);
             const tooHigh = amountBD > (this.config.max * 105n / 100n);
@@ -191,6 +200,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         } else {
             this.checkBtcAmountInBounds(requestedAmount.amount);
             amountBD = requestedAmount.amount - amountBDgas;
+            swapFee = fees.baseFee + ((amountBD * fees.feePPM + 999_999n) / 1000000n);
             if(amountBD < 0n) {
                 throw {
                     code: 20003,
@@ -203,11 +213,9 @@ export class FromBtcAmountAssertions extends AmountAssertions {
             }
         }
 
-        const swapFee = fees.baseFee + (amountBD * fees.feePPM / 1000000n);
         const swapFeeInToken = await this.swapPricing.getFromBtcSwapAmount(swapFee, requestedAmount.token, chainIdentifier, true, requestedAmount.pricePrefetch);
         signal.throwIfAborted();
 
-        const gasSwapFee = ((amountBDgas * fees.feePPM) + 999999n) / 1000000n;
         const gasSwapFeeInToken = gasTokenAmount==null ?
             0n :
             await this.swapPricing.getFromBtcSwapAmount(gasSwapFee, gasTokenAmount.token, chainIdentifier, true, gasTokenAmount.pricePrefetch);
@@ -217,7 +225,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         if(!requestedAmount.input) {
             totalInToken = requestedAmount.amount;
         } else {
-            totalInToken = await this.swapPricing.getFromBtcSwapAmount(amountBD - swapFee - gasSwapFee, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
+            totalInToken = await this.swapPricing.getFromBtcSwapAmount(amountBD - swapFee, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
             signal.throwIfAborted();
         }
 
