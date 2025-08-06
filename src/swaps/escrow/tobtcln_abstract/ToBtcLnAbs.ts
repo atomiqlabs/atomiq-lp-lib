@@ -338,6 +338,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
         const blockHeight = await this.lightning.getBlockheight();
 
+        swap.payInitiated = true;
+        await this.saveSwapData(swap);
         try {
             await this.lightning.pay({
                 request: swap.pr,

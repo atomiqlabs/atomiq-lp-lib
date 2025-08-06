@@ -27,6 +27,7 @@ class ToBtcLnSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
             this.pr = chainIdOrObj.pr;
             this.secret = chainIdOrObj.secret;
             this.lnPaymentHash = chainIdOrObj.lnPaymentHash;
+            this.payInitiated = chainIdOrObj.payInitiated;
             //Compatibility with older versions
             this.quotedNetworkFee ?? (this.quotedNetworkFee = (0, Utils_1.deserializeBN)(chainIdOrObj.maxFee));
             this.realNetworkFee ?? (this.realNetworkFee = (0, Utils_1.deserializeBN)(chainIdOrObj.realRoutingFee));
@@ -41,6 +42,7 @@ class ToBtcLnSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         partialSerialized.pr = this.pr;
         partialSerialized.lnPaymentHash = this.lnPaymentHash;
         partialSerialized.secret = this.secret;
+        partialSerialized.payInitiated = this.payInitiated;
         return partialSerialized;
     }
     isInitiated() {

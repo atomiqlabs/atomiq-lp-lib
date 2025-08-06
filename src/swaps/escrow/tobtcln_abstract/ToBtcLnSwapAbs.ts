@@ -17,6 +17,7 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
 
     lnPaymentHash: string;
     readonly pr: string;
+    payInitiated: boolean;
 
     secret: string;
 
@@ -43,6 +44,7 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
             this.pr = chainIdOrObj.pr;
             this.secret = chainIdOrObj.secret;
             this.lnPaymentHash = chainIdOrObj.lnPaymentHash;
+            this.payInitiated = chainIdOrObj.payInitiated;
 
             //Compatibility with older versions
             this.quotedNetworkFee ??= deserializeBN(chainIdOrObj.maxFee);
@@ -60,6 +62,7 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
         partialSerialized.pr = this.pr;
         partialSerialized.lnPaymentHash = this.lnPaymentHash;
         partialSerialized.secret = this.secret;
+        partialSerialized.payInitiated = this.payInitiated;
         return partialSerialized;
     }
 
