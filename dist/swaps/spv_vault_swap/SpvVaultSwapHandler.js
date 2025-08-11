@@ -12,6 +12,7 @@ const FromBtcAmountAssertions_1 = require("../assertions/FromBtcAmountAssertions
 const crypto_1 = require("crypto");
 const btc_signer_1 = require("@scure/btc-signer");
 const SpvVaults_1 = require("./SpvVaults");
+const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 const TX_MAX_VSIZE = 16 * 1024;
 class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config) {
@@ -342,7 +343,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             //Check correct psbt
             for (let i = 1; i < transaction.inputsLength; i++) { //Skip first vault input
                 const txIn = transaction.getInput(i);
-                if ((0, btc_signer_1.getInputType)(txIn).txType === "legacy")
+                if ((0, BitcoinUtils_1.isLegacyInput)(txIn))
                     throw {
                         code: 20514,
                         msg: "Legacy (pre-segwit) inputs in tx are not allowed!"

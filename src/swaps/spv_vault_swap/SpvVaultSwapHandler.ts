@@ -29,6 +29,7 @@ import {FromBtcAmountAssertions} from "../assertions/FromBtcAmountAssertions";
 import {randomBytes} from "crypto";
 import {getInputType, OutScript, Transaction} from "@scure/btc-signer";
 import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
+import {isLegacyInput} from "../../utils/BitcoinUtils";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
@@ -471,7 +472,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             //Check correct psbt
             for(let i=1;i<transaction.inputsLength;i++) { //Skip first vault input
                 const txIn = transaction.getInput(i);
-                if(getInputType(txIn).txType==="legacy") throw {
+                if(isLegacyInput(txIn)) throw {
                     code: 20514,
                     msg: "Legacy (pre-segwit) inputs in tx are not allowed!"
                 };
