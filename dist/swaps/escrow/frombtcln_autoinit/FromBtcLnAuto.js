@@ -19,6 +19,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         super(storageDirectory, path, chains, swapPricing, config);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTCLN_AUTO;
         this.swapType = base_1.ChainSwapType.HTLC;
+        this.activeSubscriptions = new Set();
         this.config = config;
         this.config.invoiceTimeoutSeconds = this.config.invoiceTimeoutSeconds || 90;
         this.lightning = lightning;
@@ -34,10 +35,12 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             if (!isBeingPaid) {
                 //Not paid
                 const isInvoiceExpired = parsedPR.expiryEpochMillis < Date.now();
-                if (!isInvoiceExpired)
+                if (isInvoiceExpired) {
+                    this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap LN invoice expired, cancelling, invoice: " + swap.pr);
+                    await this.cancelSwapAndInvoice(swap);
                     return null;
-                this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap LN invoice expired, cancelling, invoice: " + swap.pr);
-                await this.cancelSwapAndInvoice(swap);
+                }
+                this.subscribeToInvoice(swap);
                 return null;
             }
             //Adjust the state of the swap and expiry
@@ -220,6 +223,24 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         await this.removeSwapData(savedSwap, FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.REFUNDED);
     }
     /**
+     * Subscribe to a lightning network invoice
+     *
+     * @param swap
+     */
+    subscribeToInvoice(swap) {
+        const paymentHash = swap.lnPaymentHash;
+        if (this.activeSubscriptions.has(paymentHash))
+            return false;
+        this.lightning.waitForInvoice(paymentHash).then(result => {
+            this.swapLogger.info(swap, "subscribeToInvoice(): result callback, outcome: " + result.status + " invoice: " + swap.pr);
+            this.htlcReceived(swap, result).catch(e => this.swapLogger.error(swap, "subscribeToInvoice(): HTLC received result", e));
+            this.activeSubscriptions.delete(paymentHash);
+        });
+        this.swapLogger.info(swap, "subscribeToInvoice(): subscribe to invoice: " + swap.pr);
+        this.activeSubscriptions.add(paymentHash);
+        return true;
+    }
+    /**
      * Called when lightning HTLC is received, also signs an init transaction on the smart chain side, expiry of the
      *  smart chain authorization starts ticking as soon as this HTLC is received
      *
@@ -227,6 +248,8 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
      * @param invoice
      */
     async htlcReceived(invoiceData, invoice) {
+        if (invoiceData.state !== FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CREATED)
+            return;
         this.swapLogger.debug(invoiceData, "htlcReceived(): invoice: ", invoice);
         if (invoiceData.metadata != null)
             invoiceData.metadata.times.htlcReceived = Date.now();
@@ -257,8 +280,8 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Setting the state variable is done outside the promise, so is done synchronously
             await invoiceData.setState(FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED);
             await this.saveSwapData(invoiceData);
+            await this.offerHtlc(invoiceData);
         }
-        await this.offerHtlc(invoiceData);
     }
     async offerHtlc(invoiceData) {
         if (invoiceData.state !== FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED)
@@ -577,6 +600,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             await PluginManager_1.PluginManager.swapCreate(createdSwap);
             await this.saveSwapData(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /createInvoice: Created swap invoice: " + hodlInvoice.request + " amount: " + totalBtcInput.toString(10));
+            this.subscribeToInvoice(createdSwap);
             await responseStream.writeParamsAndEnd({
                 code: 20000,
                 msg: "Success",
