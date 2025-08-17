@@ -303,7 +303,7 @@ class SpvVaults {
                 }
                 const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
                 let numTx = 0;
-                const txIds = await chainInterface.sendAndConfirm(signer, txs, true, undefined, false, async (txId, rawTx) => {
+                const txIds = await chainInterface.sendAndConfirm(signer, txs, true, undefined, true, async (txId, rawTx) => {
                     numTx++;
                     if (numTx === txs.length) {
                         //Final tx

@@ -310,7 +310,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Setting the state variable is done outside the promise, so is done synchronously
             await invoiceData.setState(FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.TXS_SENT);
             await this.saveSwapData(invoiceData);
-            await chainInterface.sendAndConfirm(signer, [...txWithdraw, ...txInit], true);
+            await chainInterface.sendAndConfirm(signer, [...txWithdraw, ...txInit], true, undefined, true);
         }
         return true;
     }
