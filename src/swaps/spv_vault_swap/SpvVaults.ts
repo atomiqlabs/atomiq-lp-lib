@@ -357,7 +357,7 @@ export class SpvVaults {
                 const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
                 let numTx = 0;
                 const txIds = await chainInterface.sendAndConfirm(
-                    signer, txs, true, undefined, false,
+                    signer, txs, true, undefined, true,
                     async (txId: string, rawTx: string) => {
                         numTx++;
                         if(numTx===txs.length) {
