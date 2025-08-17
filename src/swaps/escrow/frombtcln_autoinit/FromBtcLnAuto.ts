@@ -298,7 +298,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
         this.lightning.waitForInvoice(paymentHash).then(result => {
             this.swapLogger.info(swap, "subscribeToInvoice(): result callback, outcome: "+result.status+" invoice: "+swap.pr);
-            this.htlcReceived(swap, result).catch(e => this.swapLogger.error(swap, "subscribeToInvoice(): HTLC received result", e));
+            if(result.status==="held")
+                this.htlcReceived(swap, result).catch(e => this.swapLogger.error(swap, "subscribeToInvoice(): HTLC received result", e));
             this.activeSubscriptions.delete(paymentHash);
         });
         this.swapLogger.info(swap, "subscribeToInvoice(): subscribe to invoice: "+swap.pr);
