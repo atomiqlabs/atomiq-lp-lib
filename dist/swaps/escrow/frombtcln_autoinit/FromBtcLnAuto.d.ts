@@ -32,6 +32,7 @@ export type FromBtcLnAutoRequestType = {
 export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, FromBtcLnAutoSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN_AUTO;
     readonly swapType = ChainSwapType.HTLC;
+    activeSubscriptions: Set<string>;
     readonly config: FromBtcLnAutoConfig;
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
@@ -46,6 +47,12 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
     protected processInitializeEvent(chainIdentifier: string, savedSwap: FromBtcLnAutoSwap, event: InitializeEvent<SwapData>): Promise<void>;
     protected processClaimEvent(chainIdentifier: string, savedSwap: FromBtcLnAutoSwap, event: ClaimEvent<SwapData>): Promise<void>;
     protected processRefundEvent(chainIdentifier: string, savedSwap: FromBtcLnAutoSwap, event: RefundEvent<SwapData>): Promise<void>;
+    /**
+     * Subscribe to a lightning network invoice
+     *
+     * @param swap
+     */
+    private subscribeToInvoice;
     /**
      * Called when lightning HTLC is received, also signs an init transaction on the smart chain side, expiry of the
      *  smart chain authorization starts ticking as soon as this HTLC is received
