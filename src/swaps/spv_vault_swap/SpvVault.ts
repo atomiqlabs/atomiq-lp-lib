@@ -34,7 +34,7 @@ export class SpvVault<
 
     balances: SpvVaultTokenBalance[];
 
-    scOpenTx: {txId: string, rawTx: string};
+    scOpenTxs: {[txId: string]: string};
 
     constructor(chainId: string, vault: T, btcAddress: string);
     constructor(obj: any);
@@ -54,7 +54,7 @@ export class SpvVault<
             this.initialUtxo = chainIdOrObj.initialUtxo;
             this.btcAddress = chainIdOrObj.btcAddress;
             this.pendingWithdrawals = chainIdOrObj.pendingWithdrawals.map(SpvWithdrawalTransactionData.deserialize<D>);
-            this.scOpenTx = chainIdOrObj.scOpenTx;
+            this.scOpenTxs = chainIdOrObj.scOpenTxs;
         }
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
@@ -113,7 +113,7 @@ export class SpvVault<
             initialUtxo: this.initialUtxo,
             btcAddress: this.btcAddress,
             pendingWithdrawals: this.pendingWithdrawals.map(val => val.serialize()),
-            scOpenTx: this.scOpenTx
+            scOpenTxs: this.scOpenTxs
         }
     }
 
