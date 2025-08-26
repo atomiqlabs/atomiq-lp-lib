@@ -10,14 +10,27 @@ const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 exports.VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
 class SpvVaults {
-    constructor(vaultStorage, bitcoin, vaultSigner, bitcoinRpc, getChain, config) {
+    constructor(vaultStorage, bitcoin, vaultSigner, bitcoinRpc, chains, config) {
         this.logger = (0, Utils_1.getLogger)("SpvVaults: ");
         this.vaultStorage = vaultStorage;
         this.bitcoin = bitcoin;
         this.vaultSigner = vaultSigner;
         this.bitcoinRpc = bitcoinRpc;
-        this.getChain = getChain;
+        this.chains = chains;
         this.config = config;
+        for (let chainId in chains.chains) {
+            const { chainInterface } = chains.chains[chainId];
+            chainInterface.onBeforeTxReplace(async (oldTx, oldTxId, newTx, newTxId) => {
+                for (let key in this.vaultStorage.data) {
+                    const vaultData = this.vaultStorage.data[key];
+                    if (vaultData.scOpenTxs != null && vaultData.scOpenTxs[oldTxId] != null) {
+                        vaultData.scOpenTxs[newTxId] = newTx;
+                        await this.saveVault(vaultData);
+                        break;
+                    }
+                }
+            });
+        }
     }
     async processDepositEvent(vault, event) {
         vault.update(event);
@@ -46,7 +59,7 @@ class SpvVaults {
         await this.saveVault(vault);
     }
     async createVaults(chainId, count, token, confirmations = 2, feeRate) {
-        const { signer, chainInterface, tokenMultipliers, spvVaultContract } = this.getChain(chainId);
+        const { signer, chainInterface, tokenMultipliers, spvVaultContract } = this.chains.chains[chainId];
         const signerAddress = signer.getAddress();
         //Check vaultId of the latest saved vault
         let latestVaultId = -1n;
@@ -101,14 +114,14 @@ class SpvVaults {
         return Object.keys(this.vaultStorage.data)
             .map(key => this.vaultStorage.data[key])
             .filter(val => chainId == null ? true : val.chainId === chainId)
-            .filter(val => val.data.getOwner() === this.getChain(val.chainId)?.signer?.getAddress())
+            .filter(val => val.data.getOwner() === this.chains.chains[val.chainId]?.signer?.getAddress())
             .filter(val => token == null ? true : val.data.getTokenData()[0].token === token);
     }
     async fundVault(vault, tokenAmounts) {
         if (vault.state !== SpvVault_1.SpvVaultState.OPENED)
             throw new Error("Vault not opened!");
         this.logger.info("fundVault(): Depositing tokens to the vault " + vault.data.getVaultId().toString(10) + ", amounts: " + tokenAmounts.map(val => val.toString(10)).join(", "));
-        const { signer, spvVaultContract } = this.getChain(vault.chainId);
+        const { signer, spvVaultContract } = this.chains.chains[vault.chainId];
         const txId = await spvVaultContract.deposit(signer, vault.data, tokenAmounts, { waitForConfirmation: true });
         this.logger.info("fundVault(): Tokens deposited to vault " + vault.data.getVaultId().toString(10) + ", amounts: " + tokenAmounts.map(val => val.toString(10)).join(", ") + ", txId: " + txId);
         return txId;
@@ -122,7 +135,7 @@ class SpvVaults {
         });
         if (!vault.isReady())
             throw new Error("Vault not ready, wait for the latest swap to get at least 1 confirmation!");
-        const { signer, spvVaultContract } = this.getChain(vault.chainId);
+        const { signer, spvVaultContract } = this.chains.chains[vault.chainId];
         const latestUtxo = vault.getLatestUtxo();
         const [txId, voutStr] = latestUtxo.split(":");
         const opReturnData = spvVaultContract.toOpReturnData(signer.getAddress(), tokenAmounts);
@@ -192,7 +205,7 @@ class SpvVaults {
      * @param save
      */
     async checkVaultReplacedTransactions(vault, save) {
-        const { spvVaultContract } = this.getChain(vault.chainId);
+        const { spvVaultContract } = this.chains.chains[vault.chainId];
         const initialVaultWithdrawalCount = vault.data.getWithdrawalCount();
         let latestWithdrawalIndex = initialVaultWithdrawalCount;
         const newPendingTxns = [];
@@ -272,7 +285,7 @@ class SpvVaults {
         const vaults = Object.keys(this.vaultStorage.data).map(key => this.vaultStorage.data[key]);
         const claimWithdrawals = [];
         for (let vault of vaults) {
-            const { signer, spvVaultContract, chainInterface } = this.getChain(vault.chainId);
+            const { signer, spvVaultContract, chainInterface } = this.chains.chains[vault.chainId];
             if (vault.data.getOwner() !== signer.getAddress())
                 continue;
             if (vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
@@ -290,16 +303,25 @@ class SpvVaults {
             }
             if (vault.state === SpvVault_1.SpvVaultState.BTC_CONFIRMED) {
                 //Check if open txs were sent already
-                if (vault.scOpenTx != null) {
+                if (vault.scOpenTxs != null) {
                     //Check if confirmed
-                    const status = await chainInterface.getTxStatus(vault.scOpenTx.rawTx);
-                    if (status === "pending")
-                        return;
-                    if (status === "success") {
-                        vault.state = SpvVault_1.SpvVaultState.OPENED;
-                        await this.saveVault(vault);
-                        return;
+                    let _continue = false;
+                    for (let txId in vault.scOpenTxs) {
+                        const tx = vault.scOpenTxs[txId];
+                        const status = await chainInterface.getTxStatus(tx);
+                        if (status === "pending") {
+                            _continue = true;
+                            break;
+                        }
+                        if (status === "success") {
+                            vault.state = SpvVault_1.SpvVaultState.OPENED;
+                            await this.saveVault(vault);
+                            _continue = true;
+                            break;
+                        }
                     }
+                    if (_continue)
+                        continue;
                 }
                 const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
                 let numTx = 0;
@@ -307,7 +329,7 @@ class SpvVaults {
                     numTx++;
                     if (numTx === txs.length) {
                         //Final tx
-                        vault.scOpenTx = { txId, rawTx };
+                        vault.scOpenTxs = { [txId]: rawTx };
                         await this.saveVault(vault);
                     }
                 });
@@ -374,7 +396,7 @@ class SpvVaults {
         }
     }
     async claimWithdrawals(vault, withdrawal) {
-        const { signer, spvVaultContract } = this.getChain(vault.chainId);
+        const { signer, spvVaultContract } = this.chains.chains[vault.chainId];
         try {
             const txId = await spvVaultContract.claim(signer, vault.data, withdrawal.map(tx => {
                 return { tx };
@@ -402,7 +424,7 @@ class SpvVaults {
      * @protected
      */
     async findVaultForSwap(chainIdentifier, totalSats, token, amount, gasToken, gasTokenAmount) {
-        const { signer } = this.getChain(chainIdentifier);
+        const { signer } = this.chains.chains[chainIdentifier];
         const pluginResponse = await PluginManager_1.PluginManager.onVaultSelection(chainIdentifier, totalSats, { token, amount }, { token: gasToken, amount: gasTokenAmount });
         if (pluginResponse != null) {
             AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(pluginResponse);

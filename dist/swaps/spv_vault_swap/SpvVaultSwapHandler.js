@@ -25,7 +25,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         this.vaultSigner = spvVaultSigner;
         this.config = config;
         this.AmountAssertions = new FromBtcAmountAssertions_1.FromBtcAmountAssertions(config, swapPricing);
-        this.Vaults = new SpvVaults_1.SpvVaults(vaultStorage, bitcoin, spvVaultSigner, bitcoinRpc, this.getChain.bind(this), config);
+        this.Vaults = new SpvVaults_1.SpvVaults(vaultStorage, bitcoin, spvVaultSigner, bitcoinRpc, this.chains, config);
     }
     async processClaimEvent(swap, event) {
         if (swap == null)
