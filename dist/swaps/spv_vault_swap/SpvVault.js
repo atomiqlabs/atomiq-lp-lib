@@ -28,7 +28,7 @@ class SpvVault extends base_1.Lockable {
             this.initialUtxo = chainIdOrObj.initialUtxo;
             this.btcAddress = chainIdOrObj.btcAddress;
             this.pendingWithdrawals = chainIdOrObj.pendingWithdrawals.map((base_1.SpvWithdrawalTransactionData.deserialize));
-            this.scOpenTx = chainIdOrObj.scOpenTx;
+            this.scOpenTxs = chainIdOrObj.scOpenTxs;
             this.replacedWithdrawals = new Map();
             if (chainIdOrObj.replacedWithdrawals != null) {
                 chainIdOrObj.replacedWithdrawals.forEach((val) => {
@@ -117,7 +117,7 @@ class SpvVault extends base_1.Lockable {
             btcAddress: this.btcAddress,
             pendingWithdrawals: this.pendingWithdrawals.map(val => val.serialize()),
             replacedWithdrawals,
-            scOpenTx: this.scOpenTx
+            scOpenTxs: this.scOpenTxs
         };
     }
     getIdentifier() {
