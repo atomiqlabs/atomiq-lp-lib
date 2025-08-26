@@ -16,9 +16,8 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
     data: T;
     state: SpvVaultState;
     balances: SpvVaultTokenBalance[];
-    scOpenTx: {
-        txId: string;
-        rawTx: string;
+    scOpenTxs: {
+        [txId: string]: string;
     };
     constructor(chainId: string, vault: T, btcAddress: string);
     constructor(obj: any);
