@@ -9,6 +9,7 @@ const btc_signer_1 = require("@scure/btc-signer");
 const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 exports.VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
+const MAX_PARALLEL_VAULTS_OPENING = 10;
 class SpvVaults {
     constructor(vaultStorage, bitcoin, vaultSigner, bitcoinRpc, chains, config) {
         this.logger = (0, Utils_1.getLogger)("SpvVaults: ");
@@ -284,6 +285,7 @@ class SpvVaults {
     async checkVaults() {
         const vaults = Object.keys(this.vaultStorage.data).map(key => this.vaultStorage.data[key]);
         const claimWithdrawals = [];
+        let promises = [];
         for (let vault of vaults) {
             const { signer, spvVaultContract, chainInterface } = this.chains.chains[vault.chainId];
             if (vault.data.getOwner() !== signer.getAddress())
@@ -325,17 +327,23 @@ class SpvVaults {
                 }
                 const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
                 let numTx = 0;
-                const txIds = await chainInterface.sendAndConfirm(signer, txs, true, undefined, true, async (txId, rawTx) => {
+                promises.push(chainInterface.sendAndConfirm(signer, txs, true, undefined, true, async (txId, rawTx) => {
                     numTx++;
                     if (numTx === txs.length) {
                         //Final tx
                         vault.scOpenTxs = { [txId]: rawTx };
                         await this.saveVault(vault);
                     }
-                });
-                this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " opened on " + vault.chainId + " txId: " + txIds.join(", "));
-                vault.state = SpvVault_1.SpvVaultState.OPENED;
-                await this.saveVault(vault);
+                }).then(txIds => {
+                    this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " opened on " + vault.chainId + " txId: " + txIds.join(", "));
+                    vault.state = SpvVault_1.SpvVaultState.OPENED;
+                    return this.saveVault(vault);
+                }));
+                if (promises.length >= MAX_PARALLEL_VAULTS_OPENING) {
+                    await Promise.all(promises);
+                    promises = [];
+                }
+                continue;
             }
             if (vault.state === SpvVault_1.SpvVaultState.OPENED) {
                 let changed = await this.checkVaultReplacedTransactions(vault);
