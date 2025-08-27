@@ -19,6 +19,7 @@ import {checkTransactionReplacedRpc} from "../../utils/BitcoinUtils";
 
 export const VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
+const MAX_PARALLEL_VAULTS_OPENING = 10;
 
 export class SpvVaults {
 
@@ -255,6 +256,8 @@ export class SpvVaults {
 
         const claimWithdrawals: {vault: SpvVault, withdrawals: SpvWithdrawalTransactionData[]}[] = [];
 
+        let promises: Promise<void>[] = [];
+
         for(let vault of vaults) {
             const {signer, spvVaultContract, chainInterface} = this.chains.chains[vault.chainId];
             if(vault.data.getOwner()!==signer.getAddress()) continue;
@@ -297,21 +300,29 @@ export class SpvVaults {
 
                 const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
                 let numTx = 0;
-                const txIds = await chainInterface.sendAndConfirm(
-                    signer, txs, true, undefined, true,
-                    async (txId: string, rawTx: string) => {
-                        numTx++;
-                        if(numTx===txs.length) {
-                            //Final tx
-                            vault.scOpenTxs = {[txId]: rawTx};
-                            await this.saveVault(vault);
+                promises.push(
+                    chainInterface.sendAndConfirm(
+                        signer, txs, true, undefined, true,
+                        async (txId: string, rawTx: string) => {
+                            numTx++;
+                            if(numTx===txs.length) {
+                                //Final tx
+                                vault.scOpenTxs = {[txId]: rawTx};
+                                await this.saveVault(vault);
+                            }
                         }
-                    }
-                );
-                this.logger.info("checkVaults(): Vault ID "+vault.data.getVaultId().toString(10)+" opened on "+vault.chainId+" txId: "+txIds.join(", "));
+                    ).then(txIds => {
+                        this.logger.info("checkVaults(): Vault ID "+vault.data.getVaultId().toString(10)+" opened on "+vault.chainId+" txId: "+txIds.join(", "));
 
-                vault.state = SpvVaultState.OPENED;
-                await this.saveVault(vault);
+                        vault.state = SpvVaultState.OPENED;
+                        return this.saveVault(vault);
+                    })
+                );
+                if(promises.length>=MAX_PARALLEL_VAULTS_OPENING) {
+                    await Promise.all(promises);
+                    promises = [];
+                }
+                continue;
             }
 
             if(vault.state===SpvVaultState.OPENED) {
