@@ -13,6 +13,7 @@ const ToBtcBaseSwapHandler_1 = require("../ToBtcBaseSwapHandler");
 const promise_queue_ts_1 = require("promise-queue-ts");
 const BitcoinUtils_1 = require("../../../utils/BitcoinUtils");
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
+const MAX_PARALLEL_TX_PROCESSED = 10;
 /**
  * Handler for to BTC swaps, utilizing PTLCs (proof-time locked contracts) using btc relay (on-chain bitcoin SPV)
  */
@@ -171,22 +172,30 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      */
     async processBtcTxs() {
         const unsubscribeSwaps = [];
+        let promises = [];
         for (let txId in this.activeSubscriptions) {
             const swap = this.activeSubscriptions[txId];
             //TODO: RBF the transaction if it's already taking too long to confirm
-            try {
-                let tx = await this.bitcoin.getWalletTransaction(txId);
-                if (tx == null)
-                    continue;
-                if (await this.processBtcTx(swap, tx)) {
-                    this.swapLogger.info(swap, "processBtcTxs(): swap claimed successfully, txId: " + tx.txid + " address: " + swap.address);
-                    unsubscribeSwaps.push(swap);
+            promises.push((async () => {
+                try {
+                    let tx = await this.bitcoin.getWalletTransaction(txId);
+                    if (tx == null)
+                        return;
+                    if (await this.processBtcTx(swap, tx)) {
+                        this.swapLogger.info(swap, "processBtcTxs(): swap claimed successfully, txId: " + tx.txid + " address: " + swap.address);
+                        unsubscribeSwaps.push(swap);
+                    }
                 }
-            }
-            catch (e) {
-                this.swapLogger.error(swap, "processBtcTxs(): error processing btc transaction", e);
+                catch (e) {
+                    this.swapLogger.error(swap, "processBtcTxs(): error processing btc transaction", e);
+                }
+            })());
+            if (promises.length >= MAX_PARALLEL_TX_PROCESSED) {
+                await Promise.all(promises);
+                promises = [];
             }
         }
+        await Promise.all(promises);
         unsubscribeSwaps.forEach(swap => {
             this.unsubscribePayment(swap);
         });
