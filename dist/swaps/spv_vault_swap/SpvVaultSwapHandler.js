@@ -425,7 +425,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "One or more PSBT inputs not finalized!"
                 };
             const effectiveFeeRate = await this.bitcoinRpc.getEffectiveFeeRate(await this.bitcoin.parsePsbt(signedTx));
-            if (effectiveFeeRate.feeRate < swap.btcFeeRate)
+            if (Math.round(effectiveFeeRate.feeRate) < swap.btcFeeRate)
                 throw {
                     code: 20511,
                     msg: "Bitcoin transaction fee too low, expected minimum: " + swap.btcFeeRate + " adjusted effective fee rate: " + effectiveFeeRate.feeRate
