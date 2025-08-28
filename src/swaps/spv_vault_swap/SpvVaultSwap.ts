@@ -16,6 +16,9 @@ export enum SpvVaultSwapState {
 
 export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
 
+    //Unsaved sending flag
+    sending: boolean;
+
     readonly quoteId: string;
 
     readonly vaultOwner: string;

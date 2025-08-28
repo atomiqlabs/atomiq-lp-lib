@@ -11,6 +11,7 @@ const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const ServerParamDecoder_1 = require("../../../utils/paramcoders/server/ServerParamDecoder");
 const ToBtcBaseSwapHandler_1 = require("../ToBtcBaseSwapHandler");
 const promise_queue_ts_1 = require("promise-queue-ts");
+const BitcoinUtils_1 = require("../../../utils/BitcoinUtils");
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
 /**
  * Handler for to BTC swaps, utilizing PTLCs (proof-time locked contracts) using btc relay (on-chain bitcoin SPV)
@@ -276,12 +277,21 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 };
             if (swap.metadata != null)
                 swap.metadata.times.paySignPSBT = Date.now();
-            this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: " + signResult.raw);
-            swap.txId = signResult.tx.id;
-            swap.setRealNetworkFee(BigInt(signResult.networkFee));
-            await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENDING);
-            await this.saveSwapData(swap);
-            await this.bitcoin.sendRawTransaction(signResult.raw);
+            try {
+                this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: " + signResult.raw);
+                swap.txId = signResult.tx.id;
+                swap.btcRawTx = signResult.raw;
+                swap.setRealNetworkFee(BigInt(signResult.networkFee));
+                swap.sending = true;
+                await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENDING);
+                await this.saveSwapData(swap);
+                await this.bitcoin.sendRawTransaction(signResult.raw);
+                swap.sending = false;
+            }
+            catch (e) {
+                swap.sending = false;
+                throw e;
+            }
             if (swap.metadata != null)
                 swap.metadata.times.payTxSent = Date.now();
             this.swapLogger.info(swap, "sendBitcoinPayment(): btc transaction generated, signed & broadcasted, txId: " + swap.txId + " address: " + swap.address);
@@ -296,8 +306,10 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      */
     async processInitialized(swap) {
         if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENDING) {
+            if (swap.sending)
+                return;
             //Bitcoin transaction was signed (maybe also sent)
-            const tx = await this.bitcoin.getWalletTransaction(swap.txId);
+            const tx = await (0, BitcoinUtils_1.checkTransactionReplaced)(swap.txId, swap.btcRawTx, this.bitcoin);
             const isTxSent = tx != null;
             if (!isTxSent) {
                 //Reset the state to COMMITED

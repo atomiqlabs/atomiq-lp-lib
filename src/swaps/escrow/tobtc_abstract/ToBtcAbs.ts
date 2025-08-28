@@ -23,6 +23,7 @@ import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamE
 import {ToBtcBaseConfig, ToBtcBaseSwapHandler} from "../ToBtcBaseSwapHandler";
 import {PromiseQueue} from "promise-queue-ts";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
+import {checkTransactionReplaced} from "../../../utils/BitcoinUtils";
 
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
 
@@ -362,13 +363,22 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             }
             if(swap.metadata!=null) swap.metadata.times.paySignPSBT = Date.now();
 
-            this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: "+signResult.raw);
-            swap.txId = signResult.tx.id;
-            swap.setRealNetworkFee(BigInt(signResult.networkFee));
-            await swap.setState(ToBtcSwapState.BTC_SENDING);
-            await this.saveSwapData(swap);
+            try {
+                this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: "+signResult.raw);
+                swap.txId = signResult.tx.id;
+                swap.btcRawTx = signResult.raw;
+                swap.setRealNetworkFee(BigInt(signResult.networkFee));
+                swap.sending = true;
+                await swap.setState(ToBtcSwapState.BTC_SENDING);
+                await this.saveSwapData(swap);
 
-            await this.bitcoin.sendRawTransaction(signResult.raw);
+                await this.bitcoin.sendRawTransaction(signResult.raw);
+                swap.sending = false;
+            } catch (e) {
+                swap.sending = false;
+                throw e;
+            }
+
             if(swap.metadata!=null) swap.metadata.times.payTxSent = Date.now();
             this.swapLogger.info(swap, "sendBitcoinPayment(): btc transaction generated, signed & broadcasted, txId: "+swap.txId+" address: "+swap.address);
 
@@ -384,8 +394,9 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      */
     private async processInitialized(swap: ToBtcSwapAbs) {
         if(swap.state===ToBtcSwapState.BTC_SENDING) {
+            if(swap.sending) return;
             //Bitcoin transaction was signed (maybe also sent)
-            const tx = await this.bitcoin.getWalletTransaction(swap.txId);
+            const tx = await checkTransactionReplaced(swap.txId, swap.btcRawTx, this.bitcoin);
 
             const isTxSent = tx!=null;
             if(!isTxSent) {

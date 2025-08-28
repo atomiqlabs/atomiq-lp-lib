@@ -11,6 +11,7 @@ export declare enum SpvVaultSwapState {
     CLAIMED = 4
 }
 export declare class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
+    sending: boolean;
     readonly quoteId: string;
     readonly vaultOwner: string;
     readonly vaultId: bigint;

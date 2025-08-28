@@ -5,7 +5,9 @@ export declare enum SpvVaultState {
     BTC_CONFIRMED = 1,
     OPENED = 2
 }
-export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdrawalTransactionData, T extends SpvVaultData = SpvVaultData> extends Lockable implements StorageObject {
+export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdrawalTransactionData & {
+    sending?: boolean;
+}, T extends SpvVaultData = SpvVaultData> extends Lockable implements StorageObject {
     readonly chainId: string;
     readonly initialUtxo: string;
     readonly btcAddress: string;

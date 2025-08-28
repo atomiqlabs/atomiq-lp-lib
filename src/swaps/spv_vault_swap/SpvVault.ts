@@ -18,7 +18,7 @@ export enum SpvVaultState {
 }
 
 export class SpvVault<
-    D extends SpvWithdrawalTransactionData = SpvWithdrawalTransactionData,
+    D extends SpvWithdrawalTransactionData = SpvWithdrawalTransactionData & {sending?: boolean},
     T extends SpvVaultData = SpvVaultData
 > extends Lockable implements StorageObject {
 

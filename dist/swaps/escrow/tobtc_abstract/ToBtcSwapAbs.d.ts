@@ -11,11 +11,13 @@ export declare enum ToBtcSwapState {
     CLAIMED = 4
 }
 export declare class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
+    sending: boolean;
     readonly address: string;
     readonly satsPerVbyte: bigint;
     readonly nonce: bigint;
     readonly requiredConfirmations: number;
     readonly preferedConfirmationTarget: number;
+    btcRawTx: string;
     txId: string;
     constructor(chainIdentifier: string, address: string, amount: bigint, swapFee: bigint, swapFeeInToken: bigint, networkFee: bigint, networkFeeInToken: bigint, satsPerVbyte: bigint, nonce: bigint, requiredConfirmations: number, preferedConfirmationTarget: number);
     constructor(obj: any);

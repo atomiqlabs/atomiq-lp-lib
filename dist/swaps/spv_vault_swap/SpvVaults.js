@@ -6,9 +6,9 @@ const Utils_1 = require("../../utils/Utils");
 const PluginManager_1 = require("../../plugins/PluginManager");
 const AmountAssertions_1 = require("../assertions/AmountAssertions");
 const btc_signer_1 = require("@scure/btc-signer");
+const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 exports.VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
-const BTC_FINALIZATION_CONFIRMATIONS = 6;
 class SpvVaults {
     constructor(vaultStorage, bitcoin, vaultSigner, bitcoinRpc, getChain, config) {
         this.logger = {
@@ -175,12 +175,15 @@ class SpvVaults {
         if (withdrawalData.getSpentVaultUtxo() !== vault.getLatestUtxo()) {
             throw new Error("Latest vault UTXO already spent! Please try again later.");
         }
+        withdrawalData.sending = true;
         vault.addWithdrawal(withdrawalData);
         await this.saveVault(vault);
         try {
             await this.bitcoin.sendRawTransaction(res.raw);
+            withdrawalData.sending = false;
         }
         catch (e) {
+            withdrawalData.sending = false;
             vault.removeWithdrawal(withdrawalData);
             await this.saveVault(vault);
             throw e;
@@ -241,28 +244,28 @@ class SpvVaults {
                 let latestConfirmedWithdrawalIndex = -1;
                 for (let i = 0; i < vault.pendingWithdrawals.length; i++) {
                     const pendingWithdrawal = vault.pendingWithdrawals[i];
+                    if (pendingWithdrawal.sending)
+                        continue;
                     //Check all the pending withdrawals that were not finalized yet
-                    if (pendingWithdrawal.btcTx.confirmations == null || pendingWithdrawal.btcTx.confirmations < BTC_FINALIZATION_CONFIRMATIONS) {
-                        const btcTx = await this.bitcoinRpc.getTransaction(pendingWithdrawal.btcTx.txid);
-                        if (btcTx == null) {
-                            //Probable double-spend, remove from pending withdrawals
-                            const index = vault.pendingWithdrawals.indexOf(pendingWithdrawal);
-                            if (index === -1) {
-                                this.logger.warn("checkVaults(): Tried to remove pending withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", but doesn't exist anymore!");
-                            }
-                            else {
-                                vault.pendingWithdrawals.splice(index, 1);
-                            }
-                            changed = true;
+                    const btcTx = await (0, BitcoinUtils_1.checkTransactionReplacedRpc)(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
+                    if (btcTx == null) {
+                        //Probable double-spend, remove from pending withdrawals
+                        const index = vault.pendingWithdrawals.indexOf(pendingWithdrawal);
+                        if (index === -1) {
+                            this.logger.warn("checkVaults(): Tried to remove pending withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", but doesn't exist anymore!");
                         }
                         else {
-                            //Update confirmations count
-                            if (pendingWithdrawal.btcTx.confirmations !== btcTx.confirmations ||
-                                pendingWithdrawal.btcTx.blockhash !== btcTx.blockhash) {
-                                pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
-                                pendingWithdrawal.btcTx.blockhash = btcTx.blockhash;
-                                changed = true;
-                            }
+                            vault.pendingWithdrawals.splice(index, 1);
+                        }
+                        changed = true;
+                    }
+                    else {
+                        //Update confirmations count
+                        if (pendingWithdrawal.btcTx.confirmations !== btcTx.confirmations ||
+                            pendingWithdrawal.btcTx.blockhash !== btcTx.blockhash) {
+                            pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
+                            pendingWithdrawal.btcTx.blockhash = btcTx.blockhash;
+                            changed = true;
                         }
                     }
                     //Check it has enough confirmations

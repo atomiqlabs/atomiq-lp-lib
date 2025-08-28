@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isLegacyInput = void 0;
+exports.checkTransactionReplacedRpc = exports.checkTransactionReplaced = exports.isLegacyInput = void 0;
 const utxo_1 = require("@scure/btc-signer/utxo");
 const btc_signer_1 = require("@scure/btc-signer");
+const Utils_1 = require("./Utils");
+const logger = (0, Utils_1.getLogger)("BitcoinUtils: ");
 function parsePushOpcode(script) {
     if (script[0] === 0x00) {
         return Uint8Array.from([]);
@@ -43,3 +45,31 @@ function isLegacyInput(input) {
     return true;
 }
 exports.isLegacyInput = isLegacyInput;
+async function checkTransactionReplaced(txId, txRaw, bitcoin) {
+    const existingTx = await bitcoin.getWalletTransaction(txId);
+    if (existingTx != null)
+        return existingTx;
+    //Try to re-broadcast
+    try {
+        await bitcoin.sendRawTransaction(txRaw);
+    }
+    catch (e) {
+        logger.error("checkTransactionReplaced(" + txId + "): Error when trying to re-broadcast raw transaction: ", e);
+    }
+    return await bitcoin.getWalletTransaction(txId);
+}
+exports.checkTransactionReplaced = checkTransactionReplaced;
+async function checkTransactionReplacedRpc(txId, txRaw, bitcoin) {
+    const existingTx = await bitcoin.getTransaction(txId);
+    if (existingTx != null)
+        return existingTx;
+    //Try to re-broadcast
+    try {
+        await bitcoin.sendRawTransaction(txRaw);
+    }
+    catch (e) {
+        logger.error("checkTransactionReplaced(" + txId + "): Error when trying to re-broadcast raw transaction: ", e);
+    }
+    return await bitcoin.getTransaction(txId);
+}
+exports.checkTransactionReplacedRpc = checkTransactionReplacedRpc;

@@ -29,7 +29,7 @@ import {FromBtcAmountAssertions} from "../assertions/FromBtcAmountAssertions";
 import {randomBytes} from "crypto";
 import {getInputType, OutScript, Transaction} from "@scure/btc-signer";
 import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
-import {isLegacyInput} from "../../utils/BitcoinUtils";
+import {checkTransactionReplaced, isLegacyInput} from "../../utils/BitcoinUtils";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
@@ -166,8 +166,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         }
 
         if(swap.state===SpvVaultSwapState.SIGNED) {
-            //Check if sent
-            const tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
+            if(swap.sending) return;
+            const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
+            const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
+            let tx = foundWithdrawal?.btcTx;
+            if(tx==null) tx = await this.bitcoin.getWalletTransaction(swap.btcTxId);
+
             if(tx==null) {
                 await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
                 return;
@@ -183,7 +187,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
         if(swap.state===SpvVaultSwapState.SENT) {
             //Check if confirmed or double-spent
-            const tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
+            if(swap.sending) return;
+            const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
+            const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
+            let tx = foundWithdrawal?.btcTx;
+            if(tx==null) tx = await this.bitcoin.getWalletTransaction(swap.btcTxId);
+
             if(tx==null) {
                 await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
                 return;
@@ -553,32 +562,49 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                     msg: "Vault UTXO already spent, please try again!"
                 };
             }
-            vault.addWithdrawal(data);
-            await this.Vaults.saveVault(vault);
-
-            //Double-check the state to prevent race condition
-            if(swap.state!==SpvVaultSwapState.CREATED) throw {
-                code: 20505,
-                msg: "Invalid quote ID, not found or expired!"
-            };
-            swap.btcTxId = signedTx.id;
-            swap.state = SpvVaultSwapState.SIGNED;
-            await this.saveSwapData(swap);
-
-            this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: "+swap.btcTxId);
 
             try {
-                await this.bitcoin.sendRawTransaction(Buffer.from(signedTx.toBytes(true, true)).toString("hex"));
-                await swap.setState(SpvVaultSwapState.SENT);
+                const btcRawTx = Buffer.from(signedTx.toBytes(true, true)).toString("hex");
+
+                //Double-check the state to prevent race condition
+                if(swap.state!==SpvVaultSwapState.CREATED) {
+                    throw {
+                        code: 20505,
+                        msg: "Invalid quote ID, not found or expired!"
+                    };
+                }
+
+                swap.btcTxId = signedTx.id;
+                swap.state = SpvVaultSwapState.SIGNED;
+                swap.sending = true;
+                await this.saveSwapData(swap);
+
+                data.btcTx.raw = btcRawTx;
+                (data as any).sending = true;
+                vault.addWithdrawal(data);
+                await this.Vaults.saveVault(vault);
+
+                this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: "+swap.btcTxId);
+
+                try {
+                    await this.bitcoin.sendRawTransaction(btcRawTx);
+                    await swap.setState(SpvVaultSwapState.SENT);
+                    (data as any).sending = false;
+                    swap.sending = false;
+                } catch (e) {
+                    this.swapLogger.error(swap, "REST: /postQuote: Failed to send BTC transaction: ", e);
+                    throw {
+                        code: 20512,
+                        msg: "Error broadcasting bitcoin transaction!"
+                    };
+                }
             } catch (e) {
-                this.swapLogger.error(swap, "REST: /postQuote: Failed to send BTC transaction: ", e);
+                (data as any).sending = false;
+                swap.sending = false;
                 vault.removeWithdrawal(data);
                 await this.Vaults.saveVault(vault);
                 await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
-                throw {
-                    code: 20512,
-                    msg: "Error broadcasting bitcoin transaction!"
-                };
+                throw e;
             }
 
             await responseStream.writeParamsAndEnd({

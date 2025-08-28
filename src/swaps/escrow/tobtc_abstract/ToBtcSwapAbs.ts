@@ -16,12 +16,16 @@ export enum ToBtcSwapState {
 
 export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T, ToBtcSwapState> {
 
+    //Unsaved sending flag
+    sending: boolean;
+
     readonly address: string;
     readonly satsPerVbyte: bigint;
     readonly nonce: bigint;
     readonly requiredConfirmations: number;
     readonly preferedConfirmationTarget: number;
 
+    btcRawTx: string;
     txId: string;
 
     constructor(
@@ -69,6 +73,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
 
             this.txId = chainIdOrObj.txId;
+            this.btcRawTx = chainIdOrObj.btcRawTx;
 
             //Compatibility
             this.quotedNetworkFee ??= deserializeBN(chainIdOrObj.networkFee);
@@ -84,6 +89,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         partialSerialized.nonce = this.nonce.toString(10);
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
         partialSerialized.txId = this.txId;
+        partialSerialized.btcRawTx = this.btcRawTx;
         return partialSerialized;
     }
 

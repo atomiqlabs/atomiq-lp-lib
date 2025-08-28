@@ -1,6 +1,11 @@
 import {TransactionInput} from "@scure/btc-signer/psbt";
 import {getPrevOut} from "@scure/btc-signer/utxo";
 import {OutScript} from "@scure/btc-signer";
+import {BitcoinRpc, BtcTx} from "@atomiqlabs/base";
+import {IBitcoinWallet} from "../wallets/IBitcoinWallet";
+import {getLogger} from "./Utils";
+
+const logger = getLogger("BitcoinUtils: ");
 
 function parsePushOpcode(script: Uint8Array): Uint8Array {
     if(script[0]===0x00) {
@@ -39,4 +44,28 @@ export function isLegacyInput(input: TransactionInput): boolean {
         if(second.type==="wsh" || second.type==="wpkh") return false;
     }
     return true;
+}
+
+export async function checkTransactionReplaced(txId: string, txRaw: string, bitcoin: IBitcoinWallet): Promise<BtcTx> {
+    const existingTx = await bitcoin.getWalletTransaction(txId);
+    if(existingTx!=null) return existingTx;
+    //Try to re-broadcast
+    try {
+        await bitcoin.sendRawTransaction(txRaw);
+    } catch (e) {
+        logger.error("checkTransactionReplaced("+txId+"): Error when trying to re-broadcast raw transaction: ", e);
+    }
+    return await bitcoin.getWalletTransaction(txId);
+}
+
+export async function checkTransactionReplacedRpc(txId: string, txRaw: string, bitcoin: BitcoinRpc<any>): Promise<BtcTx> {
+    const existingTx = await bitcoin.getTransaction(txId);
+    if(existingTx!=null) return existingTx;
+    //Try to re-broadcast
+    try {
+        await bitcoin.sendRawTransaction(txRaw);
+    } catch (e) {
+        logger.error("checkTransactionReplaced("+txId+"): Error when trying to re-broadcast raw transaction: ", e);
+    }
+    return await bitcoin.getTransaction(txId);
 }
