@@ -186,7 +186,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             }
         }
 
-        if(swap.state===SpvVaultSwapState.SENT) {
+        if(swap.state===SpvVaultSwapState.SENT || swap.state===SpvVaultSwapState.BTC_CONFIRMED) {
             //Check if confirmed or double-spent
             if(swap.sending) return;
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
@@ -198,8 +198,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
                 return;
             } else if(tx.confirmations > 0) {
-                await swap.setState(SpvVaultSwapState.BTC_CONFIRMED)
-                await this.saveSwapData(swap);
+                if(swap.state!==SpvVaultSwapState.BTC_CONFIRMED) {
+                    await swap.setState(SpvVaultSwapState.BTC_CONFIRMED)
+                    await this.saveSwapData(swap);
+                }
             }
         }
     }
