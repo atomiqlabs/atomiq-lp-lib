@@ -52,6 +52,8 @@ export type ToBtcRequestType = {
     exactIn?: boolean
 };
 
+const MAX_PARALLEL_TX_PROCESSED = 10;
+
 /**
  * Handler for to BTC swaps, utilizing PTLCs (proof-time locked contracts) using btc relay (on-chain bitcoin SPV)
  */
@@ -249,21 +251,29 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     private async processBtcTxs() {
         const unsubscribeSwaps: ToBtcSwapAbs[] = [];
 
+        let promises: Promise<void>[] = [];
         for(let txId in this.activeSubscriptions) {
             const swap: ToBtcSwapAbs = this.activeSubscriptions[txId];
             //TODO: RBF the transaction if it's already taking too long to confirm
-            try {
-                let tx: BtcTx = await this.bitcoin.getWalletTransaction(txId);
-                if(tx==null) continue;
+            promises.push((async () => {
+                try {
+                    let tx: BtcTx = await this.bitcoin.getWalletTransaction(txId);
+                    if(tx==null) return;
 
-                if(await this.processBtcTx(swap, tx)) {
-                    this.swapLogger.info(swap, "processBtcTxs(): swap claimed successfully, txId: "+tx.txid+" address: "+swap.address);
-                    unsubscribeSwaps.push(swap);
+                    if(await this.processBtcTx(swap, tx)) {
+                        this.swapLogger.info(swap, "processBtcTxs(): swap claimed successfully, txId: "+tx.txid+" address: "+swap.address);
+                        unsubscribeSwaps.push(swap);
+                    }
+                } catch (e) {
+                    this.swapLogger.error(swap, "processBtcTxs(): error processing btc transaction", e);
                 }
-            } catch (e) {
-                this.swapLogger.error(swap, "processBtcTxs(): error processing btc transaction", e);
+            })());
+            if(promises.length >= MAX_PARALLEL_TX_PROCESSED) {
+                await Promise.all(promises);
+                promises = [];
             }
         }
+        await Promise.all(promises);
 
         unsubscribeSwaps.forEach(swap => {
             this.unsubscribePayment(swap);
