@@ -800,20 +800,24 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
             await this.checkExpired(payment);
 
-            if (payment.state === ToBtcSwapState.COMMITED) throw {
-                _httpStatus: 200,
-                code: 20008,
-                msg: "Payment processing"
-            };
+            if (payment.state === ToBtcSwapState.COMMITED) {
+                res.status(200).json({
+                    code: 20008,
+                    msg: "Payment processing"
+                });
+                return;
+            }
 
-            if (payment.state === ToBtcSwapState.BTC_SENT || payment.state===ToBtcSwapState.BTC_SENDING) throw {
-                _httpStatus: 200,
-                code: 20006,
-                msg: "Already paid",
-                data: {
-                    txId: payment.txId
-                }
-            };
+            if (payment.state === ToBtcSwapState.BTC_SENT || payment.state===ToBtcSwapState.BTC_SENDING) {
+                res.status(200).json({
+                    code: 20006,
+                    msg: "Already paid",
+                    data: {
+                        txId: payment.txId
+                    }
+                });
+                return;
+            }
 
             const {swapContract, signer} = this.getChain(payment.chainIdentifier);
 

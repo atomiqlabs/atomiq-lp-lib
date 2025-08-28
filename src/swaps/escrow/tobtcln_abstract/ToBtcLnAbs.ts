@@ -1068,20 +1068,24 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 msg: "Payment not found"
             };
 
-            if(payment.status==="pending") throw {
-                _httpStatus: 200,
-                code: 20008,
-                msg: "Payment in-flight"
-            };
+            if(payment.status==="pending") {
+                res.status(200).json({
+                    code: 20008,
+                    msg: "Payment in-flight"
+                });
+                return;
+            }
 
-            if(payment.status==="confirmed") throw {
-                _httpStatus: 200,
-                code: 20006,
-                msg: "Already paid",
-                data: {
-                    secret: payment.secret
-                }
-            };
+            if(payment.status==="confirmed") {
+                res.status(200).json({
+                    code: 20006,
+                    msg: "Already paid",
+                    data: {
+                        secret: payment.secret
+                    }
+                });
+                return;
+            }
 
             if(payment.status==="failed") throw {
                 _httpStatus: 200,
