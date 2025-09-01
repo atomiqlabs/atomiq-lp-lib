@@ -10,7 +10,6 @@ const crypto_1 = require("crypto");
 const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const ServerParamDecoder_1 = require("../../../utils/paramcoders/server/ServerParamDecoder");
 const ToBtcBaseSwapHandler_1 = require("../ToBtcBaseSwapHandler");
-const promise_queue_ts_1 = require("promise-queue-ts");
 const BitcoinUtils_1 = require("../../../utils/BitcoinUtils");
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
 const MAX_PARALLEL_TX_PROCESSED = 10;
@@ -23,7 +22,6 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         this.type = SwapHandler_1.SwapHandlerType.TO_BTC;
         this.swapType = base_1.ChainSwapType.CHAIN_NONCED;
         this.activeSubscriptions = {};
-        this.sendBtcQueue = new promise_queue_ts_1.PromiseQueue();
         this.bitcoinRpc = bitcoinRpc;
         this.bitcoin = bitcoin;
         this.config = config;
@@ -269,7 +267,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     sendBitcoinPayment(swap) {
         //Make sure that bitcoin payouts are processed sequentially to avoid race conditions between multiple payouts,
         // e.g. that 2 payouts share the same input and would effectively double-spend each other
-        return this.sendBtcQueue.enqueue(async () => {
+        return this.bitcoin.execute(async () => {
             //Run checks
             this.checkExpiresTooSoon(swap);
             if (swap.metadata != null)

@@ -66,4 +66,12 @@ export interface IBitcoinWallet {
     getBlockheight(): Promise<number>;
     getFeeRate(): Promise<number>;
 
+    /**
+     * Post a task to be executed on the sequential thread of the wallet, this makes sure the UTXOs stay consistent during
+     *  operation, it is recommended to use this approach when spending wallet UTXOs
+     *
+     * @param executor
+     */
+    execute(executor: () => Promise<void>): Promise<void>;
+
 }
