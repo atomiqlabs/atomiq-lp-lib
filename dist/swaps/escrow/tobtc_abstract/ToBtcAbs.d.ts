@@ -5,7 +5,6 @@ import { ISwapPrice } from "../../../prices/ISwapPrice";
 import { BtcTx, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../../storage/IIntermediaryStorage";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
-import { PromiseQueue } from "promise-queue-ts";
 import { IBitcoinWallet } from "../../../wallets/IBitcoinWallet";
 export type ToBtcConfig = ToBtcBaseConfig & {
     sendSafetyFactor: bigint;
@@ -38,7 +37,6 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
     };
     bitcoinRpc: BitcoinRpc<BtcBlock>;
     bitcoin: IBitcoinWallet;
-    sendBtcQueue: PromiseQueue;
     readonly config: ToBtcConfig;
     constructor(storageDirectory: IIntermediaryStorage<ToBtcSwapAbs>, path: string, chainData: MultichainData, bitcoin: IBitcoinWallet, swapPricing: ISwapPrice, bitcoinRpc: BitcoinRpc<BtcBlock>, config: ToBtcConfig);
     /**

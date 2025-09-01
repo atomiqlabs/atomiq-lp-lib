@@ -21,7 +21,6 @@ import {serverParamDecoder} from "../../../utils/paramcoders/server/ServerParamD
 import {IParamReader} from "../../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamEncoder";
 import {ToBtcBaseConfig, ToBtcBaseSwapHandler} from "../ToBtcBaseSwapHandler";
-import {PromiseQueue} from "promise-queue-ts";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {checkTransactionReplaced} from "../../../utils/BitcoinUtils";
 
@@ -64,7 +63,6 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     activeSubscriptions: {[txId: string]: ToBtcSwapAbs} = {};
     bitcoinRpc: BitcoinRpc<BtcBlock>;
     bitcoin: IBitcoinWallet;
-    sendBtcQueue: PromiseQueue = new PromiseQueue();
 
     readonly config: ToBtcConfig;
 
@@ -351,7 +349,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     private sendBitcoinPayment(swap: ToBtcSwapAbs) {
         //Make sure that bitcoin payouts are processed sequentially to avoid race conditions between multiple payouts,
         // e.g. that 2 payouts share the same input and would effectively double-spend each other
-        return this.sendBtcQueue.enqueue<void>(async () => {
+        return this.bitcoin.execute(async () => {
             //Run checks
             this.checkExpiresTooSoon(swap);
             if(swap.metadata!=null) swap.metadata.times.payCLTVChecked = Date.now();
