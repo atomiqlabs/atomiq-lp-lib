@@ -560,6 +560,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 msg: "Bitcoin transaction size too large, maximum: "+TX_MAX_VSIZE+" actual: "+txVsize
             };
 
+            await this.Vaults.checkVaultReplacedTransactions(vault, true);
             if(swap.vaultUtxo!==vault.getLatestUtxo()) {
                 throw {
                     code: 20510,
