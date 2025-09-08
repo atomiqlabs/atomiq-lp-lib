@@ -115,40 +115,46 @@ export class SpvVaults {
             vaultAddreses.push({vaultId, address});
         }
 
-        //Construct transaction
-        const txResult = await this.bitcoin.getSignedMultiTransaction(vaultAddreses.map(val => {
-            return {address: val.address, amount: VAULT_DUST_AMOUNT}
-        }), feeRate);
-
         const nativeToken = chainInterface.getNativeCurrencyAddress();
 
-        const vaults = await Promise.all(vaultAddreses.map(async (val, index) => {
-            const vaultData = await spvVaultContract.createVaultData(signerAddress, val.vaultId, txResult.txId+":"+index, confirmations, [
-                {token, multiplier: tokenMultipliers?.[token] ?? 1n},
-                {token: nativeToken, multiplier: tokenMultipliers?.[nativeToken] ?? 1n}
-            ]);
-            return new SpvVault(chainId, vaultData, val.address);
-        }));
+        let txId: string = null;
+        let vaults: SpvVault[] = null;
+        await this.bitcoin.execute(async () => {
+            //Construct transaction
+            const txResult = await this.bitcoin.getSignedMultiTransaction(vaultAddreses.map(val => {
+                return {address: val.address, amount: VAULT_DUST_AMOUNT}
+            }), feeRate);
 
-        //Save vaults
-        if(this.vaultStorage.saveDataArr!=null) {
-            await this.vaultStorage.saveDataArr(vaults.map(val => {
-                return {id: val.getIdentifier(), object: val}
+            vaults = await Promise.all(vaultAddreses.map(async (val, index) => {
+                const vaultData = await spvVaultContract.createVaultData(signerAddress, val.vaultId, txResult.txId+":"+index, confirmations, [
+                    {token, multiplier: tokenMultipliers?.[token] ?? 1n},
+                    {token: nativeToken, multiplier: tokenMultipliers?.[nativeToken] ?? 1n}
+                ]);
+                return new SpvVault(chainId, vaultData, val.address);
             }));
-        } else {
-            for(let vault of vaults) {
-                await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+
+            //Save vaults
+            if(this.vaultStorage.saveDataArr!=null) {
+                await this.vaultStorage.saveDataArr(vaults.map(val => {
+                    return {id: val.getIdentifier(), object: val}
+                }));
+            } else {
+                for(let vault of vaults) {
+                    await this.vaultStorage.saveData(vault.getIdentifier(), vault);
+                }
             }
-        }
 
-        //Send bitcoin tx
-        await this.bitcoin.sendRawTransaction(txResult.raw);
+            //Send bitcoin tx
+            await this.bitcoin.sendRawTransaction(txResult.raw);
 
-        this.logger.info("createVaults(): Funding "+count+" vaults, bitcoin txId: "+txResult.txId);
+            txId = txResult.txId;
+        });
+
+        this.logger.info("createVaults(): Funding "+count+" vaults, bitcoin txId: "+txId);
 
         return {
             vaultsCreated: vaults.map(val => val.data.getVaultId()),
-            btcTxId: txResult.txId
+            btcTxId: txId
         };
     }
 
