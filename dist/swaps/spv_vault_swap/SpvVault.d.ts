@@ -12,6 +12,7 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
     readonly initialUtxo: string;
     readonly btcAddress: string;
     readonly pendingWithdrawals: D[];
+    readonly replacedWithdrawals: Map<number, D[]>;
     data: T;
     state: SpvVaultState;
     balances: SpvVaultTokenBalance[];
@@ -24,6 +25,7 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
     update(event: SpvVaultOpenEvent | SpvVaultDepositEvent | SpvVaultCloseEvent | SpvVaultClaimEvent): void;
     addWithdrawal(withdrawalData: D): void;
     removeWithdrawal(withdrawalData: D): boolean;
+    doubleSpendPendingWithdrawal(withdrawalData: D): boolean;
     toRawAmounts(amounts: bigint[]): bigint[];
     fromRawAmounts(rawAmounts: bigint[]): bigint[];
     /**

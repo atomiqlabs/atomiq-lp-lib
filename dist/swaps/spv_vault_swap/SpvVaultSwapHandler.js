@@ -256,7 +256,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             metadata.times.priceCalculated = Date.now();
             const totalBtcOutput = amountBD + amountBDgas;
             //Check if we have enough funds to honor the request
-            const vault = await this.Vaults.findVaultForSwap(chainIdentifier, totalBtcOutput, useToken, totalInToken, gasToken, totalInGasToken);
+            let vault;
+            do {
+                vault = await this.Vaults.findVaultForSwap(chainIdentifier, totalBtcOutput, useToken, totalInToken, gasToken, totalInGasToken);
+            } while (await this.Vaults.checkVaultReplacedTransactions(vault, true));
+            abortController.signal.throwIfAborted();
             metadata.times.vaultPicked = Date.now();
             //Create swap receive bitcoin address
             const btcFeeRate = await this.bitcoin.getFeeRate();

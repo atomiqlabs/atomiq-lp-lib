@@ -38,6 +38,13 @@ export declare class SpvVaults {
     }, import("@atomiqlabs/base").SpvVaultData<SpvWithdrawalTransactionData>>[]>;
     fundVault(vault: SpvVault, tokenAmounts: bigint[]): Promise<string>;
     withdrawFromVault(vault: SpvVault, tokenAmounts: bigint[], feeRate?: number): Promise<string>;
+    /**
+     * Call this to check whether some of the previously replaced transactions got re-introduced to the mempool
+     *
+     * @param vault
+     * @param save
+     */
+    checkVaultReplacedTransactions(vault: SpvVault, save?: boolean): Promise<boolean>;
     checkVaults(): Promise<void>;
     claimWithdrawals(vault: SpvVault, withdrawal: SpvWithdrawalTransactionData[]): Promise<boolean>;
     getVault(chainId: string, owner: string, vaultId: bigint): Promise<SpvVault<SpvWithdrawalTransactionData & {

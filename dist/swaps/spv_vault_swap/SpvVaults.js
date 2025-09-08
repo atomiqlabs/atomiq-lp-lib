@@ -190,6 +190,89 @@ class SpvVaults {
         }
         return res.txId;
     }
+    /**
+     * Call this to check whether some of the previously replaced transactions got re-introduced to the mempool
+     *
+     * @param vault
+     * @param save
+     */
+    async checkVaultReplacedTransactions(vault, save) {
+        const { spvVaultContract } = this.getChain(vault.chainId);
+        const initialVaultWithdrawalCount = vault.data.getWithdrawalCount();
+        let latestWithdrawalIndex = initialVaultWithdrawalCount;
+        const newPendingTxns = [];
+        const reintroducedTxIds = new Set();
+        for (let [withdrawalIndex, replacedWithdrawalGroup] of vault.replacedWithdrawals) {
+            if (withdrawalIndex <= latestWithdrawalIndex)
+                continue; //Don't check txns that should already be included
+            for (let replacedWithdrawal of replacedWithdrawalGroup) {
+                if (reintroducedTxIds.has(replacedWithdrawal.getTxId()))
+                    continue;
+                const tx = await this.bitcoinRpc.getTransaction(replacedWithdrawal.getTxId());
+                if (tx == null)
+                    continue;
+                //Re-introduce transaction to the pending withdrawals list
+                if (withdrawalIndex > latestWithdrawalIndex) {
+                    const txChain = [replacedWithdrawal];
+                    withdrawalIndex--;
+                    while (withdrawalIndex > latestWithdrawalIndex) {
+                        const tx = await this.bitcoinRpc.getTransaction(txChain[0].getSpentVaultUtxo().split(":")[0]);
+                        if (tx == null)
+                            break;
+                        reintroducedTxIds.add(tx.txid);
+                        txChain.unshift(await spvVaultContract.getWithdrawalData(tx));
+                        withdrawalIndex--;
+                    }
+                    if (withdrawalIndex > latestWithdrawalIndex) {
+                        this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Tried to re-introduce previously replaced TX, but one of txns in the chain not found!`);
+                        continue;
+                    }
+                    newPendingTxns.push(...txChain);
+                    latestWithdrawalIndex += txChain.length;
+                    break; //Don't check other txns at the same withdrawal index
+                }
+                else {
+                    this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Tried to re-introduce previously replaced TX, but vault has already processed such withdrawal!`);
+                }
+            }
+        }
+        if (newPendingTxns.length === 0)
+            return false;
+        if (initialVaultWithdrawalCount !== vault.data.getWithdrawalCount()) {
+            this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Not saving vault after checking replaced transactions, due to withdrawal count changed!`);
+            return false;
+        }
+        const backup = vault.pendingWithdrawals.splice(0, newPendingTxns.length);
+        const txsToAddOnTop = vault.pendingWithdrawals.splice(0, vault.pendingWithdrawals.length);
+        try {
+            newPendingTxns.forEach(val => vault.addWithdrawal(val));
+            txsToAddOnTop.forEach(val => vault.addWithdrawal(val));
+            for (let i = 0; i < newPendingTxns.length; i++) {
+                const withdrawalIndex = initialVaultWithdrawalCount + i + 1;
+                const arr = vault.replacedWithdrawals.get(withdrawalIndex);
+                if (arr == null)
+                    continue;
+                const index = arr.indexOf(newPendingTxns[i]);
+                if (index === -1) {
+                    this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Cannot remove re-introduced tx ${newPendingTxns[i].getTxId()}, not found in the respective array!`);
+                    continue;
+                }
+                arr.splice(index, 1);
+                if (arr.length === 0)
+                    vault.replacedWithdrawals.delete(withdrawalIndex);
+            }
+            this.logger.info(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Re-introduced back ${newPendingTxns.length} txns that were re-added to the mempool!`);
+            if (save)
+                await this.saveVault(vault);
+            return true;
+        }
+        catch (e) {
+            this.logger.error(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Failed to update the vault with new pending txns (rolling back): `, e);
+            //Rollback the pending withdrawals
+            vault.pendingWithdrawals.push(...backup, ...txsToAddOnTop);
+            return false;
+        }
+    }
     async checkVaults() {
         const vaults = Object.keys(this.vaultStorage.data).map(key => this.vaultStorage.data[key]);
         const claimWithdrawals = [];
@@ -238,7 +321,7 @@ class SpvVaults {
                 await this.saveVault(vault);
             }
             if (vault.state === SpvVault_1.SpvVaultState.OPENED) {
-                let changed = false;
+                let changed = await this.checkVaultReplacedTransactions(vault);
                 //Check if some of the pendingWithdrawals got confirmed
                 let latestOwnWithdrawalIndex = -1;
                 let latestConfirmedWithdrawalIndex = -1;
@@ -250,8 +333,11 @@ class SpvVaults {
                     const btcTx = await (0, BitcoinUtils_1.checkTransactionReplacedRpc)(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
                     if (btcTx == null) {
                         //Probable double-spend, remove from pending withdrawals
-                        if (!vault.removeWithdrawal(pendingWithdrawal)) {
+                        if (!vault.doubleSpendPendingWithdrawal(pendingWithdrawal)) {
                             this.logger.warn("checkVaults(): Tried to remove pending withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", but doesn't exist anymore!");
+                        }
+                        else {
+                            this.logger.info("checkVaults(): Successfully removed withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", due to being replaced in the mempool!");
                         }
                         changed = true;
                     }
