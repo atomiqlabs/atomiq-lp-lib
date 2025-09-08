@@ -46,19 +46,7 @@ export function isLegacyInput(input: TransactionInput): boolean {
     return true;
 }
 
-export async function checkTransactionReplaced(txId: string, txRaw: string, bitcoin: IBitcoinWallet): Promise<BtcTx> {
-    const existingTx = await bitcoin.getWalletTransaction(txId);
-    if(existingTx!=null) return existingTx;
-    //Try to re-broadcast
-    try {
-        await bitcoin.sendRawTransaction(txRaw);
-    } catch (e) {
-        logger.error("checkTransactionReplaced("+txId+"): Error when trying to re-broadcast raw transaction: ", e);
-    }
-    return await bitcoin.getWalletTransaction(txId);
-}
-
-export async function checkTransactionReplacedRpc(txId: string, txRaw: string, bitcoin: BitcoinRpc<any>): Promise<BtcTx> {
+export async function checkTransactionReplaced(txId: string, txRaw: string, bitcoin: BitcoinRpc<any>): Promise<BtcTx> {
     const existingTx = await bitcoin.getTransaction(txId);
     if(existingTx!=null) return existingTx;
     //Try to re-broadcast

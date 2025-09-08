@@ -15,7 +15,7 @@ import {ISpvVaultSigner} from "../../wallets/ISpvVaultSigner";
 import {AmountAssertions} from "../assertions/AmountAssertions";
 import {ChainData} from "../SwapHandler";
 import {Transaction} from "@scure/btc-signer";
-import {checkTransactionReplacedRpc} from "../../utils/BitcoinUtils";
+import {checkTransactionReplaced} from "../../utils/BitcoinUtils";
 
 export const VAULT_DUST_AMOUNT = 600;
 const VAULT_INIT_CONFIRMATIONS = 2;
@@ -389,7 +389,7 @@ export class SpvVaults {
                     if(pendingWithdrawal.sending) continue;
 
                     //Check all the pending withdrawals that were not finalized yet
-                    const btcTx = await checkTransactionReplacedRpc(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
+                    const btcTx = await checkTransactionReplaced(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
                     if(btcTx==null) {
                         //Probable double-spend, remove from pending withdrawals
                         if(!vault.doubleSpendPendingWithdrawal(pendingWithdrawal)) {

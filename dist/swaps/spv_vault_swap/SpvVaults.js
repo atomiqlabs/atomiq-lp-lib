@@ -330,7 +330,7 @@ class SpvVaults {
                     if (pendingWithdrawal.sending)
                         continue;
                     //Check all the pending withdrawals that were not finalized yet
-                    const btcTx = await (0, BitcoinUtils_1.checkTransactionReplacedRpc)(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
+                    const btcTx = await (0, BitcoinUtils_1.checkTransactionReplaced)(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
                     if (btcTx == null) {
                         //Probable double-spend, remove from pending withdrawals
                         if (!vault.doubleSpendPendingWithdrawal(pendingWithdrawal)) {

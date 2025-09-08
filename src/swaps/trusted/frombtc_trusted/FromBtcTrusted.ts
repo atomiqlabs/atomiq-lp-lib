@@ -702,7 +702,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
 
     private async checkDoubleSpends(): Promise<void> {
         for(let swap of this.doubleSpendWatchdogSwaps.keys()) {
-            const tx = await this.bitcoin.getWalletTransaction(swap.txId);
+            const tx = await this.bitcoinRpc.getTransaction(swap.txId);
             if(tx==null) {
                 this.swapLogger.debug(swap, "checkDoubleSpends(): Swap was double spent, burning... - original txId: "+swap.txId);
                 this.processPastSwap(swap, null, null);

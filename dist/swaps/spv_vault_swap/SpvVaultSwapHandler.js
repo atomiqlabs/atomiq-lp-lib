@@ -105,7 +105,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
             let tx = foundWithdrawal?.btcTx;
             if (tx == null)
-                tx = await this.bitcoin.getWalletTransaction(swap.btcTxId);
+                tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
             if (tx == null) {
                 await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
                 return;
@@ -128,7 +128,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
             let tx = foundWithdrawal?.btcTx;
             if (tx == null)
-                tx = await this.bitcoin.getWalletTransaction(swap.btcTxId);
+                tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
             if (tx == null) {
                 await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.DOUBLE_SPENT);
                 return;

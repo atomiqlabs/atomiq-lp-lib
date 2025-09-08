@@ -27,9 +27,9 @@ import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEnco
 import {FieldTypeEnum} from "../../utils/paramcoders/SchemaVerifier";
 import {FromBtcAmountAssertions} from "../assertions/FromBtcAmountAssertions";
 import {randomBytes} from "crypto";
-import {getInputType, OutScript, Transaction} from "@scure/btc-signer";
+import {Transaction} from "@scure/btc-signer";
 import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
-import {checkTransactionReplaced, isLegacyInput} from "../../utils/BitcoinUtils";
+import {isLegacyInput} from "../../utils/BitcoinUtils";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
@@ -170,7 +170,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
             let tx = foundWithdrawal?.btcTx;
-            if(tx==null) tx = await this.bitcoin.getWalletTransaction(swap.btcTxId);
+            if(tx==null) tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
 
             if(tx==null) {
                 await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
@@ -191,7 +191,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
             let tx = foundWithdrawal?.btcTx;
-            if(tx==null) tx = await this.bitcoin.getWalletTransaction(swap.btcTxId);
+            if(tx==null) tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
 
             if(tx==null) {
                 await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);

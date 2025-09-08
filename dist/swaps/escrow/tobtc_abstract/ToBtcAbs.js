@@ -309,7 +309,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             if (swap.sending)
                 return;
             //Bitcoin transaction was signed (maybe also sent)
-            const tx = await (0, BitcoinUtils_1.checkTransactionReplaced)(swap.txId, swap.btcRawTx, this.bitcoin);
+            const tx = await (0, BitcoinUtils_1.checkTransactionReplaced)(swap.txId, swap.btcRawTx, this.bitcoinRpc);
             const isTxSent = tx != null;
             if (!isTxSent) {
                 //Reset the state to COMMITED
