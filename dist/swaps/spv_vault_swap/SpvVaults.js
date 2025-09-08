@@ -250,12 +250,8 @@ class SpvVaults {
                     const btcTx = await (0, BitcoinUtils_1.checkTransactionReplacedRpc)(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
                     if (btcTx == null) {
                         //Probable double-spend, remove from pending withdrawals
-                        const index = vault.pendingWithdrawals.indexOf(pendingWithdrawal);
-                        if (index === -1) {
+                        if (!vault.removeWithdrawal(pendingWithdrawal)) {
                             this.logger.warn("checkVaults(): Tried to remove pending withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", but doesn't exist anymore!");
-                        }
-                        else {
-                            vault.pendingWithdrawals.splice(index, 1);
                         }
                         changed = true;
                     }
