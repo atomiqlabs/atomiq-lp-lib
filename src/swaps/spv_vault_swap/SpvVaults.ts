@@ -227,34 +227,38 @@ export class SpvVaults {
             script: opReturnScript
         });
 
-        psbt = await this.bitcoin.fundPsbt(psbt, feeRate);
-        if(psbt.inputsLength<2) throw new Error("PSBT needs at least 2 inputs!");
-        psbt.updateInput(0, {sequence: 0x80000000});
-        psbt.updateInput(1, {sequence: 0x80000000});
-        psbt = await this.vaultSigner.signPsbt(vault.chainId, vault.data.getVaultId(), psbt, [0]);
-        const res = await this.bitcoin.signPsbt(psbt);
+        let withdrawalTxId: string = null;
+        await this.bitcoin.execute(async () => {
+            psbt = await this.bitcoin.fundPsbt(psbt, feeRate);
+            if(psbt.inputsLength<2) throw new Error("PSBT needs at least 2 inputs!");
+            psbt.updateInput(0, {sequence: 0x80000000});
+            psbt.updateInput(1, {sequence: 0x80000000});
+            psbt = await this.vaultSigner.signPsbt(vault.chainId, vault.data.getVaultId(), psbt, [0]);
+            const res = await this.bitcoin.signPsbt(psbt);
+            withdrawalTxId = res.txId;
 
-        const parsedTransaction = await this.bitcoinRpc.parseTransaction(res.raw);
-        const withdrawalData = await spvVaultContract.getWithdrawalData(parsedTransaction);
+            const parsedTransaction = await this.bitcoinRpc.parseTransaction(res.raw);
+            const withdrawalData = await spvVaultContract.getWithdrawalData(parsedTransaction);
 
-        if(withdrawalData.getSpentVaultUtxo()!==vault.getLatestUtxo()) {
-            throw new Error("Latest vault UTXO already spent! Please try again later.");
-        }
-        (withdrawalData as any).sending = true;
-        vault.addWithdrawal(withdrawalData);
-        await this.saveVault(vault);
-
-        try {
-            await this.bitcoin.sendRawTransaction(res.raw);
-            (withdrawalData as any).sending = false;
-        } catch (e) {
-            (withdrawalData as any).sending = false;
-            vault.removeWithdrawal(withdrawalData);
+            if(withdrawalData.getSpentVaultUtxo()!==vault.getLatestUtxo()) {
+                throw new Error("Latest vault UTXO already spent! Please try again later.");
+            }
+            (withdrawalData as any).sending = true;
+            vault.addWithdrawal(withdrawalData);
             await this.saveVault(vault);
-            throw e;
-        }
 
-        return res.txId;
+            try {
+                await this.bitcoin.sendRawTransaction(res.raw);
+                (withdrawalData as any).sending = false;
+            } catch (e) {
+                (withdrawalData as any).sending = false;
+                vault.removeWithdrawal(withdrawalData);
+                await this.saveVault(vault);
+                throw e;
+            }
+        });
+
+        return withdrawalTxId;
     }
 
     /**
