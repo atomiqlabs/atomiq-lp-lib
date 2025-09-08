@@ -301,7 +301,7 @@ export class SpvVaults {
                 //Check if some of the pendingWithdrawals got confirmed
                 let latestOwnWithdrawalIndex = -1;
                 let latestConfirmedWithdrawalIndex = -1;
-                for(let i=0; i<vault.pendingWithdrawals.length; i++) {
+                for(let i = vault.pendingWithdrawals.length-1; i>=0; i--) {
                     const pendingWithdrawal = vault.pendingWithdrawals[i];
                     if(pendingWithdrawal.sending) continue;
 
