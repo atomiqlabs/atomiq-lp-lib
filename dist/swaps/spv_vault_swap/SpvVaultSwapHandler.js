@@ -13,6 +13,7 @@ const crypto_1 = require("crypto");
 const btc_signer_1 = require("@scure/btc-signer");
 const SpvVaults_1 = require("./SpvVaults");
 const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
+const AmountAssertions_1 = require("../assertions/AmountAssertions");
 const TX_MAX_VSIZE = 16 * 1024;
 class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config) {
@@ -355,7 +356,6 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "Error parsing PSBT, hex format required!"
                 };
             }
-            //Check correct psbt
             for (let i = 1; i < transaction.inputsLength; i++) { //Skip first vault input
                 const txIn = transaction.getInput(i);
                 if ((0, BitcoinUtils_1.isLegacyInput)(txIn))
@@ -363,6 +363,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                         code: 20514,
                         msg: "Legacy (pre-segwit) inputs in tx are not allowed!"
                     };
+            }
+            //Check the posted quote with the plugins
+            AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(await PluginManager_1.PluginManager.onHandlePostedFromBtcQuote(this.type, { chainIdentifier: swap.chainIdentifier, raw: req, parsed: parsedBody, metadata }, swap));
+            //Check correct psbt
+            for (let i = 1; i < transaction.inputsLength; i++) { //Skip first vault input
+                const txIn = transaction.getInput(i);
                 //Check UTXOs exist and are unspent
                 if (await this.bitcoinRpc.isSpent(Buffer.from(txIn.txid).toString("hex") + ":" + txIn.index.toString(10)))
                     throw {

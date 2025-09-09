@@ -1,8 +1,8 @@
-import {BitcoinRpc, SpvWithdrawalTransactionData, SwapData} from "@atomiqlabs/base";
+import {BitcoinRpc} from "@atomiqlabs/base";
 import {
     FromBtcLnRequestType,
     FromBtcRequestType, FromBtcTrustedRequestType,
-    ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType,
+    ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType,
     SwapHandler, SwapHandlerType,
     ToBtcLnRequestType,
     ToBtcRequestType
@@ -150,6 +150,12 @@ export interface IPlugin {
         constraints: {minInBtc: bigint, maxInBtc: bigint},
         fees: {baseFeeInBtc: bigint, feePPM: bigint, networkFeeGetter: (amount: bigint) => Promise<bigint>}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
+
+    onHandlePostedFromBtcQuote?(
+        swapType: SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<SpvVaultPostQuote>,
+        swap: SpvVaultSwap
+    ): Promise<QuoteThrow | null>;
 
     onVaultSelection?(
         chainIdentifier: string,

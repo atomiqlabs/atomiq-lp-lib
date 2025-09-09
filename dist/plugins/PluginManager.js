@@ -214,6 +214,21 @@ class PluginManager {
         }
         return null;
     }
+    static async onHandlePostedFromBtcQuote(swapType, request, swap) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHandlePostedFromBtcQuote != null) {
+                    const result = await plugin.onHandlePostedFromBtcQuote(swapType, request, swap);
+                    if (result != null && (0, IPlugin_1.isQuoteThrow)(result))
+                        return result;
+                }
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "onHandlePostedFromBtcQuote(): plugin error", e);
+            }
+        }
+        return null;
+    }
     static async onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount) {
         for (let plugin of PluginManager.plugins.values()) {
             try {

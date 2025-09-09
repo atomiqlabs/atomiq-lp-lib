@@ -30,6 +30,7 @@ import {randomBytes} from "crypto";
 import {Transaction} from "@scure/btc-signer";
 import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
 import {isLegacyInput} from "../../utils/BitcoinUtils";
+import {AmountAssertions} from "../assertions/AmountAssertions";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
@@ -482,13 +483,24 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 };
             }
 
-            //Check correct psbt
             for(let i=1;i<transaction.inputsLength;i++) { //Skip first vault input
                 const txIn = transaction.getInput(i);
-                if(isLegacyInput(txIn)) throw {
+                if (isLegacyInput(txIn)) throw {
                     code: 20514,
                     msg: "Legacy (pre-segwit) inputs in tx are not allowed!"
                 };
+            }
+
+            //Check the posted quote with the plugins
+            AmountAssertions.handlePluginErrorResponses(await PluginManager.onHandlePostedFromBtcQuote(
+                this.type,
+                {chainIdentifier: swap.chainIdentifier, raw: req, parsed: parsedBody, metadata},
+                swap
+            ));
+
+            //Check correct psbt
+            for(let i=1;i<transaction.inputsLength;i++) { //Skip first vault input
+                const txIn = transaction.getInput(i);
                 //Check UTXOs exist and are unspent
                 if(await this.bitcoinRpc.isSpent(Buffer.from(txIn.txid).toString("hex")+":"+txIn.index.toString(10))) throw {
                     code: 20515,

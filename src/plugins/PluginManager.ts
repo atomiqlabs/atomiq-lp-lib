@@ -1,4 +1,4 @@
-import {BitcoinRpc, SpvWithdrawalTransactionData, SwapData} from "@atomiqlabs/base";
+import {BitcoinRpc, SwapData} from "@atomiqlabs/base";
 import {
     IPlugin, isPluginQuote, isQuoteAmountTooHigh, isQuoteAmountTooLow, isQuoteSetFees,
     isQuoteThrow, isToBtcPluginQuote, PluginQuote,
@@ -10,7 +10,7 @@ import {
 import {
     FromBtcLnRequestType,
     FromBtcRequestType, FromBtcTrustedRequestType,
-    ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType,
+    ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType,
     SwapHandler, SwapHandlerType,
     ToBtcLnRequestType,
     ToBtcRequestType
@@ -286,6 +286,24 @@ export class PluginManager {
                 }
             } catch (e) {
                 pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
+    }
+
+    static async onHandlePostedFromBtcQuote(
+        swapType: SwapHandlerType.FROM_BTC_SPV,
+        request: RequestData<SpvVaultPostQuote>,
+        swap: SpvVaultSwap
+    ): Promise<QuoteThrow | null> {
+        for(let plugin of PluginManager.plugins.values()) {
+            try {
+                if(plugin.onHandlePostedFromBtcQuote!=null) {
+                    const result = await plugin.onHandlePostedFromBtcQuote(swapType, request, swap);
+                    if(result!=null && isQuoteThrow(result)) return result;
+                }
+            } catch (e) {
+                pluginLogger.error(plugin, "onHandlePostedFromBtcQuote(): plugin error", e);
             }
         }
         return null;

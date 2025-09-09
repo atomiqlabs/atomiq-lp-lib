@@ -1,5 +1,5 @@
 import { BitcoinRpc } from "@atomiqlabs/base";
-import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
+import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { Command } from "@atomiqlabs/server-base";
 import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
@@ -128,6 +128,7 @@ export interface IPlugin {
         feePPM: bigint;
         networkFeeGetter: (amount: bigint) => Promise<bigint>;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
+    onHandlePostedFromBtcQuote?(swapType: SwapHandlerType.FROM_BTC_SPV, request: RequestData<SpvVaultPostQuote>, swap: SpvVaultSwap): Promise<QuoteThrow | null>;
     onVaultSelection?(chainIdentifier: string, totalSats: bigint, requestedAmount: {
         amount: bigint;
         token: string;

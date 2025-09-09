@@ -1,6 +1,6 @@
 import { BitcoinRpc, SwapData } from "@atomiqlabs/base";
 import { IPlugin, PluginQuote, QuoteAmountTooHigh, QuoteAmountTooLow, QuoteSetFees, QuoteThrow, ToBtcPluginQuote } from "./IPlugin";
-import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
+import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
@@ -101,6 +101,7 @@ export declare class PluginManager {
         baseFeeInBtc: bigint;
         feePPM: bigint;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
+    static onHandlePostedFromBtcQuote(swapType: SwapHandlerType.FROM_BTC_SPV, request: RequestData<SpvVaultPostQuote>, swap: SpvVaultSwap): Promise<QuoteThrow | null>;
     static onVaultSelection(chainIdentifier: string, totalSats: bigint, requestedAmount: {
         amount: bigint;
         token: string;
