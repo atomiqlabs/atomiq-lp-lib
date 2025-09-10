@@ -52,6 +52,7 @@ export abstract class AmountAssertions {
      * @throws {DefinedRuntimeError} will throw an error if the response is an error
      */
     static handlePluginErrorResponses(res: any): void {
+        if(res==null) return;
         if(isQuoteThrow(res)) throw {
             code: 29999,
             msg: res.message
