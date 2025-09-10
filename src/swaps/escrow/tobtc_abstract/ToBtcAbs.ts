@@ -104,17 +104,16 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param vout
      */
     private async tryClaimSwap(tx: {blockhash: string, confirmations: number, txid: string, hex: string}, swap: ToBtcSwapAbs, vout: number): Promise<boolean> {
-        const {swapContract, signer} = this.getChain(swap.chainIdentifier);
+        const {chainInterface, swapContract, signer} = this.getChain(swap.chainIdentifier);
 
         const blockHeader = await this.bitcoinRpc.getBlockHeader(tx.blockhash);
 
         //Set flag that we are sending the transaction already, so we don't end up with race condition
-        const unlock: () => boolean = swap.lock(swapContract.claimWithTxDataTimeout);
-        if(unlock==null) return false;
+        if(swap.isLocked()) return false;
 
+        let txns: any[];
         try {
-            this.swapLogger.debug(swap, "tryClaimSwap(): initiate claim of swap, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout);
-            const result = await swapContract.claimWithTxData(
+            txns = await swapContract.txsClaimWithTxData(
                 signer,
                 swap.data,
                 {...tx, height: blockHeader.getHeight()},
@@ -122,11 +121,19 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 vout,
                 null,
                 null,
-                false,
-                {
-                    waitForConfirmation: true
-                }
+                false
             );
+        } catch (e) {
+            this.swapLogger.error(swap, "tryClaimSwap(): error occurred creating swap claim transactions, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout+" address: "+swap.address, e);
+            return false
+        }
+
+        const unlock: () => boolean = swap.lock(swapContract.claimWithTxDataTimeout);
+        if(unlock==null) return false;
+
+        try {
+            this.swapLogger.debug(swap, "tryClaimSwap(): initiate claim of swap, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout);
+            await chainInterface.sendAndConfirm(signer, txns, true);
             this.swapLogger.info(swap, "tryClaimSwap(): swap claimed successfully, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout+" address: "+swap.address);
             if(swap.metadata!=null) swap.metadata.times.txClaimed = Date.now();
             unlock();
