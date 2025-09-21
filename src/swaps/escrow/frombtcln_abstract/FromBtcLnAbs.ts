@@ -532,7 +532,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             address = invoice.description;
         }
         const {chainInterface} = this.getChain(chainIdentifier);
-        if(!chainInterface.isValidAddress(address)) throw {
+        if(!chainInterface.isValidAddress(address, true)) throw {
             _httpStatus: 200,
             code: 10001,
             msg: "Invoice expired/canceled"
@@ -595,7 +595,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             const parsedBody: FromBtcLnRequestType = await req.paramReader.getParams({
                 address: (val: string) => val!=null &&
                             typeof(val)==="string" &&
-                            chainInterface.isValidAddress(val) ? val : null,
+                            chainInterface.isValidAddress(val, true) ? val : null,
                 paymentHash: (val: string) => val!=null &&
                             typeof(val)==="string" &&
                             val.length===64 &&
