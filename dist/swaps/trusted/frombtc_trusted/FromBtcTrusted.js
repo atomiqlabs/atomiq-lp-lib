@@ -347,7 +347,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
             const parsedBody = (0, SchemaVerifier_1.verifySchema)(req.query, {
                 address: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 refundAddress: (val) => val == null ? "" :
                     typeof (val) === "string" &&
                         this.isValidBitcoinAddress(val) ? val : null,

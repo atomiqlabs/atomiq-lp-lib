@@ -637,7 +637,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 offerer: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 exactIn: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
                 amount: SchemaVerifier_1.FieldTypeEnum.BigIntOptional
             });

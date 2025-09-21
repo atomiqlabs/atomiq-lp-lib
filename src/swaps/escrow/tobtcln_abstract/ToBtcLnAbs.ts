@@ -822,7 +822,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
                 offerer: (val: string) => val!=null &&
                         typeof(val)==="string" &&
-                        chainInterface.isValidAddress(val) ? val : null,
+                        chainInterface.isValidAddress(val, true) ? val : null,
                 exactIn: FieldTypeEnum.BooleanOptional,
                 amount: FieldTypeEnum.BigIntOptional
             });
