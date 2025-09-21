@@ -421,7 +421,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         const chainIdentifier = arr[0];
         const address = arr[1];
         const { chainInterface } = this.getChain(chainIdentifier);
-        if (!chainInterface.isValidAddress(address))
+        if (!chainInterface.isValidAddress(address, true))
             throw {
                 _httpStatus: 200,
                 code: 10001,
@@ -473,7 +473,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const parsedBody = await req.paramReader.getParams({
                 address: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 paymentHash: (val) => val != null &&
                     typeof (val) === "string" &&
                     val.length === 64 &&

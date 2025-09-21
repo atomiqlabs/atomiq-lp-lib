@@ -273,7 +273,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
         const chainIdentifier = arr[0];
         const address = arr[2];
         const { chainInterface } = this.getChain(chainIdentifier);
-        if (!chainInterface.isValidAddress(address))
+        if (!chainInterface.isValidAddress(address, true))
             throw {
                 _httpStatus: 200,
                 code: 10001,
@@ -322,7 +322,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             const parsedBody = (0, SchemaVerifier_1.verifySchema)(req.query, {
                 address: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,

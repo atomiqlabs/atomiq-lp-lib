@@ -202,7 +202,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const parsedBody = await req.paramReader.getParams({
                 address: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
