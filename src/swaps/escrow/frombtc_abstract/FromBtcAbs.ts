@@ -254,7 +254,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 times: {[key: string]: number},
             } = {request: {}, times: {}};
 
-            const chainIdentifier = req.query.chain as string ?? this.chains.default;
+            const chainIdentifier = req.query.chain as string;
             const {swapContract, signer, chainInterface} = this.getChain(chainIdentifier);
             const depositToken = req.query.depositToken as string ?? chainInterface.getNativeCurrencyAddress();
             this.checkAllowedDepositToken(chainIdentifier, depositToken);

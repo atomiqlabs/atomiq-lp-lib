@@ -18,7 +18,6 @@ export type SwapHandlerInfoType = {
     swapBaseFee: number;
     min: number;
     max: number;
-    tokens: string[];
     chainTokens: {
         [chainId: string]: string[];
     };
@@ -41,7 +40,6 @@ export type MultichainData = {
     chains: {
         [identifier: string]: ChainData;
     };
-    default: string;
 };
 export type ChainData<T extends ChainType = ChainType> = {
     signer: T["Signer"];
@@ -90,7 +88,6 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHan
         error: (swap: SwapHandlerSwap, msg: string, ...args: any) => void;
     };
     protected constructor(storageDirectory: IIntermediaryStorage<V>, path: string, chainsData: MultichainData, swapPricing: ISwapPrice);
-    protected getDefaultChain(): ChainData;
     protected getChain(identifier: string): ChainData;
     protected abstract processPastSwaps(): Promise<void>;
     /**

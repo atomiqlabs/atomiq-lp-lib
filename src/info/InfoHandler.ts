@@ -13,8 +13,6 @@ type InfoHandlerResponseEnvelope = {
 
 type InfoHandlerResponse = {
     envelope: string,
-    address: string,
-    signature: string,
     chains: {
         [chainIdentifier: string]: {
             address: string,
@@ -88,12 +86,8 @@ export class InfoHandler {
                 };
             }
 
-            const defaults = chains[this.chainData.default];
-
             const response: InfoHandlerResponse = {
                 envelope,
-                address: defaults.address,
-                signature: defaults.signature,
                 chains
             };
 

@@ -522,15 +522,14 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         };
 
         const arr = invoice.description.split("-");
-        let chainIdentifier: string;
-        let address: string;
-        if(arr.length>1) {
-            chainIdentifier = arr[0];
-            address = arr[1];
-        } else {
-            chainIdentifier = this.chains.default;
-            address = invoice.description;
-        }
+        if(arr.length<2) throw {
+            _httpStatus: 200,
+            code: 10001,
+            msg: "Invoice expired/canceled"
+        };
+        const chainIdentifier = arr[0];
+        const address = arr[1];
+
         const {chainInterface} = this.getChain(chainIdentifier);
         if(!chainInterface.isValidAddress(address)) throw {
             _httpStatus: 200,
@@ -573,7 +572,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 times: {[key: string]: number}
             } = {request: {}, times: {}};
 
-            const chainIdentifier = req.query.chain as string ?? this.chains.default;
+            const chainIdentifier = req.query.chain as string;
             const {swapContract, signer, chainInterface} = this.getChain(chainIdentifier);
             const depositToken = req.query.depositToken as string ?? chainInterface.getNativeCurrencyAddress();
             this.checkAllowedDepositToken(chainIdentifier, depositToken);

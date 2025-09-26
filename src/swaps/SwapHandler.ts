@@ -24,7 +24,6 @@ export type SwapHandlerInfoType = {
     swapBaseFee: number,
     min: number,
     max: number,
-    tokens: string[],
     chainTokens: {[chainId: string]: string[]};
     data?: any,
 };
@@ -46,8 +45,7 @@ export type SwapBaseConfig = {
 export type MultichainData = {
     chains: {
         [identifier: string]: ChainData
-    },
-    default: string
+    }
 };
 
 export type ChainData<T extends ChainType = ChainType> = {
@@ -107,17 +105,12 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     ) {
         this.storageManager = storageDirectory;
         this.chains = chainsData;
-        if(this.chains.chains[this.chains.default]==null) throw new Error("Invalid default chain specified");
         this.path = path;
         this.swapPricing = swapPricing;
         this.allowedTokens = {};
         for(let chainId in chainsData.chains) {
             this.allowedTokens[chainId] = new Set<string>(chainsData.chains[chainId].allowedTokens);
         }
-    }
-
-    protected getDefaultChain(): ChainData {
-        return this.chains.chains[this.chains.default];
     }
 
     protected getChain(identifier: string): ChainData {
@@ -268,7 +261,6 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
             min: Number(this.config.min),
             max: Number(this.config.max),
             data: this.getInfoData(),
-            tokens: Array.from<string>(this.allowedTokens[this.chains.default]),
             chainTokens
         };
     }

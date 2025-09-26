@@ -412,16 +412,14 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 msg: "Invoice expired/canceled"
             };
         const arr = invoice.description.split("-");
-        let chainIdentifier;
-        let address;
-        if (arr.length > 1) {
-            chainIdentifier = arr[0];
-            address = arr[1];
-        }
-        else {
-            chainIdentifier = this.chains.default;
-            address = invoice.description;
-        }
+        if (arr.length < 2)
+            throw {
+                _httpStatus: 200,
+                code: 10001,
+                msg: "Invoice expired/canceled"
+            };
+        const chainIdentifier = arr[0];
+        const address = arr[1];
         const { chainInterface } = this.getChain(chainIdentifier);
         if (!chainInterface.isValidAddress(address))
             throw {
@@ -456,7 +454,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         restServer.use(this.path + "/createInvoice", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
         restServer.post(this.path + "/createInvoice", (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
             const metadata = { request: {}, times: {} };
-            const chainIdentifier = req.query.chain ?? this.chains.default;
+            const chainIdentifier = req.query.chain;
             const { swapContract, signer, chainInterface } = this.getChain(chainIdentifier);
             const depositToken = req.query.depositToken ?? chainInterface.getNativeCurrencyAddress();
             this.checkAllowedDepositToken(chainIdentifier, depositToken);

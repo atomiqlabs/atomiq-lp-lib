@@ -393,7 +393,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                 times: {[key: string]: number}
             } = {request: {}, times: {}};
 
-            const chainIdentifier = req.query.chain as string ?? this.chains.default;
+            const chainIdentifier = req.query.chain as string;
             const {chainInterface, signer} = this.getChain(chainIdentifier);
 
             metadata.times.requestReceived = Date.now();

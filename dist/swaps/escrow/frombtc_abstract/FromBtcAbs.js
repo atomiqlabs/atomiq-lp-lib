@@ -178,7 +178,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         restServer.use(this.path + "/getAddress", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
         restServer.post(this.path + "/getAddress", (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
             const metadata = { request: {}, times: {} };
-            const chainIdentifier = req.query.chain ?? this.chains.default;
+            const chainIdentifier = req.query.chain;
             const { swapContract, signer, chainInterface } = this.getChain(chainIdentifier);
             const depositToken = req.query.depositToken ?? chainInterface.getNativeCurrencyAddress();
             this.checkAllowedDepositToken(chainIdentifier, depositToken);

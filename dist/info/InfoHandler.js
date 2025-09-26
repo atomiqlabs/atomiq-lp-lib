@@ -47,11 +47,8 @@ class InfoHandler {
                     signature: await singleChain.swapContract.getDataSignature(singleChain.signer, envelopeBuffer)
                 };
             }
-            const defaults = chains[this.chainData.default];
             const response = {
                 envelope,
-                address: defaults.address,
-                signature: defaults.signature,
                 chains
             };
             res.status(200).json(response);

@@ -608,7 +608,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 times: {[key: string]: number}
             } = {request: {}, times: {}};
 
-            const chainIdentifier = req.query.chain as string ?? this.chains.default;
+            const chainIdentifier = req.query.chain as string;
             const {swapContract, signer, chainInterface} = this.getChain(chainIdentifier);
 
             metadata.times.requestReceived = Date.now();

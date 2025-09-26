@@ -31,17 +31,12 @@ class SwapHandler {
         };
         this.storageManager = storageDirectory;
         this.chains = chainsData;
-        if (this.chains.chains[this.chains.default] == null)
-            throw new Error("Invalid default chain specified");
         this.path = path;
         this.swapPricing = swapPricing;
         this.allowedTokens = {};
         for (let chainId in chainsData.chains) {
             this.allowedTokens[chainId] = new Set(chainsData.chains[chainId].allowedTokens);
         }
-    }
-    getDefaultChain() {
-        return this.chains.chains[this.chains.default];
     }
     getChain(identifier) {
         if (this.chains.chains[identifier] == null)
@@ -152,7 +147,6 @@ class SwapHandler {
             min: Number(this.config.min),
             max: Number(this.config.max),
             data: this.getInfoData(),
-            tokens: Array.from(this.allowedTokens[this.chains.default]),
             chainTokens
         };
     }

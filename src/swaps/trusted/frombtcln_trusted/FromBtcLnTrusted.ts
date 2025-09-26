@@ -315,15 +315,14 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
         }
 
         const arr = invoice.description.split("-");
-        let chainIdentifier: string;
-        let address: string;
-        if(arr.length>2 && arr[1]==="GAS") {
-            chainIdentifier = arr[0];
-            address = arr[2];
-        } else {
-            chainIdentifier = this.chains.default;
-            address = invoice.description;
+        if(arr.length<3 || arr[1]!=="GAS") throw {
+            _httpStatus: 200,
+            code: 10001,
+            msg: "Invoice expired/canceled"
         }
+        const chainIdentifier = arr[0];
+        const address = arr[2];
+
         const { chainInterface} = this.getChain(chainIdentifier);
         if(!chainInterface.isValidAddress(address)) throw {
             _httpStatus: 200,
@@ -370,7 +369,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 times: {[key: string]: number}
             } = {request: {}, times: {}};
 
-            const chainIdentifier = req.query.chain as string ?? this.chains.default;
+            const chainIdentifier = req.query.chain as string;
             const {signer, chainInterface} = this.getChain(chainIdentifier);
 
             metadata.times.requestReceived = Date.now();

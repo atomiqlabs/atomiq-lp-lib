@@ -174,7 +174,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         restServer.use(this.path + "/getQuote", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
         restServer.post(this.path + "/getQuote", (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
             const metadata = { request: {}, times: {} };
-            const chainIdentifier = req.query.chain ?? this.chains.default;
+            const chainIdentifier = req.query.chain;
             const { signer, chainInterface, spvVaultContract } = this.getChain(chainIdentifier);
             metadata.times.requestReceived = Date.now();
             /**
