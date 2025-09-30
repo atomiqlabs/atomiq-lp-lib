@@ -19,8 +19,6 @@ import {
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
-import {FromBtcLnSwapState} from "../frombtcln_abstract/FromBtcLnSwapAbs";
-import {ToBtcLnSwapAbs} from "../tobtcln_abstract/ToBtcLnSwapAbs";
 
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -528,15 +526,14 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         };
 
         const arr = invoice.description.split("-");
-        let chainIdentifier: string;
-        let address: string;
-        if(arr.length>1) {
-            chainIdentifier = arr[0];
-            address = arr[1];
-        } else {
-            chainIdentifier = this.chains.default;
-            address = invoice.description;
-        }
+        if(arr.length<2) throw {
+            _httpStatus: 200,
+            code: 10001,
+            msg: "Invoice expired/canceled"
+        };
+        const chainIdentifier = arr[0];
+        const address = arr[1];
+
         const {chainInterface} = this.getChain(chainIdentifier);
         if(!chainInterface.isValidAddress(address, true)) throw {
             _httpStatus: 200,
@@ -579,7 +576,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                 times: {[key: string]: number}
             } = {request: {}, times: {}};
 
-            const chainIdentifier = req.query.chain as string ?? this.chains.default;
+            const chainIdentifier = req.query.chain as string;
             const {swapContract, signer, chainInterface} = this.getChain(chainIdentifier);
             if(!swapContract.supportsInitWithoutClaimer) throw {
                 code: 20299,
