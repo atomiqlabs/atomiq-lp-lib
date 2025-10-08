@@ -566,13 +566,13 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 return resp;
             }, abortController.signal);
             metadata.times.priceCalculated = Date.now();
-            const paymentHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.confirmations, parsedBody.nonce, amountBD).toString("hex");
+            const claimHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.confirmations, parsedBody.nonce, amountBD).toString("hex");
             //Add grace period another time, so the user has 1 hour to commit
             const expirySeconds = this.getExpiryFromCLTV(parsedBody.confirmationTarget, parsedBody.confirmations) + this.config.gracePeriod;
             const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
             const minRequiredExpiry = currentTimestamp + expirySeconds;
             const sequence = base_1.BigIntBufferUtils.fromBuffer((0, crypto_1.randomBytes)(8));
-            const payObject = await swapContract.createSwapData(base_1.ChainSwapType.CHAIN_NONCED, parsedBody.offerer, signer.getAddress(), useToken, totalInToken, paymentHash, sequence, minRequiredExpiry, true, false, 0n, 0n);
+            const payObject = await swapContract.createSwapData(base_1.ChainSwapType.CHAIN_NONCED, parsedBody.offerer, signer.getAddress(), useToken, totalInToken, claimHash, sequence, minRequiredExpiry, true, false, 0n, 0n);
             abortController.signal.throwIfAborted();
             metadata.times.swapCreated = Date.now();
             const sigData = await this.getToBtcSignatureData(chainIdentifier, payObject, req, abortController.signal, signDataPrefetchPromise);
