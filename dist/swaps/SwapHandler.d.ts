@@ -30,6 +30,10 @@ export type SwapBaseConfig = {
     initAuthorizationTimeouts?: {
         [chainId: string]: number;
     };
+    minNativeBalances?: {
+        [chainId: string]: bigint;
+    };
+    maxInflightSwaps?: number;
     bitcoinBlocktime: bigint;
     baseFee: bigint;
     feePPM: bigint;
@@ -76,7 +80,9 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHan
         [chainId: string]: Set<string>;
     };
     readonly swapPricing: ISwapPrice;
+    abstract readonly inflightSwapStates: Set<S>;
     abstract config: SwapBaseConfig;
+    inflightSwaps: Set<string>;
     logger: LoggerType;
     protected swapLogger: {
         debug: (swap: SwapHandlerSwap, msg: string, ...args: any) => void;
@@ -109,18 +115,33 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHan
     /**
      * Remove swap data
      *
-     * @param hash
-     * @param sequence
-     */
-    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
-    /**
-     * Remove swap data
-     *
      * @param swap
      * @param ultimateState set the ultimate state of the swap before removing
      */
     protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
     protected saveSwapData(swap: V): Promise<void>;
+    /**
+     * Pre-fetches native balance to further check if we have enough reserve in a native token
+     *
+     * @param chainIdentifier
+     * @param abortController
+     * @protected
+     */
+    protected prefetchNativeBalanceIfNeeded(chainIdentifier: string, abortController: AbortController): Promise<bigint> | null;
+    /**
+     * Checks if we have enough native balance to facilitate swaps
+     *
+     * @param chainIdentifier
+     * @param balancePrefetch
+     * @param signal
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
+     */
+    protected checkNativeBalance(chainIdentifier: string, balancePrefetch: Promise<bigint>, signal: AbortSignal | null): Promise<void>;
+    /**
+     * Checks whether there are too many swaps in-flight currently
+     * @private
+     */
+    protected checkTooManyInflightSwaps(): void;
     /**
      * Checks if we have enough balance of the token in the swap vault
      *

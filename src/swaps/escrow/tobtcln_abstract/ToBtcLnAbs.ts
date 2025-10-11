@@ -88,11 +88,11 @@ export type ToBtcLnRequestType = {
  * Swap handler handling to BTCLN swaps using submarine swaps
  */
 export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwapState> {
-
-    activeSubscriptions: Set<string> = new Set<string>();
-
     readonly type = SwapHandlerType.TO_BTCLN;
     readonly swapType = ChainSwapType.HTLC;
+    readonly inflightSwapStates = new Set([ToBtcLnSwapState.COMMITED, ToBtcLnSwapState.PAID]);
+
+    activeSubscriptions: Set<string> = new Set<string>();
 
     readonly config: ToBtcLnConfig & {minTsSendCltv: bigint};
 
@@ -397,6 +397,18 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         }
 
         if(swap.state===ToBtcLnSwapState.SAVED) {
+            try {
+                this.checkTooManyInflightSwaps();
+            } catch (e) {
+                this.swapLogger.error(swap, "processInitialized(): checking too many inflight swaps error: ", e);
+                if(isDefinedRuntimeError(e)) {
+                    if(swap.metadata!=null) swap.metadata.payError = e;
+                    await swap.setState(ToBtcLnSwapState.NON_PAYABLE);
+                    await this.saveSwapData(swap);
+                    return;
+                } else throw e;
+            }
+
             await swap.setState(ToBtcLnSwapState.COMMITED);
             await this.saveSwapData(swap);
             try {
@@ -701,11 +713,13 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 };
             }
 
+            this.checkTooManyInflightSwaps();
+            const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
+
             const responseStream = res.responseStream;
             const abortSignal = responseStream.getAbortSignal();
 
             //Check request params
-            const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
             const {parsedPR, halfConfidence} = await this.checkPaymentRequest(parsedAuth.chainIdentifier, parsedBody.pr);
             await this.checkPaymentRequestMatchesInitial(parsedBody.pr, parsedAuth);
 
@@ -847,6 +861,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             const currentTimestamp: bigint = BigInt(Math.floor(Date.now()/1000));
 
             //Check request params
+            this.checkTooManyInflightSwaps();
             this.checkAmount(parsedBody.amount, parsedBody.exactIn);
             this.checkMaxFee(parsedBody.maxFee);
             this.checkExpiry(parsedBody.expiryTimestamp, currentTimestamp);
@@ -865,10 +880,14 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
             //Pre-fetch
             const {pricePrefetchPromise, signDataPrefetchPromise} = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
 
             //Check if prior payment has been made
             await this.LightningAssertions.checkPriorPayment(parsedPR.id, abortController.signal);
             metadata.times.priorPaymentChecked = Date.now();
+
+            //Check if we still have enough native balance
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             //Check amounts
             const {

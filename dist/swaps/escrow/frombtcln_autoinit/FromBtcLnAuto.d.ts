@@ -32,6 +32,7 @@ export type FromBtcLnAutoRequestType = {
 export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, FromBtcLnAutoSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN_AUTO;
     readonly swapType = ChainSwapType.HTLC;
+    readonly inflightSwapStates: Set<FromBtcLnAutoSwapState>;
     activeSubscriptions: Set<string>;
     readonly config: FromBtcLnAutoConfig;
     readonly lightning: ILightningWallet;

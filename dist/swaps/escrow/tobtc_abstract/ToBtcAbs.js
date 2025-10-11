@@ -21,6 +21,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         super(storageDirectory, path, chainData, swapPricing, config);
         this.type = SwapHandler_1.SwapHandlerType.TO_BTC;
         this.swapType = base_1.ChainSwapType.CHAIN_NONCED;
+        this.inflightSwapStates = new Set([ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENDING, ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENT]);
         this.activeSubscriptions = {};
         this.bitcoinRpc = bitcoinRpc;
         this.bitcoin = bitcoin;
@@ -277,6 +278,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         // e.g. that 2 payouts share the same input and would effectively double-spend each other
         return this.bitcoin.execute(async () => {
             //Run checks
+            this.checkTooManyInflightSwaps();
             this.checkExpiresTooSoon(swap);
             if (swap.metadata != null)
                 swap.metadata.times.payCLTVChecked = Date.now();
@@ -563,6 +565,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             };
             const useToken = parsedBody.token;
             const responseStream = res.responseStream;
+            this.checkTooManyInflightSwaps();
             this.checkNonceValid(parsedBody.nonce);
             this.checkConfirmationTarget(parsedBody.confirmationTarget);
             this.checkRequiredConfirmations(parsedBody.confirmations);
@@ -573,6 +576,8 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             //Initialize abort controller for the parallel async operations
             const abortController = (0, Utils_1.getAbortController)(responseStream);
             const { pricePrefetchPromise, signDataPrefetchPromise } = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
             const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amount) => {
                 metadata.times.amountsChecked = Date.now();
                 const resp = await this.checkAndGetNetworkFee(parsedBody.address, amount);

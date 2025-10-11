@@ -16,6 +16,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, path, chains, lightning, swapPricing, config) {
         super(storageDirectory, path, chains, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTCLN_TRUSTED;
+        this.inflightSwapStates = new Set([FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED, FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.SENT, FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED]);
         this.activeSubscriptions = new Map();
         this.processedTxIds = new Map();
         this.lightning = lightning;
@@ -153,6 +154,13 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
         const { signer, chainInterface } = this.getChain(invoiceData.chainIdentifier);
         //Important to prevent race condition and issuing 2 signed init messages at the same time
         if (invoiceData.state === FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CREATED) {
+            try {
+                this.checkTooManyInflightSwaps();
+            }
+            catch (e) {
+                await this.cancelSwapAndInvoice(invoiceData);
+                throw e;
+            }
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcReceived = Date.now();
             await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED);
@@ -189,7 +197,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                 await this.storageManager.saveData(invoice.id, null, invoiceData);
                 await this.lightning.cancelHodlInvoice(invoice.id);
                 this.unsubscribeInvoice(invoice.id);
-                await this.removeSwapData(invoice.id, null);
+                await this.removeSwapData(invoiceData);
                 this.swapLogger.info(invoiceData, "htlcReceived(): transaction sending failed, refunding lightning: ", invoiceData.pr);
                 throw {
                     code: 20002,
@@ -221,7 +229,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                 await this.storageManager.saveData(invoice.id, null, invoiceData);
                 await this.lightning.cancelHodlInvoice(invoice.id);
                 this.unsubscribeInvoice(invoice.id);
-                await this.removeSwapData(invoice.id, null);
+                await this.removeSwapData(invoiceData);
                 this.swapLogger.info(invoiceData, "htlcReceived(): transaction reverted, refunding lightning: ", invoiceData.pr);
                 throw {
                     code: 20002,
@@ -344,6 +352,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                 metadata
             };
             const useToken = parsedBody.token;
+            this.checkTooManyInflightSwaps();
             //Check request params
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -361,7 +370,10 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                 abortController.abort(e);
                 return null;
             });
+            const nativeBalancePrefetch = useToken === chainInterface.getNativeCurrencyAddress() ?
+                balancePrefetch : this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
             const channelsPrefetch = this.LightningAssertions.getChannelsPrefetch(abortController);
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
             //Check valid amount specified (min/max)
             const { amountBD, swapFee, swapFeeInToken, totalInToken } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();

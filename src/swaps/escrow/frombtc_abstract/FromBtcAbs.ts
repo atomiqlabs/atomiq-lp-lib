@@ -40,6 +40,7 @@ export type FromBtcRequestType = {
 export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSwapState> {
     readonly type = SwapHandlerType.FROM_BTC;
     readonly swapType = ChainSwapType.CHAIN;
+    readonly inflightSwapStates = new Set([FromBtcSwapState.COMMITED]);
 
     readonly config: FromBtcConfig & {swapTsCsvDelta: bigint};
 
@@ -303,6 +304,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const useToken = parsedBody.token;
 
             //Check request params
+            this.checkTooManyInflightSwaps();
             this.checkSequence(parsedBody.sequence);
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -319,6 +321,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, depositToken, abortController);
             const balancePrefetch: Promise<bigint> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const signDataPrefetchPromise: Promise<any> = this.getSignDataPrefetch(chainIdentifier, abortController, responseStream);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
 
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address);
             abortController.signal.throwIfAborted();
@@ -327,6 +330,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise,
                 abortController
             );
+
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             //Check valid amount specified (min/max)
             const {

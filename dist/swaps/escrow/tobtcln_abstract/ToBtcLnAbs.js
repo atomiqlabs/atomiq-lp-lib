@@ -18,9 +18,10 @@ const LightningAssertions_1 = require("../../assertions/LightningAssertions");
 class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     constructor(storageDirectory, path, chainData, lightning, swapPricing, config) {
         super(storageDirectory, path, chainData, swapPricing, config);
-        this.activeSubscriptions = new Set();
         this.type = SwapHandler_1.SwapHandlerType.TO_BTCLN;
         this.swapType = base_1.ChainSwapType.HTLC;
+        this.inflightSwapStates = new Set([ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED, ToBtcLnSwapAbs_1.ToBtcLnSwapState.PAID]);
+        this.activeSubscriptions = new Set();
         this.exactInAuths = {};
         this.lightning = lightning;
         this.LightningAssertions = new LightningAssertions_1.LightningAssertions(this.logger, lightning);
@@ -292,6 +293,21 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             }
         }
         if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED) {
+            try {
+                this.checkTooManyInflightSwaps();
+            }
+            catch (e) {
+                this.swapLogger.error(swap, "processInitialized(): checking too many inflight swaps error: ", e);
+                if ((0, Utils_1.isDefinedRuntimeError)(e)) {
+                    if (swap.metadata != null)
+                        swap.metadata.payError = e;
+                    await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE);
+                    await this.saveSwapData(swap);
+                    return;
+                }
+                else
+                    throw e;
+            }
             await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
             await this.saveSwapData(swap);
             try {
@@ -561,10 +577,11 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     msg: "Invalid request body"
                 };
             }
+            this.checkTooManyInflightSwaps();
+            const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
             const responseStream = res.responseStream;
             const abortSignal = responseStream.getAbortSignal();
             //Check request params
-            const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
             const { parsedPR, halfConfidence } = await this.checkPaymentRequest(parsedAuth.chainIdentifier, parsedBody.pr);
             await this.checkPaymentRequestMatchesInitial(parsedBody.pr, parsedAuth);
             const metadata = parsedAuth.metadata;
@@ -658,6 +675,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const responseStream = res.responseStream;
             const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
             //Check request params
+            this.checkTooManyInflightSwaps();
             this.checkAmount(parsedBody.amount, parsedBody.exactIn);
             this.checkMaxFee(parsedBody.maxFee);
             this.checkExpiry(parsedBody.expiryTimestamp, currentTimestamp);
@@ -674,9 +692,12 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const abortController = (0, Utils_1.getAbortController)(responseStream);
             //Pre-fetch
             const { pricePrefetchPromise, signDataPrefetchPromise } = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
             //Check if prior payment has been made
             await this.LightningAssertions.checkPriorPayment(parsedPR.id, abortController.signal);
             metadata.times.priorPaymentChecked = Date.now();
+            //Check if we still have enough native balance
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
             //Check amounts
             const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amountBD) => {
                 //Check if we have enough liquidity to process the swap

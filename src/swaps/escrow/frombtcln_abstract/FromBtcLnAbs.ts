@@ -27,6 +27,7 @@ import {
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
+import {FromBtcLnAutoSwapState} from "../frombtcln_autoinit/FromBtcLnAutoSwap";
 
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -49,6 +50,7 @@ export type FromBtcLnRequestType = {
 export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN;
     readonly swapType = ChainSwapType.HTLC;
+    readonly inflightSwapStates = new Set([FromBtcLnSwapState.RECEIVED, FromBtcLnSwapState.COMMITED, FromBtcLnSwapState.CLAIMED]);
 
     readonly config: FromBtcLnConfig;
     readonly lightning: ILightningWallet;
@@ -93,12 +95,6 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 //Result is either FromBtcLnSwapState.RECEIVED or FromBtcLnSwapState.CANCELED
             } catch (e) {
                 this.swapLogger.error(swap, "processPastSwap(state=CREATED): htlcReceived error", e);
-            }
-
-            // @ts-ignore Previous call (htlcReceived) mutates the state of the swap, so this is valid
-            if(swap.state===FromBtcLnSwapState.CANCELED) {
-                this.swapLogger.info(swap, "processPastSwap(state=CREATED): invoice CANCELED after htlcReceived(), cancelling, invoice: "+swap.pr);
-                return "CANCEL";
             }
 
             return null;
@@ -314,6 +310,14 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         const useToken = invoiceData.token;
         const escrowAmount: bigint = invoiceData.totalTokens;
 
+        try {
+            this.checkTooManyInflightSwaps();
+        } catch (e) {
+            if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = e;
+            if(invoiceData.state===FromBtcLnSwapState.CREATED) await this.cancelSwapAndInvoice(invoiceData);
+            throw e;
+        }
+
         //Create abort controller for parallel fetches
         const abortController = new AbortController();
 
@@ -333,6 +337,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcTimeoutCalculated = Date.now();
         } catch (e) {
             if(!abortController.signal.aborted) {
+                if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = e;
                 if(invoiceData.state===FromBtcLnSwapState.CREATED) await this.cancelSwapAndInvoice(invoiceData);
             }
             throw e;
@@ -372,6 +377,15 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
 
         //Important to prevent race condition and issuing 2 signed init messages at the same time
         if(invoiceData.state===FromBtcLnSwapState.CREATED) {
+            //Re-check right before signing
+            try {
+                this.checkTooManyInflightSwaps();
+            } catch (e) {
+                if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = e;
+                if(invoiceData.state===FromBtcLnSwapState.CREATED) await this.cancelSwapAndInvoice(invoiceData);
+                throw e;
+            }
+
             invoiceData.data = payInvoiceObject;
             invoiceData.prefix = sigData.prefix;
             invoiceData.timeout = sigData.timeout;
@@ -622,6 +636,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             const useToken = parsedBody.token;
 
             //Check request params
+            this.checkTooManyInflightSwaps();
             this.checkDescriptionHash(parsedBody.descriptionHash);
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -638,6 +653,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, depositToken, abortController);
             const balancePrefetch: Promise<bigint> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const channelsPrefetch: Promise<LightningNetworkChannel[]> = this.LightningAssertions.getChannelsPrefetch(abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
 
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address, parsedBody.paymentHash);
             abortController.signal.throwIfAborted();
@@ -649,6 +665,8 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
 
             //Asynchronously send the node's public key to the client
             this.sendPublicKeyAsync(responseStream);
+
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             //Check valid amount specified (min/max)
             const {

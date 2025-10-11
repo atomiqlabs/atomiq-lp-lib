@@ -26,6 +26,7 @@ export type FromBtcLnRequestType = {
 export declare class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN;
     readonly swapType = ChainSwapType.HTLC;
+    readonly inflightSwapStates: Set<FromBtcLnSwapState>;
     readonly config: FromBtcLnConfig;
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;

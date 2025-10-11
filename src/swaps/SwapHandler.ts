@@ -1,7 +1,6 @@
 import {Express, Request} from "express";
 import {ISwapPrice} from "../prices/ISwapPrice";
 import {
-    ChainSwapType,
     ChainType
 } from "@atomiqlabs/base";
 import {SwapHandlerSwap} from "./SwapHandlerSwap";
@@ -35,6 +34,10 @@ export type SwapBaseConfig = {
     initAuthorizationTimeouts?: {
         [chainId: string]: number
     },
+    minNativeBalances?: {
+        [chainId: string]: bigint
+    },
+    maxInflightSwaps?: number,
     bitcoinBlocktime: bigint,
     baseFee: bigint,
     feePPM: bigint,
@@ -83,7 +86,10 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     readonly allowedTokens: {[chainId: string]: Set<string>};
     readonly swapPricing: ISwapPrice;
 
+    abstract readonly inflightSwapStates: Set<S>;
     abstract config: SwapBaseConfig;
+
+    inflightSwaps: Set<string> = new Set();
 
     logger: LoggerType = getLogger(() => "SwapHandler("+this.type+"): ");
 
@@ -150,6 +156,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
                 await this.storageManager.removeData(hash, sequence);
                 await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
             }
+            if(this.inflightSwapStates.has(swap.state)) this.inflightSwaps.add(swap.getIdentifier());
         }
     }
 
@@ -168,35 +175,82 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     /**
      * Remove swap data
      *
-     * @param hash
-     * @param sequence
-     */
-    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
-
-    /**
-     * Remove swap data
-     *
      * @param swap
      * @param ultimateState set the ultimate state of the swap before removing
      */
-    protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
-
-    protected async removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: bigint | S) {
-        let swap: V;
-        if(typeof(hashOrSwap)==="string") {
-            if(typeof(sequenceOrUltimateState)!=="bigint") throw new Error("Sequence must be a BN instance!");
-            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
-        } else {
-            swap = hashOrSwap;
-            if(sequenceOrUltimateState!=null && typeof(sequenceOrUltimateState)!=="bigint") await swap.setState(sequenceOrUltimateState);
-        }
+    protected async removeSwapData(swap: V, ultimateState?: S) {
+        this.inflightSwaps.delete(swap.getIdentifier());
+        this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+        if(ultimateState!=null) await swap.setState(ultimateState);
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
         await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
 
     protected async saveSwapData(swap: V) {
+        if(this.inflightSwapStates.has(swap.state)) {
+            this.inflightSwaps.add(swap.getIdentifier());
+            this.logger.debug("removeSwapData(): Adding in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+        } else {
+            this.inflightSwaps.delete(swap.getIdentifier());
+            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+        }
         await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+    }
+
+    /**
+     * Pre-fetches native balance to further check if we have enough reserve in a native token
+     *
+     * @param chainIdentifier
+     * @param abortController
+     * @protected
+     */
+    protected prefetchNativeBalanceIfNeeded(chainIdentifier: string, abortController: AbortController): Promise<bigint> | null {
+        const minNativeTokenReserve: bigint = this.config.minNativeBalances?.[chainIdentifier] ?? 0n;
+        if(minNativeTokenReserve===0n) return null;
+
+        const { chainInterface, signer} = this.getChain(chainIdentifier);
+
+        return chainInterface.getBalance(signer.getAddress(), chainInterface.getNativeCurrencyAddress()).catch(e => {
+            this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
+            abortController.abort(e);
+            return null;
+        });
+    }
+
+    /**
+     * Checks if we have enough native balance to facilitate swaps
+     *
+     * @param chainIdentifier
+     * @param balancePrefetch
+     * @param signal
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
+     */
+    protected async checkNativeBalance(chainIdentifier: string, balancePrefetch: Promise<bigint>, signal: AbortSignal | null): Promise<void> {
+        if(signal!=null) signal.throwIfAborted();
+
+        const minNativeTokenReserve: bigint = this.config.minNativeBalances?.[chainIdentifier] ?? 0n;
+        if(minNativeTokenReserve===0n) return;
+        const balance = await balancePrefetch;
+
+        if(balance==null || balance < minNativeTokenReserve) {
+            throw {
+                code: 20012,
+                msg: "LP ran out of native token to cover gas fees"
+            };
+        }
+    }
+
+    /**
+     * Checks whether there are too many swaps in-flight currently
+     * @private
+     */
+    protected checkTooManyInflightSwaps() {
+        if(this.config.maxInflightSwaps==null) return;
+        if(this.inflightSwaps.size>=this.config.maxInflightSwaps) throw {
+            code: 20013,
+            msg: "LP has too many in-flight swaps, retry later!"
+        }
     }
 
     /**

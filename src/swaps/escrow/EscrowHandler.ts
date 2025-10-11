@@ -89,17 +89,10 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
         }
     }
 
-    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
-    protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
-    protected async removeSwapData(hashOrSwap: string | V, sequenceOrUltimateState?: bigint | S) {
-        let swap: V;
-        if(typeof(hashOrSwap)==="string") {
-            if(typeof(sequenceOrUltimateState)!=="bigint") throw new Error("Sequence must be a BN instance!");
-            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
-        } else {
-            swap = hashOrSwap;
-            if(sequenceOrUltimateState!=null && typeof(sequenceOrUltimateState)!=="bigint") await swap.setState(sequenceOrUltimateState);
-        }
+    protected async removeSwapData(swap: V, ultimateState?: S) {
+        this.inflightSwaps.delete(swap.getIdentifier());
+        this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+        if(ultimateState!=null) await swap.setState(ultimateState);
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
         this.removeSwapFromEscrowHashMap(swap);

@@ -21,6 +21,7 @@ export type FromBtcLnTrustedRequestType = {
  */
 export declare class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcLnTrustedSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN_TRUSTED;
+    readonly inflightSwapStates: Set<FromBtcLnTrustedSwapState>;
     activeSubscriptions: Map<string, AbortController>;
     processedTxIds: Map<string, string>;
     readonly config: SwapForGasServerConfig;

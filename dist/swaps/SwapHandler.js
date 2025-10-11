@@ -19,6 +19,7 @@ var SwapHandlerType;
  */
 class SwapHandler {
     constructor(storageDirectory, path, chainsData, swapPricing) {
+        this.inflightSwaps = new Set();
         this.logger = (0, Utils_1.getLogger)(() => "SwapHandler(" + this.type + "): ");
         this.swapLogger = {
             debug: (swap, msg, ...args) => this.logger.debug(swap.getIdentifier() + ": " + msg, ...args),
@@ -65,27 +66,89 @@ class SwapHandler {
                 await this.storageManager.removeData(hash, sequence);
                 await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
             }
+            if (this.inflightSwapStates.has(swap.state))
+                this.inflightSwaps.add(swap.getIdentifier());
         }
     }
-    async removeSwapData(hashOrSwap, sequenceOrUltimateState) {
-        let swap;
-        if (typeof (hashOrSwap) === "string") {
-            if (typeof (sequenceOrUltimateState) !== "bigint")
-                throw new Error("Sequence must be a BN instance!");
-            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
-        }
-        else {
-            swap = hashOrSwap;
-            if (sequenceOrUltimateState != null && typeof (sequenceOrUltimateState) !== "bigint")
-                await swap.setState(sequenceOrUltimateState);
-        }
+    /**
+     * Remove swap data
+     *
+     * @param swap
+     * @param ultimateState set the ultimate state of the swap before removing
+     */
+    async removeSwapData(swap, ultimateState) {
+        this.inflightSwaps.delete(swap.getIdentifier());
+        this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
+        if (ultimateState != null)
+            await swap.setState(ultimateState);
         if (swap != null)
             await PluginManager_1.PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
         await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
     async saveSwapData(swap) {
+        if (this.inflightSwapStates.has(swap.state)) {
+            this.inflightSwaps.add(swap.getIdentifier());
+            this.logger.debug("removeSwapData(): Adding in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
+        }
+        else {
+            this.inflightSwaps.delete(swap.getIdentifier());
+            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
+        }
         await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+    }
+    /**
+     * Pre-fetches native balance to further check if we have enough reserve in a native token
+     *
+     * @param chainIdentifier
+     * @param abortController
+     * @protected
+     */
+    prefetchNativeBalanceIfNeeded(chainIdentifier, abortController) {
+        const minNativeTokenReserve = this.config.minNativeBalances?.[chainIdentifier] ?? 0n;
+        if (minNativeTokenReserve === 0n)
+            return null;
+        const { chainInterface, signer } = this.getChain(chainIdentifier);
+        return chainInterface.getBalance(signer.getAddress(), chainInterface.getNativeCurrencyAddress()).catch(e => {
+            this.logger.error("getBalancePrefetch(): balancePrefetch error: ", e);
+            abortController.abort(e);
+            return null;
+        });
+    }
+    /**
+     * Checks if we have enough native balance to facilitate swaps
+     *
+     * @param chainIdentifier
+     * @param balancePrefetch
+     * @param signal
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
+     */
+    async checkNativeBalance(chainIdentifier, balancePrefetch, signal) {
+        if (signal != null)
+            signal.throwIfAborted();
+        const minNativeTokenReserve = this.config.minNativeBalances?.[chainIdentifier] ?? 0n;
+        if (minNativeTokenReserve === 0n)
+            return;
+        const balance = await balancePrefetch;
+        if (balance == null || balance < minNativeTokenReserve) {
+            throw {
+                code: 20012,
+                msg: "LP ran out of native token to cover gas fees"
+            };
+        }
+    }
+    /**
+     * Checks whether there are too many swaps in-flight currently
+     * @private
+     */
+    checkTooManyInflightSwaps() {
+        if (this.config.maxInflightSwaps == null)
+            return;
+        if (this.inflightSwaps.size >= this.config.maxInflightSwaps)
+            throw {
+                code: 20013,
+                msg: "LP has too many in-flight swaps, retry later!"
+            };
     }
     /**
      * Checks if we have enough balance of the token in the swap vault

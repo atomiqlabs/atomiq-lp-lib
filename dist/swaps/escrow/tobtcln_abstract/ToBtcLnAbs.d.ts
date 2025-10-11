@@ -56,9 +56,10 @@ export type ToBtcLnRequestType = {
  * Swap handler handling to BTCLN swaps using submarine swaps
  */
 export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwapState> {
-    activeSubscriptions: Set<string>;
     readonly type = SwapHandlerType.TO_BTCLN;
     readonly swapType = ChainSwapType.HTLC;
+    readonly inflightSwapStates: Set<ToBtcLnSwapState>;
+    activeSubscriptions: Set<string>;
     readonly config: ToBtcLnConfig & {
         minTsSendCltv: bigint;
     };

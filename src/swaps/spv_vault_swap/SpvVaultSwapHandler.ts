@@ -3,7 +3,7 @@ import {Express, Request, Response} from "express";
 import {IBitcoinWallet} from "../../wallets/IBitcoinWallet";
 import {
     BitcoinRpc,
-    BtcBlock, BtcTx,
+    BtcBlock,
     ChainEvent,
     IStorageManager,
     SpvVaultClaimEvent,
@@ -21,7 +21,7 @@ import {ISpvVaultSigner} from "../../wallets/ISpvVaultSigner";
 import {PluginManager} from "../../plugins/PluginManager";
 import {SpvVault} from "./SpvVault";
 import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDecoder";
-import {expressHandlerWrapper, getAbortController, HEX_REGEX} from "../../utils/Utils";
+import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
 import {IParamReader} from "../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEncoder";
 import {FieldTypeEnum} from "../../utils/paramcoders/SchemaVerifier";
@@ -57,8 +57,8 @@ export type SpvVaultPostQuote = {
 const TX_MAX_VSIZE = 16*1024;
 
 export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
-
     readonly type = SwapHandlerType.FROM_BTC_SPV;
+    readonly inflightSwapStates = new Set([SpvVaultSwapState.SIGNED, SpvVaultSwapState.SENT, SpvVaultSwapState.BTC_CONFIRMED]);
 
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
@@ -318,6 +318,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const useToken = parsedBody.token;
             const gasToken = parsedBody.gasToken;
 
+            this.checkTooManyInflightSwaps();
+
             //Check request params
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
             metadata.times.requestChecked = Date.now();
@@ -331,6 +333,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 pricePrefetchPromise,
                 gasTokenPricePrefetchPromise
             } = this.getPricePrefetches(chainIdentifier, useToken, gasToken, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
+
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             //Check valid amount specified (min/max)
             let {
@@ -465,6 +470,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             metadata.times ??= {};
             metadata.times.requestReceived = requestReceived;
 
+            this.checkTooManyInflightSwaps();
+
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             if(vault==null || !vault.isReady()) {
                 throw {
@@ -593,6 +600,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                     };
                 }
 
+                //Double check in-flight swap count
+                this.checkTooManyInflightSwaps();
+
                 swap.btcTxId = signedTx.id;
                 swap.state = SpvVaultSwapState.SIGNED;
                 swap.sending = true;
@@ -622,7 +632,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 swap.sending = false;
                 vault.removeWithdrawal(data);
                 await this.Vaults.saveVault(vault);
+
+                if(isDefinedRuntimeError(e) && swap.metadata!=null) swap.metadata.postQuoteError = e;
                 await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+
                 throw e;
             }
 
@@ -654,20 +667,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         return super.saveSwapData(swap);
     }
 
-    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
-    protected removeSwapData(swap: SpvVaultSwap, ultimateState?: SpvVaultSwapState): Promise<void>;
-    protected async removeSwapData(hashOrSwap: string | SpvVaultSwap, sequenceOrUltimateState?: bigint | SpvVaultSwapState): Promise<void> {
-        let swap: SpvVaultSwap;
-        let state: SpvVaultSwapState;
-        if(typeof(hashOrSwap)==="string") {
-            if(typeof(sequenceOrUltimateState)!=="bigint") throw new Error("Sequence must be a BN instance!");
-            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
-        } else {
-            swap = hashOrSwap;
-            if(sequenceOrUltimateState!=null && typeof(sequenceOrUltimateState)!=="bigint") state = sequenceOrUltimateState;
-        }
+    protected async removeSwapData(swap: SpvVaultSwap, ultimateState?: SpvVaultSwapState): Promise<void> {
         if(swap.btcTxId!=null) this.btcTxIdIndex.delete(swap.btcTxId);
-        return super.removeSwapData(swap, state);
+        return super.removeSwapData(swap, ultimateState);
     }
 
 }

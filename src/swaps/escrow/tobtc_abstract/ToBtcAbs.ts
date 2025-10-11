@@ -59,6 +59,7 @@ const MAX_PARALLEL_TX_PROCESSED = 10;
 export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>  {
     readonly type = SwapHandlerType.TO_BTC;
     readonly swapType = ChainSwapType.CHAIN_NONCED;
+    readonly inflightSwapStates = new Set([ToBtcSwapState.BTC_SENDING, ToBtcSwapState.BTC_SENT]);
 
     activeSubscriptions: {[txId: string]: ToBtcSwapAbs} = {};
     bitcoinRpc: BitcoinRpc<BtcBlock>;
@@ -358,6 +359,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         // e.g. that 2 payouts share the same input and would effectively double-spend each other
         return this.bitcoin.execute(async () => {
             //Run checks
+            this.checkTooManyInflightSwaps();
             this.checkExpiresTooSoon(swap);
             if(swap.metadata!=null) swap.metadata.times.payCLTVChecked = Date.now();
 
@@ -672,6 +674,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
             const responseStream = res.responseStream;
 
+            this.checkTooManyInflightSwaps();
             this.checkNonceValid(parsedBody.nonce);
             this.checkConfirmationTarget(parsedBody.confirmationTarget);
             this.checkRequiredConfirmations(parsedBody.confirmations);
@@ -685,6 +688,9 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             const abortController = getAbortController(responseStream);
 
             const {pricePrefetchPromise, signDataPrefetchPromise} = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
+
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             const {
                 amountBD,

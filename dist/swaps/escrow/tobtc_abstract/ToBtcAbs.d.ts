@@ -32,6 +32,7 @@ export type ToBtcRequestType = {
 export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState> {
     readonly type = SwapHandlerType.TO_BTC;
     readonly swapType = ChainSwapType.CHAIN_NONCED;
+    readonly inflightSwapStates: Set<ToBtcSwapState>;
     activeSubscriptions: {
         [txId: string]: ToBtcSwapAbs;
     };

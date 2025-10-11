@@ -23,6 +23,7 @@ export type FromBtcRequestType = {
 export declare class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSwapState> {
     readonly type = SwapHandlerType.FROM_BTC;
     readonly swapType = ChainSwapType.CHAIN;
+    readonly inflightSwapStates: Set<FromBtcSwapState>;
     readonly config: FromBtcConfig & {
         swapTsCsvDelta: bigint;
     };

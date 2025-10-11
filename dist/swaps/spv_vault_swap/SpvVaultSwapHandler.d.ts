@@ -32,6 +32,7 @@ export type SpvVaultPostQuote = {
 };
 export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapState> {
     readonly type = SwapHandlerType.FROM_BTC_SPV;
+    readonly inflightSwapStates: Set<SpvVaultSwapState>;
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
     readonly vaultSigner: ISpvVaultSigner;
@@ -63,6 +64,5 @@ export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVa
     startRestServer(restServer: Express): void;
     getInfoData(): any;
     protected saveSwapData(swap: SpvVaultSwap): Promise<void>;
-    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
     protected removeSwapData(swap: SpvVaultSwap, ultimateState?: SpvVaultSwapState): Promise<void>;
 }

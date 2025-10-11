@@ -4,7 +4,7 @@ import {FromBtcLnAutoSwap, FromBtcLnAutoSwapState} from "./FromBtcLnAutoSwap";
 import {MultichainData, SwapHandlerType} from "../../SwapHandler";
 import {ISwapPrice} from "../../../prices/ISwapPrice";
 import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
-import {expressHandlerWrapper, getAbortController, HEX_REGEX} from "../../../utils/Utils";
+import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
 import {PluginManager} from "../../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
 import {FieldTypeEnum, verifySchema} from "../../../utils/paramcoders/SchemaVerifier";
@@ -45,6 +45,7 @@ export type FromBtcLnAutoRequestType = {
 export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, FromBtcLnAutoSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN_AUTO;
     readonly swapType = ChainSwapType.HTLC;
+    readonly inflightSwapStates = new Set([FromBtcLnAutoSwapState.TXS_SENT, FromBtcLnAutoSwapState.COMMITED, FromBtcLnAutoSwapState.CLAIMED]);
 
     activeSubscriptions: Set<string> = new Set<string>();
 
@@ -100,13 +101,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
         if(swap.state===FromBtcLnAutoSwapState.RECEIVED) {
             try {
-                if(!await this.offerHtlc(swap)) {
-                    //Expired
-                    if(swap.state===FromBtcLnAutoSwapState.RECEIVED) {
-                        this.swapLogger.info(swap, "processPastSwap(state=RECEIVED): offer HTLC expired, cancelling invoice: "+swap.pr);
-                        await this.cancelSwapAndInvoice(swap);
-                    }
-                }
+                await this.offerHtlc(swap);
             } catch (e) {
                 this.swapLogger.error(swap, "processPastSwap(state=RECEIVED): offerHtlc error", e);
             }
@@ -319,7 +314,6 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcReceived = Date.now();
 
         const useToken = invoiceData.token;
-        const gasToken = invoiceData.gasToken;
 
         let expiryTimeout: bigint;
         try {
@@ -327,6 +321,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             expiryTimeout = await this.checkHtlcExpiry(invoice);
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcTimeoutCalculated = Date.now();
         } catch (e) {
+            if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = e;
             if(invoiceData.state===FromBtcLnAutoSwapState.CREATED) await this.cancelSwapAndInvoice(invoiceData);
             throw e;
         }
@@ -369,6 +364,14 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
     private async offerHtlc(invoiceData: FromBtcLnAutoSwap) {
         if(invoiceData.state!==FromBtcLnAutoSwapState.RECEIVED) return;
 
+        try {
+            this.checkTooManyInflightSwaps();
+        } catch (e) {
+            if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcOfferError = e;
+            if(invoiceData.state===FromBtcLnAutoSwapState.RECEIVED) await this.cancelSwapAndInvoice(invoiceData);
+            throw e;
+        }
+
         this.swapLogger.debug(invoiceData, "offerHtlc(): invoice: ", invoiceData.pr);
         if(invoiceData.metadata!=null) invoiceData.metadata.times.offerHtlc = Date.now();
 
@@ -386,6 +389,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             null : this.getBalancePrefetch(invoiceData.chainIdentifier, gasToken, abortController);
 
         if(await swapContract.getInitAuthorizationExpiry(invoiceData.data, invoiceData) < Date.now()) {
+            if(invoiceData.metadata!=null) invoiceData.metadata.htlcOfferError = "Init authorization expired, before being sent!";
             if(invoiceData.state===FromBtcLnAutoSwapState.RECEIVED) {
                 await this.cancelSwapAndInvoice(invoiceData);
             }
@@ -403,6 +407,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             if(invoiceData.metadata!=null) invoiceData.metadata.times.offerHtlcChecked = Date.now();
         } catch (e) {
             if(!abortController.signal.aborted) {
+                if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcOfferError = e;
                 if(invoiceData.state===FromBtcLnAutoSwapState.RECEIVED) await this.cancelSwapAndInvoice(invoiceData);
             }
             throw e;
@@ -416,6 +421,15 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         }, true);
 
         if(invoiceData.state===FromBtcLnAutoSwapState.RECEIVED) {
+            //Re-check the current HTLC count
+            try {
+                this.checkTooManyInflightSwaps();
+            } catch (e) {
+                if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcOfferError = e;
+                if(invoiceData.state===FromBtcLnAutoSwapState.RECEIVED) await this.cancelSwapAndInvoice(invoiceData);
+                throw e;
+            }
+            this.swapLogger.debug(invoiceData, `offerHtlc(): Sending HTLC offer, current in flight swaps: ${this.inflightSwaps.size}, invoice: `, invoiceData.pr);
             //Setting the state variable is done outside the promise, so is done synchronously
             await invoiceData.setState(FromBtcLnAutoSwapState.TXS_SENT);
             await this.saveSwapData(invoiceData);
@@ -653,6 +667,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
             //Check request params
             this.checkDescriptionHash(parsedBody.descriptionHash);
+            this.checkTooManyInflightSwaps();
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
             metadata.times.requestChecked = Date.now();
 
@@ -668,6 +683,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             const balancePrefetch: Promise<bigint> = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const gasTokenBalancePrefetch: Promise<bigint> = gasTokenAmount.amount===0n || useToken===gasToken ?
                 null : this.getBalancePrefetch(chainIdentifier, gasToken, abortController);
+            const nativeTokenBalancePrefetch: Promise<bigint> = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
             const channelsPrefetch: Promise<LightningNetworkChannel[]> = this.LightningAssertions.getChannelsPrefetch(abortController);
 
             //Asynchronously send the node's public key to the client
@@ -692,6 +708,9 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             metadata.times.priceCalculated = Date.now();
 
             const totalBtcInput = amountBD + amountBDgas;
+
+            //Check if we have at least the minimum needed native balance
+            await this.checkNativeBalance(chainIdentifier, nativeTokenBalancePrefetch, abortController.signal);
 
             //Check if we have enough funds to honor the request
             if(useToken===gasToken) {
