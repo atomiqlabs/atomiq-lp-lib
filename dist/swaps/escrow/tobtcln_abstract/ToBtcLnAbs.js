@@ -30,6 +30,10 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         this.config.minLnRoutingFeePPM = this.config.minLnRoutingFeePPM || 1000n;
         this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10 * 1000;
+        this.config.lnSendBitcoinBlockTimeSafetyFactorPPM = this.config.lnSendBitcoinBlockTimeSafetyFactorPPM ?? (this.config.safetyFactor * 1000000n);
+        if (this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1100000n) {
+            throw new Error("Lightning network send block safety factor set below 1.1, this is insecure!");
+        }
     }
     /**
      * Cleans up exactIn authorization that are already past their expiry
@@ -225,7 +229,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         //Compute max cltv delta
         const maxFee = swap.quotedNetworkFee;
         const maxUsableCLTVdelta = (expiryTimestamp - currentTimestamp - this.config.gracePeriod)
-            / (this.config.bitcoinBlocktime * this.config.safetyFactor);
+            / (this.config.bitcoinBlocktime * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
         //Initiate payment
         this.swapLogger.info(swap, "sendLightningPayment(): paying lightning network invoice," +
             " cltvDelta: " + maxUsableCLTVdelta.toString(10) +
@@ -426,10 +430,12 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the destination is unreachable
      */
     async checkAndGetNetworkFee(amountBD, maxFee, expiryTimestamp, currentTimestamp, pr, metadata, abortSignal) {
-        const maxUsableCLTV = (expiryTimestamp - currentTimestamp - this.config.gracePeriod) / (this.config.bitcoinBlocktime * this.config.safetyFactor);
+        const maxUsableCLTV = (expiryTimestamp - currentTimestamp - this.config.gracePeriod)
+            / (this.config.bitcoinBlocktime * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
         const blockHeight = await this.lightning.getBlockheight();
         abortSignal.throwIfAborted();
         metadata.times.blockheightFetched = Date.now();
+        metadata.probeAndRouteTimeoutDelta = maxUsableCLTV;
         const maxTimeoutBlockheight = BigInt(blockHeight) + maxUsableCLTV;
         const req = {
             request: pr,
@@ -437,6 +443,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             maxFeeMtokens: maxFee * 1000n,
             maxTimeoutHeight: Number(maxTimeoutBlockheight)
         };
+        this.logger.debug(`checkAndGetNetworkFee(): Attempting to probe/route the payment amount: ${amountBD.toString(10)}` +
+            `, maxFee: ${maxFee.toString(10)}, expiryDelta: ${maxUsableCLTV.toString(10)}, expiryHeight: ${maxTimeoutBlockheight.toString(10)}, pr: ${pr}`);
         let probeOrRouteResp = await this.lightning.probe(req);
         metadata.times.probeResult = Date.now();
         metadata.probeResponse = { ...probeOrRouteResp };

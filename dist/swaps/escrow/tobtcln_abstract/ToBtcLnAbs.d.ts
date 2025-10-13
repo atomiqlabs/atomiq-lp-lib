@@ -15,6 +15,7 @@ export type ToBtcLnConfig = ToBtcBaseConfig & {
     minLnRoutingFeePPM?: bigint;
     minLnBaseFee?: bigint;
     exactInExpiry?: number;
+    lnSendBitcoinBlockTimeSafetyFactorPPM?: bigint;
 };
 type ExactInAuthorization = {
     chainIdentifier: string;
