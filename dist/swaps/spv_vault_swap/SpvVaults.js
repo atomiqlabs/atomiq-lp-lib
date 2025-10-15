@@ -120,7 +120,7 @@ class SpvVaults {
         return Object.keys(this.vaultStorage.data)
             .map(key => this.vaultStorage.data[key])
             .filter(val => chainId == null ? true : val.chainId === chainId)
-            .filter(val => val.data.getOwner() === this.chains.chains[val.chainId]?.signer?.getAddress())
+            .filter(val => this.chains.chains[val.chainId] != null && val.data.getOwner() === this.chains.chains[val.chainId]?.signer?.getAddress())
             .filter(val => token == null ? true : val.data.getTokenData()[0].token === token);
     }
     async fundVault(vault, tokenAmounts) {
@@ -296,7 +296,10 @@ class SpvVaults {
         const claimWithdrawals = [];
         let promises = [];
         for (let vault of vaults) {
-            const { signer, spvVaultContract, chainInterface } = this.chains.chains[vault.chainId];
+            const chainData = this.chains.chains[vault.chainId];
+            if (chainData == null)
+                continue;
+            const { signer, spvVaultContract, chainInterface } = chainData;
             if (vault.data.getOwner() !== signer.getAddress())
                 continue;
             if (vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
