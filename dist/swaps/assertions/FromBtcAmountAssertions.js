@@ -138,7 +138,7 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             this.checkBtcAmountInBounds(requestedAmount.amount);
             amountBD = requestedAmount.amount - amountBDgas;
             swapFee = fees.baseFee + ((amountBD * fees.feePPM + 999999n) / 1000000n);
-            if (amountBD < 0n) {
+            if (amountBD - swapFee < 0n) {
                 throw {
                     code: 20003,
                     msg: "Amount too low!",
@@ -163,6 +163,11 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             totalInToken = await this.swapPricing.getFromBtcSwapAmount(amountBD - swapFee, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
             signal.throwIfAborted();
         }
+        if (totalInToken < 0n)
+            throw {
+                code: 20003,
+                msg: "Amount too low!"
+            };
         return {
             amountBD,
             swapFee,

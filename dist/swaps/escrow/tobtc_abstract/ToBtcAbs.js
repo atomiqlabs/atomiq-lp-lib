@@ -586,6 +586,11 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 return resp;
             }, abortController.signal);
             metadata.times.priceCalculated = Date.now();
+            if (amountBD < 600n)
+                throw {
+                    code: "20019",
+                    msg: "Swap output amount is below bitcoin dust (600 sats)!"
+                };
             const claimHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.confirmations, parsedBody.nonce, amountBD).toString("hex");
             //Add grace period another time, so the user has 1 hour to commit
             const expirySeconds = this.getExpiryFromCLTV(parsedBody.confirmationTarget, parsedBody.confirmations) + this.config.gracePeriod;
