@@ -167,11 +167,10 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
      * Checks if the newly submitted PR has the same parameters (destination, cltv_delta, routes) as the initial dummy
      *  invoice sent for exactIn swap quote
      *
-     * @param pr
+     * @param parsedRequest
      * @param parsedAuth
-     * @throws {DefinedRuntimeError} will throw an error if the details don't match
      */
-    private checkPaymentRequestMatchesInitial;
+    private isPaymentRequestMatchingInitial;
     startRestServer(restServer: Express): void;
     init(): Promise<void>;
     getInfoData(): any;

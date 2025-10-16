@@ -537,26 +537,13 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * Checks if the newly submitted PR has the same parameters (destination, cltv_delta, routes) as the initial dummy
      *  invoice sent for exactIn swap quote
      *
-     * @param pr
+     * @param parsedRequest
      * @param parsedAuth
-     * @throws {DefinedRuntimeError} will throw an error if the details don't match
      */
-    async checkPaymentRequestMatchesInitial(pr, parsedAuth) {
-        const parsedRequest = await this.lightning.parsePaymentRequest(pr);
-        if (parsedRequest.destination !== parsedAuth.initialInvoice.destination ||
-            parsedRequest.cltvDelta !== parsedAuth.initialInvoice.cltvDelta ||
-            parsedRequest.mtokens !== parsedAuth.amount * 1000n) {
-            throw {
-                code: 20102,
-                msg: "Provided PR doesn't match initial!"
-            };
-        }
-        if (!(0, ILightningWallet_1.routesMatch)(parsedRequest.routes, parsedAuth.initialInvoice.routes)) {
-            throw {
-                code: 20102,
-                msg: "Provided PR doesn't match initial (routes)!"
-            };
-        }
+    isPaymentRequestMatchingInitial(parsedRequest, parsedAuth) {
+        return parsedRequest.destination === parsedAuth.initialInvoice.destination &&
+            parsedRequest.cltvDelta === parsedAuth.initialInvoice.cltvDelta &&
+            (0, ILightningWallet_1.routesMatch)(parsedRequest.routes, parsedAuth.initialInvoice.routes);
     }
     startRestServer(restServer) {
         restServer.use(this.path + "/payInvoiceExactIn", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
@@ -583,7 +570,25 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const abortSignal = responseStream.getAbortSignal();
             //Check request params
             const { parsedPR, halfConfidence } = await this.checkPaymentRequest(parsedAuth.chainIdentifier, parsedBody.pr);
-            await this.checkPaymentRequestMatchesInitial(parsedBody.pr, parsedAuth);
+            if (parsedPR.mtokens !== parsedAuth.amount * 1000n)
+                throw {
+                    code: 20102,
+                    msg: "Provided PR doesn't match requested (amount)!"
+                };
+            if (!this.isPaymentRequestMatchingInitial(parsedPR, parsedAuth)) {
+                //The provided payment request doesn't match the parameters from the initial one, try to probe/route again
+                // with the same max fee parameters
+                const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
+                const { networkFee, confidence } = await this.checkAndGetNetworkFee(parsedAuth.amount, parsedAuth.quotedNetworkFee, parsedAuth.swapExpiry, currentTimestamp, parsedBody.pr, parsedAuth.metadata, abortSignal);
+                this.logger.info("REST: /payInvoiceExactIn: re-checked network fee for exact-in swap," +
+                    " reqId: " + parsedBody.reqId +
+                    " initialNetworkFee: " + parsedAuth.quotedNetworkFee.toString(10) +
+                    " newNetworkFee: " + networkFee.toString(10) +
+                    " oldConfidence: " + parsedAuth.confidence.toString(10) +
+                    " newConfidence: " + confidence.toString(10) +
+                    " invoice: " + parsedBody.pr);
+                parsedAuth.confidence = confidence;
+            }
             const metadata = parsedAuth.metadata;
             const sequence = base_1.BigIntBufferUtils.fromBuffer((0, crypto_1.randomBytes)(8));
             const { swapContract, signer } = this.getChain(parsedAuth.chainIdentifier);
