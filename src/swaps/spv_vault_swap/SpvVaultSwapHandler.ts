@@ -251,36 +251,82 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const {signer, chainInterface, spvVaultContract} = this.getChain(chainIdentifier);
 
             metadata.times.requestReceived = Date.now();
+
+            /**
+             * token: string                Desired token to use
+             * gasToken: string
+             */
+            const preFetchParsedBody = await req.paramReader.getParams({
+                token: (val: string) => val!=null &&
+                    typeof(val)==="string" &&
+                    this.isTokenSupported(chainIdentifier, val) ? val : null,
+                gasToken: (val: string) => val!=null &&
+                    typeof(val)==="string" &&
+                    chainInterface.isValidToken(val) ? val : null
+            });
+            if(preFetchParsedBody==null) throw {
+                code: 20100,
+                msg: "Invalid request body"
+            };
+
+            //Create abortController for parallel prefetches
+            const responseStream = res.responseStream;
+            const abortController = getAbortController(responseStream);
+
+            //Pre-fetch data
+            const {
+                pricePrefetchPromise,
+                gasTokenPricePrefetchPromise
+            } = this.getPricePrefetches(chainIdentifier, preFetchParsedBody.token, preFetchParsedBody.gasToken, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
+            const btcFeeRatePrefetch = this.bitcoin.getFeeRate().catch(e => {
+                abortController.abort(e);
+                return null;
+            });
+
+            //Listener that re-adds the returned bitcoin address to the unused address list if request fails or closes
+            let abortAddUnusedAddressListener: () => void;
+            const bitcoinAddressPrefetch = this.bitcoin.getAddress().then(value => {
+                //Already aborted
+                if(abortController.signal.aborted) {
+                    this.bitcoin.addUnusedAddress(value);
+                    return null;
+                }
+                //Not aborted yet, add an event listener to re-add the address to the unused list
+                abortController.signal.addEventListener("abort", abortAddUnusedAddressListener = () => {
+                    this.bitcoin.addUnusedAddress(value);
+                });
+                return value;
+            }).catch(e => {
+                abortController.abort(e);
+                return null;
+            });
+
             /**
              * address: string              smart chain address of the recipient
              * amount: string               amount (in sats)
-             * token: string                Desired token to use
              * gasAmount: string            Desired amount in gas token to also get
-             * gasToken: string
              * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
              * callerFeeRate: string        Caller/watchtower fee (in output token) to assign to the swap
              * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
              */
-            const parsedBody: SpvVaultSwapRequestType = await req.paramReader.getParams({
+            const actualParsedBody = await req.paramReader.getParams({
                 address: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     chainInterface.isValidAddress(val, true) ? val : null,
                 amount: FieldTypeEnum.BigInt,
-                token: (val: string) => val!=null &&
-                    typeof(val)==="string" &&
-                    this.isTokenSupported(chainIdentifier, val) ? val : null,
                 gasAmount: FieldTypeEnum.BigInt,
-                gasToken: (val: string) => val!=null &&
-                    typeof(val)==="string" &&
-                    chainInterface.isValidToken(val) ? val : null,
                 exactOut: FieldTypeEnum.BooleanOptional,
                 callerFeeRate: FieldTypeEnum.BigInt,
                 frontingFeeRate: FieldTypeEnum.BigInt,
             });
-            if(parsedBody==null) throw {
+            abortController.signal.throwIfAborted();
+            if(actualParsedBody==null) throw {
                 code: 20100,
                 msg: "Invalid request body"
             };
+
+            const parsedBody: SpvVaultSwapRequestType = {...preFetchParsedBody, ...actualParsedBody};
             metadata.request = parsedBody;
 
             if(parsedBody.gasToken!==chainInterface.getNativeCurrencyAddress()) throw {
@@ -324,17 +370,6 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
             metadata.times.requestChecked = Date.now();
 
-            //Create abortController for parallel prefetches
-            const responseStream = res.responseStream;
-            const abortController = getAbortController(responseStream);
-
-            //Pre-fetch data
-            const {
-                pricePrefetchPromise,
-                gasTokenPricePrefetchPromise
-            } = this.getPricePrefetches(chainIdentifier, useToken, gasToken, abortController);
-            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
-
             await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             //Check valid amount specified (min/max)
@@ -368,8 +403,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             metadata.times.vaultPicked = Date.now();
 
             //Create swap receive bitcoin address
-            const btcFeeRate = await this.bitcoin.getFeeRate();
-            const receiveAddress = await this.bitcoin.getAddress();
+            const btcFeeRate = await btcFeeRatePrefetch;
+            const receiveAddress = await bitcoinAddressPrefetch;
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
 
@@ -404,6 +439,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             );
             swap.metadata = metadata;
 
+            //We can remove the listener to add unused address now, as we are about to save the swap
+            abortController.signal.removeEventListener("abort", abortAddUnusedAddressListener);
             await PluginManager.swapCreate(swap);
             await this.saveSwapData(swap);
 
