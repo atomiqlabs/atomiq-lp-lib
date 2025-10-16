@@ -44,15 +44,14 @@ export class InfoHandler {
      */
     startRestServer(restServer: Express) {
 
-        restServer.use(this.path+"/info", express.json());
-        restServer.post(this.path+"/info", async (req, res) => {
-            if (
-                req.body == null ||
+        const infoHandler = async (req, res) => {
+            const reqParams = {...req.body, ...req.query};
 
-                req.body.nonce == null ||
-                typeof(req.body.nonce) !== "string" ||
-                req.body.nonce.length>64 ||
-                !HEX_REGEX.test(req.body.nonce)
+            if (
+                reqParams.nonce == null ||
+                typeof(reqParams.nonce) !== "string" ||
+                reqParams.nonce.length>64 ||
+                !HEX_REGEX.test(reqParams.nonce)
             ) {
                 res.status(400).json({
                     msg: "Invalid request body (nonce)"
@@ -61,7 +60,7 @@ export class InfoHandler {
             }
 
             const env: InfoHandlerResponseEnvelope = {
-                nonce: req.body.nonce,
+                nonce: reqParams.nonce,
                 services: {}
             };
 
@@ -92,7 +91,11 @@ export class InfoHandler {
             };
 
             res.status(200).json(response);
-        });
+        };
+
+        restServer.use(this.path+"/info", express.json());
+        restServer.post(this.path+"/info", infoHandler);
+        restServer.get(this.path+"/info", infoHandler);
 
     }
 
