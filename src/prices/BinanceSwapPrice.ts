@@ -1,4 +1,4 @@
-import {ISwapPrice} from "./ISwapPrice";
+import {ISwapPrice, ISwapPriceCoinsMap} from "./ISwapPrice";
 
 const CACHE_DURATION = 15000;
 
@@ -21,20 +21,8 @@ export class BinanceSwapPrice extends ISwapPrice<{ pair: string, decimals: numbe
         }
     } = {};
 
-    constructor(url: string, coins: BinancePriceData) {
-        const coinsMap = {};
-        for(let pair in coins) {
-            const chains = coins[pair];
-            for(let chainId in chains) {
-                const tokenData = chains[chainId];
-                if(coinsMap[chainId]==null) coinsMap[chainId] = {};
-                coinsMap[chainId][tokenData.address] = {
-                    pair,
-                    decimals: tokenData.decimals
-                }
-            }
-        }
-        super(coinsMap);
+    constructor(url: string, coins: ISwapPriceCoinsMap<{pair: string, decimals: number}>) {
+        super(coins);
         this.url = url || "https://api.binance.com/api/v3";
     }
 

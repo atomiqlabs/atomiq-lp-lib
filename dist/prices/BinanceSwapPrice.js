@@ -5,20 +5,7 @@ const ISwapPrice_1 = require("./ISwapPrice");
 const CACHE_DURATION = 15000;
 class BinanceSwapPrice extends ISwapPrice_1.ISwapPrice {
     constructor(url, coins) {
-        const coinsMap = {};
-        for (let pair in coins) {
-            const chains = coins[pair];
-            for (let chainId in chains) {
-                const tokenData = chains[chainId];
-                if (coinsMap[chainId] == null)
-                    coinsMap[chainId] = {};
-                coinsMap[chainId][tokenData.address] = {
-                    pair,
-                    decimals: tokenData.decimals
-                };
-            }
-        }
-        super(coinsMap);
+        super(coins);
         this.cache = {};
         this.url = url || "https://api.binance.com/api/v3";
     }

@@ -1,4 +1,4 @@
-import { ISwapPrice } from "./ISwapPrice";
+import { ISwapPrice, ISwapPriceCoinsMap } from "./ISwapPrice";
 export type OKXPriceData = {
     [pair: string]: {
         [chainId: string]: {
@@ -18,7 +18,10 @@ export declare class OKXSwapPrice extends ISwapPrice<{
             expiry: number;
         };
     };
-    constructor(url: string, coins: OKXPriceData);
+    constructor(url: string, coins: ISwapPriceCoinsMap<{
+        pair: string;
+        decimals: number;
+    }>);
     fetchPrice(pair: string): Promise<number>;
     getPrice(tokenData: {
         pair: string;
