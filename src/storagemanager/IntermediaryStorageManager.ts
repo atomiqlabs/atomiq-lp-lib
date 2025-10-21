@@ -1,6 +1,8 @@
 import {StorageObject} from "@atomiqlabs/base";
 import * as fs from "fs/promises";
+import * as fsSync from "fs";
 import {IIntermediaryStorage, StorageQueryParam} from "../storage/IIntermediaryStorage";
+import {getLogger, LoggerType} from "../utils/Utils";
 
 export class IntermediaryStorageManager<T extends StorageObject> implements IIntermediaryStorage<T> {
 
@@ -9,9 +11,11 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
     private data: {
         [key: string]: T
     } = {};
+    private logger: LoggerType;
 
     constructor(directory: string) {
         this.directory = directory;
+        this.logger = getLogger("IntermediaryStorageManager("+directory+"): ");
     }
 
     async init(): Promise<void> {
@@ -82,18 +86,23 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
             if(this.data[identifier]!=null) delete this.data[identifier];
             await fs.rm(this.directory+"/"+identifier+".json");
         } catch (e) {
-            console.error(e);
+            this.logger.error("removeData(): Error when removing data: ", e);
         }
     }
 
     async loadData(type: new(data: any) => T): Promise<void> {
         this.type = type;
 
+        if(!fsSync.existsSync(this.directory)) {
+            this.logger.debug("loadData(): Data directory not found!");
+            return;
+        }
+
         let files: string[];
         try {
             files = await fs.readdir(this.directory);
         } catch (e) {
-            console.error(e);
+            this.logger.error("loadData(): Error when checking directory: ", e);
             return;
         }
 

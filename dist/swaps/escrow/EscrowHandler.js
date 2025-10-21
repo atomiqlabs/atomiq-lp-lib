@@ -73,18 +73,11 @@ class EscrowHandler extends SwapHandler_1.SwapHandler {
             this.saveSwapToEscrowHashMap(swap);
         }
     }
-    async removeSwapData(hashOrSwap, sequenceOrUltimateState) {
-        let swap;
-        if (typeof (hashOrSwap) === "string") {
-            if (typeof (sequenceOrUltimateState) !== "bigint")
-                throw new Error("Sequence must be a BN instance!");
-            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
-        }
-        else {
-            swap = hashOrSwap;
-            if (sequenceOrUltimateState != null && typeof (sequenceOrUltimateState) !== "bigint")
-                await swap.setState(sequenceOrUltimateState);
-        }
+    async removeSwapData(swap, ultimateState) {
+        this.inflightSwaps.delete(swap.getIdentifier());
+        this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
+        if (ultimateState != null)
+            await swap.setState(ultimateState);
         if (swap != null)
             await PluginManager_1.PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);

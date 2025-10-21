@@ -19,13 +19,14 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config) {
         super(storageDirectory, path, chainsData, swapPricing);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_SPV;
+        this.inflightSwapStates = new Set([SpvVaultSwap_1.SpvVaultSwapState.SIGNED, SpvVaultSwap_1.SpvVaultSwapState.SENT, SpvVaultSwap_1.SpvVaultSwapState.BTC_CONFIRMED]);
         this.btcTxIdIndex = new Map();
         this.bitcoinRpc = bitcoinRpc;
         this.bitcoin = bitcoin;
         this.vaultSigner = spvVaultSigner;
         this.config = config;
         this.AmountAssertions = new FromBtcAmountAssertions_1.FromBtcAmountAssertions(config, swapPricing);
-        this.Vaults = new SpvVaults_1.SpvVaults(vaultStorage, bitcoin, spvVaultSigner, bitcoinRpc, this.getChain.bind(this), config);
+        this.Vaults = new SpvVaults_1.SpvVaults(vaultStorage, bitcoin, spvVaultSigner, bitcoinRpc, this.chains, config);
     }
     async processClaimEvent(swap, event) {
         if (swap == null)
@@ -121,7 +122,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 await this.saveSwapData(swap);
             }
         }
-        if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.SENT) {
+        if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.SENT || swap.state === SpvVaultSwap_1.SpvVaultSwapState.BTC_CONFIRMED) {
             //Check if confirmed or double-spent
             if (swap.sending)
                 return;
@@ -135,8 +136,10 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 return;
             }
             else if (tx.confirmations > 0) {
-                await swap.setState(SpvVaultSwap_1.SpvVaultSwapState.BTC_CONFIRMED);
-                await this.saveSwapData(swap);
+                if (swap.state !== SpvVaultSwap_1.SpvVaultSwapState.BTC_CONFIRMED) {
+                    await swap.setState(SpvVaultSwap_1.SpvVaultSwapState.BTC_CONFIRMED);
+                    await this.saveSwapData(swap);
+                }
             }
         }
     }
@@ -178,36 +181,74 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const { signer, chainInterface, spvVaultContract } = this.getChain(chainIdentifier);
             metadata.times.requestReceived = Date.now();
             /**
-             * address: string              smart chain address of the recipient
-             * amount: string               amount (in sats)
              * token: string                Desired token to use
-             * gasAmount: string            Desired amount in gas token to also get
              * gasToken: string
-             * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
-             * callerFeeRate: string        Caller/watchtower fee (in output token) to assign to the swap
-             * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
              */
-            const parsedBody = await req.paramReader.getParams({
-                address: (val) => val != null &&
-                    typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
-                amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
+            const preFetchParsedBody = await req.paramReader.getParams({
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
-                gasAmount: SchemaVerifier_1.FieldTypeEnum.BigInt,
                 gasToken: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidToken(val) ? val : null,
-                exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
-                callerFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                frontingFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                    chainInterface.isValidToken(val) ? val : null
             });
-            if (parsedBody == null)
+            if (preFetchParsedBody == null)
                 throw {
                     code: 20100,
                     msg: "Invalid request body"
                 };
+            //Create abortController for parallel prefetches
+            const responseStream = res.responseStream;
+            const abortController = (0, Utils_1.getAbortController)(responseStream);
+            //Pre-fetch data
+            const { pricePrefetchPromise, gasTokenPricePrefetchPromise } = this.getPricePrefetches(chainIdentifier, preFetchParsedBody.token, preFetchParsedBody.gasToken, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
+            const btcFeeRatePrefetch = this.bitcoin.getFeeRate().catch(e => {
+                abortController.abort(e);
+                return null;
+            });
+            //Listener that re-adds the returned bitcoin address to the unused address list if request fails or closes
+            let abortAddUnusedAddressListener;
+            const bitcoinAddressPrefetch = this.bitcoin.getAddress().then(value => {
+                //Already aborted
+                if (abortController.signal.aborted) {
+                    this.bitcoin.addUnusedAddress(value);
+                    return null;
+                }
+                //Not aborted yet, add an event listener to re-add the address to the unused list
+                abortController.signal.addEventListener("abort", abortAddUnusedAddressListener = () => {
+                    this.bitcoin.addUnusedAddress(value);
+                });
+                return value;
+            }).catch(e => {
+                abortController.abort(e);
+                return null;
+            });
+            /**
+             * address: string              smart chain address of the recipient
+             * amount: string               amount (in sats)
+             * gasAmount: string            Desired amount in gas token to also get
+             * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
+             * callerFeeRate: string        Caller/watchtower fee (in output token) to assign to the swap
+             * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
+             */
+            const actualParsedBody = await req.paramReader.getParams({
+                address: (val) => val != null &&
+                    typeof (val) === "string" &&
+                    chainInterface.isValidAddress(val, true) ? val : null,
+                amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                gasAmount: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
+                callerFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                frontingFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
+            });
+            abortController.signal.throwIfAborted();
+            if (actualParsedBody == null)
+                throw {
+                    code: 20100,
+                    msg: "Invalid request body"
+                };
+            const parsedBody = { ...preFetchParsedBody, ...actualParsedBody };
             metadata.request = parsedBody;
             if (parsedBody.gasToken !== chainInterface.getNativeCurrencyAddress())
                 throw {
@@ -244,14 +285,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             };
             const useToken = parsedBody.token;
             const gasToken = parsedBody.gasToken;
+            this.checkTooManyInflightSwaps();
             //Check request params
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
             metadata.times.requestChecked = Date.now();
-            //Create abortController for parallel prefetches
-            const responseStream = res.responseStream;
-            const abortController = (0, Utils_1.getAbortController)(responseStream);
-            //Pre-fetch data
-            const { pricePrefetchPromise, gasTokenPricePrefetchPromise } = this.getPricePrefetches(chainIdentifier, useToken, gasToken, abortController);
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
             //Check valid amount specified (min/max)
             let { amountBD, swapFee, swapFeeInToken, totalInToken, amountBDgas, gasSwapFee, gasSwapFeeInToken, totalInGasToken } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal, { ...gasTokenAmount, pricePrefetch: gasTokenPricePrefetchPromise });
             metadata.times.priceCalculated = Date.now();
@@ -264,8 +302,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             abortController.signal.throwIfAborted();
             metadata.times.vaultPicked = Date.now();
             //Create swap receive bitcoin address
-            const btcFeeRate = await this.bitcoin.getFeeRate();
-            const receiveAddress = await this.bitcoin.getAddress();
+            const btcFeeRate = await btcFeeRatePrefetch;
+            const receiveAddress = await bitcoinAddressPrefetch;
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
             //Adjust the amounts based on passed fees
@@ -288,6 +326,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const quoteId = (0, crypto_1.randomBytes)(32).toString("hex");
             const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, quoteId, expiry, vault, utxo, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, useToken, gasToken);
             swap.metadata = metadata;
+            //We can remove the listener to add unused address now, as we are about to save the swap
+            abortController.signal.removeEventListener("abort", abortAddUnusedAddressListener);
             await PluginManager_1.PluginManager.swapCreate(swap);
             await this.saveSwapData(swap);
             this.swapLogger.info(swap, "REST: /getQuote: Created swap address: " + receiveAddress + " amount: " + totalBtcOutput.toString(10));
@@ -337,6 +377,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const metadata = swap.metadata;
             metadata.times ?? (metadata.times = {});
             metadata.times.requestReceived = requestReceived;
+            this.checkTooManyInflightSwaps();
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             if (vault == null || !vault.isReady()) {
                 throw {
@@ -388,7 +429,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "PSBT transaction cannot be parsed!"
                 };
             }
-            if (data.recipient !== swap.recipient ||
+            if (!data.isRecipient(swap.recipient) ||
                 data.callerFeeRate !== swap.callerFeeShare ||
                 data.frontingFeeRate !== swap.frontingFeeShare ||
                 data.executionFeeRate !== swap.executionFeeShare ||
@@ -423,7 +464,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "One or more PSBT inputs not finalized!"
                 };
             const effectiveFeeRate = await this.bitcoinRpc.getEffectiveFeeRate(await this.bitcoin.parsePsbt(signedTx));
-            if (effectiveFeeRate.feeRate < swap.btcFeeRate)
+            if (effectiveFeeRate.feeRate < 1 || Math.round(effectiveFeeRate.feeRate) < swap.btcFeeRate)
                 throw {
                     code: 20511,
                     msg: "Bitcoin transaction fee too low, expected minimum: " + swap.btcFeeRate + " adjusted effective fee rate: " + effectiveFeeRate.feeRate
@@ -450,6 +491,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                         msg: "Invalid quote ID, not found or expired!"
                     };
                 }
+                //Double check in-flight swap count
+                this.checkTooManyInflightSwaps();
                 swap.btcTxId = signedTx.id;
                 swap.state = SpvVaultSwap_1.SpvVaultSwapState.SIGNED;
                 swap.sending = true;
@@ -478,6 +521,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 swap.sending = false;
                 vault.removeWithdrawal(data);
                 await this.Vaults.saveVault(vault);
+                if ((0, Utils_1.isDefinedRuntimeError)(e) && swap.metadata != null)
+                    swap.metadata.postQuoteError = e;
                 await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
                 throw e;
             }
@@ -507,22 +552,10 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             this.btcTxIdIndex.set(swap.btcTxId, swap);
         return super.saveSwapData(swap);
     }
-    async removeSwapData(hashOrSwap, sequenceOrUltimateState) {
-        let swap;
-        let state;
-        if (typeof (hashOrSwap) === "string") {
-            if (typeof (sequenceOrUltimateState) !== "bigint")
-                throw new Error("Sequence must be a BN instance!");
-            swap = await this.storageManager.getData(hashOrSwap, sequenceOrUltimateState);
-        }
-        else {
-            swap = hashOrSwap;
-            if (sequenceOrUltimateState != null && typeof (sequenceOrUltimateState) !== "bigint")
-                state = sequenceOrUltimateState;
-        }
+    async removeSwapData(swap, ultimateState) {
         if (swap.btcTxId != null)
             this.btcTxIdIndex.delete(swap.btcTxId);
-        return super.removeSwapData(swap, state);
+        return super.removeSwapData(swap, ultimateState);
     }
 }
 exports.SpvVaultSwapHandler = SpvVaultSwapHandler;

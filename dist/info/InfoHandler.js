@@ -18,20 +18,19 @@ class InfoHandler {
      * @param restServer
      */
     startRestServer(restServer) {
-        restServer.use(this.path + "/info", express.json());
-        restServer.post(this.path + "/info", async (req, res) => {
-            if (req.body == null ||
-                req.body.nonce == null ||
-                typeof (req.body.nonce) !== "string" ||
-                req.body.nonce.length > 64 ||
-                !HEX_REGEX.test(req.body.nonce)) {
+        const infoHandler = async (req, res) => {
+            const reqParams = { ...req.body, ...req.query };
+            if (reqParams.nonce == null ||
+                typeof (reqParams.nonce) !== "string" ||
+                reqParams.nonce.length > 64 ||
+                !HEX_REGEX.test(reqParams.nonce)) {
                 res.status(400).json({
                     msg: "Invalid request body (nonce)"
                 });
                 return;
             }
             const env = {
-                nonce: req.body.nonce,
+                nonce: reqParams.nonce,
                 services: {}
             };
             for (let swapHandler of this.swapHandlers) {
@@ -52,7 +51,10 @@ class InfoHandler {
                 chains
             };
             res.status(200).json(response);
-        });
+        };
+        restServer.use(this.path + "/info", express.json());
+        restServer.post(this.path + "/info", infoHandler);
+        restServer.get(this.path + "/info", infoHandler);
     }
 }
 exports.InfoHandler = InfoHandler;

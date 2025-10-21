@@ -1,4 +1,4 @@
-import {ISwapPrice} from "./ISwapPrice";
+import {ISwapPrice, ISwapPriceCoinsMap} from "./ISwapPrice";
 
 const CACHE_DURATION = 15000;
 
@@ -21,20 +21,8 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
         }
     } = {};
 
-    constructor(url: string, coins: CoinGeckoPriceData) {
-        const coinsMap = {};
-        for(let coinId in coins) {
-            const chains = coins[coinId];
-            for(let chainId in chains) {
-                const tokenData = chains[chainId];
-                if(coinsMap[chainId]==null) coinsMap[chainId] = {};
-                coinsMap[chainId][tokenData.address] = {
-                    coinId,
-                    decimals: tokenData.decimals
-                };
-            }
-        }
-        super(coinsMap);
+    constructor(url: string, coins: ISwapPriceCoinsMap<{coinId: string, decimals: number}>) {
+        super(coins);
         this.url = url || "https://api.coingecko.com/api/v3";
     }
 

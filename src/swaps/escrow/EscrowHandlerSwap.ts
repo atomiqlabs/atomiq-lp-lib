@@ -55,14 +55,14 @@ export abstract class EscrowHandlerSwap<T extends SwapData = SwapData, S = any> 
      * Returns the escrow hash - i.e. hash of the escrow data
      */
     getEscrowHash(): string {
-        return this.data.getEscrowHash();
+        return this.data?.getEscrowHash();
     }
 
     /**
      * Returns the claim data hash - i.e. hash passed to the claim handler
      */
     getClaimHash(): string {
-        return this.data.getClaimHash();
+        return this.data?.getClaimHash();
     }
 
     /**

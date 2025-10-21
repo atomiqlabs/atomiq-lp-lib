@@ -18,6 +18,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         super(storageDirectory, path, chains, swapPricing, config);
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC;
         this.swapType = base_1.ChainSwapType.CHAIN;
+        this.inflightSwapStates = new Set([FromBtcSwapAbs_1.FromBtcSwapState.COMMITED]);
         this.bitcoin = bitcoin;
         this.config = {
             ...config,
@@ -202,7 +203,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const parsedBody = await req.paramReader.getParams({
                 address: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
@@ -225,6 +226,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             };
             const useToken = parsedBody.token;
             //Check request params
+            this.checkTooManyInflightSwaps();
             this.checkSequence(parsedBody.sequence);
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -235,9 +237,11 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const { pricePrefetchPromise, gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise } = this.getFromBtcPricePrefetches(chainIdentifier, useToken, depositToken, abortController);
             const balancePrefetch = this.getBalancePrefetch(chainIdentifier, useToken, abortController);
             const signDataPrefetchPromise = this.getSignDataPrefetch(chainIdentifier, abortController, responseStream);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
             const dummySwapData = await this.getDummySwapData(chainIdentifier, useToken, parsedBody.address);
             abortController.signal.throwIfAborted();
             const baseSDPromise = this.getBaseSecurityDepositPrefetch(chainIdentifier, dummySwapData, depositToken, gasTokenPricePrefetchPromise, depositTokenPricePrefetchPromise, abortController);
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
             //Check valid amount specified (min/max)
             const { amountBD, swapFee, swapFeeInToken, totalInToken, securityDepositApyPPM, securityDepositBaseMultiplierPPM } = await this.AmountAssertions.checkFromBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, abortController.signal);
             metadata.times.priceCalculated = Date.now();

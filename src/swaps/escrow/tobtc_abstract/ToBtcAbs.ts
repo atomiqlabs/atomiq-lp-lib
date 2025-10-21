@@ -21,7 +21,6 @@ import {serverParamDecoder} from "../../../utils/paramcoders/server/ServerParamD
 import {IParamReader} from "../../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamEncoder";
 import {ToBtcBaseConfig, ToBtcBaseSwapHandler} from "../ToBtcBaseSwapHandler";
-import {PromiseQueue} from "promise-queue-ts";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {checkTransactionReplaced} from "../../../utils/BitcoinUtils";
 
@@ -52,17 +51,19 @@ export type ToBtcRequestType = {
     exactIn?: boolean
 };
 
+const MAX_PARALLEL_TX_PROCESSED = 10;
+
 /**
  * Handler for to BTC swaps, utilizing PTLCs (proof-time locked contracts) using btc relay (on-chain bitcoin SPV)
  */
 export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>  {
     readonly type = SwapHandlerType.TO_BTC;
     readonly swapType = ChainSwapType.CHAIN_NONCED;
+    readonly inflightSwapStates = new Set([ToBtcSwapState.BTC_SENDING, ToBtcSwapState.BTC_SENT]);
 
     activeSubscriptions: {[txId: string]: ToBtcSwapAbs} = {};
     bitcoinRpc: BitcoinRpc<BtcBlock>;
     bitcoin: IBitcoinWallet;
-    sendBtcQueue: PromiseQueue = new PromiseQueue();
 
     readonly config: ToBtcConfig;
 
@@ -104,17 +105,16 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param vout
      */
     private async tryClaimSwap(tx: {blockhash: string, confirmations: number, txid: string, hex: string}, swap: ToBtcSwapAbs, vout: number): Promise<boolean> {
-        const {swapContract, signer} = this.getChain(swap.chainIdentifier);
+        const {chainInterface, swapContract, signer} = this.getChain(swap.chainIdentifier);
 
         const blockHeader = await this.bitcoinRpc.getBlockHeader(tx.blockhash);
 
         //Set flag that we are sending the transaction already, so we don't end up with race condition
-        const unlock: () => boolean = swap.lock(swapContract.claimWithTxDataTimeout);
-        if(unlock==null) return false;
+        if(swap.isLocked()) return false;
 
+        let txns: any[];
         try {
-            this.swapLogger.debug(swap, "tryClaimSwap(): initiate claim of swap, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout);
-            const result = await swapContract.claimWithTxData(
+            txns = await swapContract.txsClaimWithTxData(
                 signer,
                 swap.data,
                 {...tx, height: blockHeader.getHeight()},
@@ -122,11 +122,19 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 vout,
                 null,
                 null,
-                false,
-                {
-                    waitForConfirmation: true
-                }
+                false
             );
+        } catch (e) {
+            this.swapLogger.error(swap, "tryClaimSwap(): error occurred creating swap claim transactions, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout+" address: "+swap.address, e);
+            return false
+        }
+
+        const unlock: () => boolean = swap.lock(swapContract.claimWithTxDataTimeout);
+        if(unlock==null) return false;
+
+        try {
+            this.swapLogger.debug(swap, "tryClaimSwap(): initiate claim of swap, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout);
+            await chainInterface.sendAndConfirm(signer, txns, true);
             this.swapLogger.info(swap, "tryClaimSwap(): swap claimed successfully, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout+" address: "+swap.address);
             if(swap.metadata!=null) swap.metadata.times.txClaimed = Date.now();
             unlock();
@@ -249,21 +257,29 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     private async processBtcTxs() {
         const unsubscribeSwaps: ToBtcSwapAbs[] = [];
 
+        let promises: Promise<void>[] = [];
         for(let txId in this.activeSubscriptions) {
             const swap: ToBtcSwapAbs = this.activeSubscriptions[txId];
             //TODO: RBF the transaction if it's already taking too long to confirm
-            try {
-                let tx: BtcTx = await this.bitcoin.getWalletTransaction(txId);
-                if(tx==null) continue;
+            promises.push((async () => {
+                try {
+                    let tx: BtcTx = await this.bitcoin.getWalletTransaction(txId);
+                    if(tx==null) return;
 
-                if(await this.processBtcTx(swap, tx)) {
-                    this.swapLogger.info(swap, "processBtcTxs(): swap claimed successfully, txId: "+tx.txid+" address: "+swap.address);
-                    unsubscribeSwaps.push(swap);
+                    if(await this.processBtcTx(swap, tx)) {
+                        this.swapLogger.info(swap, "processBtcTxs(): swap claimed successfully, txId: "+tx.txid+" address: "+swap.address);
+                        unsubscribeSwaps.push(swap);
+                    }
+                } catch (e) {
+                    this.swapLogger.error(swap, "processBtcTxs(): error processing btc transaction", e);
                 }
-            } catch (e) {
-                this.swapLogger.error(swap, "processBtcTxs(): error processing btc transaction", e);
+            })());
+            if(promises.length >= MAX_PARALLEL_TX_PROCESSED) {
+                await Promise.all(promises);
+                promises = [];
             }
         }
+        await Promise.all(promises);
 
         unsubscribeSwaps.forEach(swap => {
             this.unsubscribePayment(swap);
@@ -341,8 +357,9 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     private sendBitcoinPayment(swap: ToBtcSwapAbs) {
         //Make sure that bitcoin payouts are processed sequentially to avoid race conditions between multiple payouts,
         // e.g. that 2 payouts share the same input and would effectively double-spend each other
-        return this.sendBtcQueue.enqueue<void>(async () => {
+        return this.bitcoin.execute(async () => {
             //Run checks
+            this.checkTooManyInflightSwaps();
             this.checkExpiresTooSoon(swap);
             if(swap.metadata!=null) swap.metadata.times.payCLTVChecked = Date.now();
 
@@ -637,7 +654,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
                 offerer: (val: string) => val!=null &&
                         typeof(val)==="string" &&
-                        chainInterface.isValidAddress(val) ? val : null,
+                        chainInterface.isValidAddress(val, true) ? val : null,
                 exactIn: FieldTypeEnum.BooleanOptional
             });
             if (parsedBody==null) throw {
@@ -657,6 +674,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
             const responseStream = res.responseStream;
 
+            this.checkTooManyInflightSwaps();
             this.checkNonceValid(parsedBody.nonce);
             this.checkConfirmationTarget(parsedBody.confirmationTarget);
             this.checkRequiredConfirmations(parsedBody.confirmations);
@@ -670,6 +688,9 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             const abortController = getAbortController(responseStream);
 
             const {pricePrefetchPromise, signDataPrefetchPromise} = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
+
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             const {
                 amountBD,
@@ -686,6 +707,11 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 return resp;
             }, abortController.signal);
             metadata.times.priceCalculated = Date.now();
+
+            if(amountBD < 600n) throw {
+                code: "20019",
+                msg: "Swap output amount is below bitcoin dust (600 sats)!"
+            };
 
             const claimHash = this.getHash(chainIdentifier, parsedBody.address, parsedBody.confirmations, parsedBody.nonce, amountBD).toString("hex");
 
@@ -790,20 +816,24 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
             await this.checkExpired(payment);
 
-            if (payment.state === ToBtcSwapState.COMMITED) throw {
-                _httpStatus: 200,
-                code: 20008,
-                msg: "Payment processing"
-            };
+            if (payment.state === ToBtcSwapState.COMMITED) {
+                res.status(200).json({
+                    code: 20008,
+                    msg: "Payment processing"
+                });
+                return;
+            }
 
-            if (payment.state === ToBtcSwapState.BTC_SENT || payment.state===ToBtcSwapState.BTC_SENDING) throw {
-                _httpStatus: 200,
-                code: 20006,
-                msg: "Already paid",
-                data: {
-                    txId: payment.txId
-                }
-            };
+            if (payment.state === ToBtcSwapState.BTC_SENT || payment.state===ToBtcSwapState.BTC_SENDING) {
+                res.status(200).json({
+                    code: 20006,
+                    msg: "Already paid",
+                    data: {
+                        txId: payment.txId
+                    }
+                });
+                return;
+            }
 
             const {swapContract, signer} = this.getChain(payment.chainIdentifier);
 

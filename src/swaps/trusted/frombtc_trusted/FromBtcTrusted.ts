@@ -28,6 +28,7 @@ export type FromBtcTrustedRequestType = {
 
 export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
     readonly type = SwapHandlerType.FROM_BTC_TRUSTED;
+    readonly inflightSwapStates = new Set([FromBtcTrustedSwapState.RECEIVED, FromBtcTrustedSwapState.BTC_CONFIRMED, FromBtcTrustedSwapState.SENT, FromBtcTrustedSwapState.CONFIRMED]);
 
     readonly config: FromBtcTrustedConfig;
     readonly bitcoin: IBitcoinWallet;
@@ -199,6 +200,14 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
             swap.txId = tx.txid;
             swap.vout = vout;
             this.subscriptions.delete(outputScript);
+
+            try {
+                this.checkTooManyInflightSwaps();
+            } catch (e) {
+                await this.refundSwap(swap);
+                return;
+            }
+
             await swap.setState(FromBtcTrustedSwapState.RECEIVED);
             await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
         }
@@ -407,7 +416,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
             const parsedBody: FromBtcTrustedRequestType = verifySchema(req.query,{
                 address: (val: string) => val!=null &&
                     typeof(val)==="string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 refundAddress: (val: string) => val==null ? "" :
                     typeof(val)==="string" &&
                     this.isValidBitcoinAddress(val) ? val : null,
@@ -435,6 +444,8 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
             };
             const useToken = parsedBody.token;
 
+            this.checkTooManyInflightSwaps();
+
             //Check request params
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -454,6 +465,10 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                 abortController.abort(e);
                 return null;
             });
+            const nativeBalancePrefetch: Promise<bigint> = useToken===chainInterface.getNativeCurrencyAddress() ?
+                balancePrefetch : this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
+
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
 
             //Check valid amount specified (min/max)
             const {
@@ -713,7 +728,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
     private async startDoubleSpendWatchdog() {
         let rerun: () => Promise<void>;
         rerun = async () => {
-            await this.checkDoubleSpends().catch( e => console.error(e));
+            await this.checkDoubleSpends().catch( e => this.logger.error("startDoubleSpendWatchdog(): Error when checking double spends: ", e));
             setTimeout(rerun, this.config.doubleSpendCheckInterval);
         };
         await rerun();

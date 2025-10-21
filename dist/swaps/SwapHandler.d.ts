@@ -4,6 +4,7 @@ import { ChainType } from "@atomiqlabs/base";
 import { SwapHandlerSwap } from "./SwapHandlerSwap";
 import { IIntermediaryStorage } from "../storage/IIntermediaryStorage";
 import { IParamReader } from "../utils/paramcoders/IParamReader";
+import { LoggerType } from "../utils/Utils";
 export declare enum SwapHandlerType {
     TO_BTC = "TO_BTC",
     FROM_BTC = "FROM_BTC",
@@ -11,7 +12,8 @@ export declare enum SwapHandlerType {
     FROM_BTCLN = "FROM_BTCLN",
     FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED",
     FROM_BTC_TRUSTED = "FROM_BTC_TRUSTED",
-    FROM_BTC_SPV = "FROM_BTC_SPV"
+    FROM_BTC_SPV = "FROM_BTC_SPV",
+    FROM_BTCLN_AUTO = "FROM_BTCLN_AUTO"
 }
 export type SwapHandlerInfoType = {
     swapFeePPM: number;
@@ -28,6 +30,10 @@ export type SwapBaseConfig = {
     initAuthorizationTimeouts?: {
         [chainId: string]: number;
     };
+    minNativeBalances?: {
+        [chainId: string]: bigint;
+    };
+    maxInflightSwaps?: number;
     bitcoinBlocktime: bigint;
     baseFee: bigint;
     feePPM: bigint;
@@ -74,13 +80,10 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHan
         [chainId: string]: Set<string>;
     };
     readonly swapPricing: ISwapPrice;
+    abstract readonly inflightSwapStates: Set<S>;
     abstract config: SwapBaseConfig;
-    logger: {
-        debug: (msg: string, ...args: any) => void;
-        info: (msg: string, ...args: any) => void;
-        warn: (msg: string, ...args: any) => void;
-        error: (msg: string, ...args: any) => void;
-    };
+    inflightSwaps: Set<string>;
+    logger: LoggerType;
     protected swapLogger: {
         debug: (swap: SwapHandlerSwap, msg: string, ...args: any) => void;
         info: (swap: SwapHandlerSwap, msg: string, ...args: any) => void;
@@ -112,18 +115,33 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHan
     /**
      * Remove swap data
      *
-     * @param hash
-     * @param sequence
-     */
-    protected removeSwapData(hash: string, sequence: bigint): Promise<void>;
-    /**
-     * Remove swap data
-     *
      * @param swap
      * @param ultimateState set the ultimate state of the swap before removing
      */
     protected removeSwapData(swap: V, ultimateState?: S): Promise<void>;
     protected saveSwapData(swap: V): Promise<void>;
+    /**
+     * Pre-fetches native balance to further check if we have enough reserve in a native token
+     *
+     * @param chainIdentifier
+     * @param abortController
+     * @protected
+     */
+    protected prefetchNativeBalanceIfNeeded(chainIdentifier: string, abortController: AbortController): Promise<bigint> | null;
+    /**
+     * Checks if we have enough native balance to facilitate swaps
+     *
+     * @param chainIdentifier
+     * @param balancePrefetch
+     * @param signal
+     * @throws {DefinedRuntimeError} will throw an error if there are not enough funds in the vault
+     */
+    protected checkNativeBalance(chainIdentifier: string, balancePrefetch: Promise<bigint>, signal: AbortSignal | null): Promise<void>;
+    /**
+     * Checks whether there are too many swaps in-flight currently
+     * @private
+     */
+    protected checkTooManyInflightSwaps(): void;
     /**
      * Checks if we have enough balance of the token in the swap vault
      *

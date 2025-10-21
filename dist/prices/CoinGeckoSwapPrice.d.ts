@@ -1,4 +1,4 @@
-import { ISwapPrice } from "./ISwapPrice";
+import { ISwapPrice, ISwapPriceCoinsMap } from "./ISwapPrice";
 export type CoinGeckoPriceData = {
     [coinId: string]: {
         [chainId: string]: {
@@ -18,7 +18,10 @@ export declare class CoinGeckoSwapPrice extends ISwapPrice<{
             expiry: number;
         };
     };
-    constructor(url: string, coins: CoinGeckoPriceData);
+    constructor(url: string, coins: ISwapPriceCoinsMap<{
+        coinId: string;
+        decimals: number;
+    }>);
     /**
      * Returns coin price in mSat
      *

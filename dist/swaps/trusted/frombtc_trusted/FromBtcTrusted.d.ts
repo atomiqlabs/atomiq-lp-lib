@@ -20,6 +20,7 @@ export type FromBtcTrustedRequestType = {
 };
 export declare class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrustedSwapState> {
     readonly type = SwapHandlerType.FROM_BTC_TRUSTED;
+    readonly inflightSwapStates: Set<FromBtcTrustedSwapState>;
     readonly config: FromBtcTrustedConfig;
     readonly bitcoin: IBitcoinWallet;
     readonly bitcoinRpc: BitcoinRpc<BtcBlock>;

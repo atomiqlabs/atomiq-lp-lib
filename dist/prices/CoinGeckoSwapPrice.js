@@ -5,20 +5,7 @@ const ISwapPrice_1 = require("./ISwapPrice");
 const CACHE_DURATION = 15000;
 class CoinGeckoSwapPrice extends ISwapPrice_1.ISwapPrice {
     constructor(url, coins) {
-        const coinsMap = {};
-        for (let coinId in coins) {
-            const chains = coins[coinId];
-            for (let chainId in chains) {
-                const tokenData = chains[chainId];
-                if (coinsMap[chainId] == null)
-                    coinsMap[chainId] = {};
-                coinsMap[chainId][tokenData.address] = {
-                    coinId,
-                    decimals: tokenData.decimals
-                };
-            }
-        }
-        super(coinsMap);
+        super(coins);
         this.cache = {};
         this.url = url || "https://api.coingecko.com/api/v3";
     }

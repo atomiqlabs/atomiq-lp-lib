@@ -1,5 +1,7 @@
 import {StorageObject, IStorageManager} from "@atomiqlabs/base";
 import * as fs from "fs/promises";
+import {getLogger, LoggerType} from "../utils/Utils";
+import * as fsSync from "fs";
 
 export class StorageManager<T extends StorageObject> implements IStorageManager<T> {
 
@@ -8,8 +10,11 @@ export class StorageManager<T extends StorageObject> implements IStorageManager<
         [key: string]: T
     } = {};
 
+    private logger: LoggerType;
+
     constructor(directory: string) {
         this.directory = directory;
+        this.logger = getLogger("StorageManager("+directory+"): ");
     }
 
     async init(): Promise<void> {
@@ -38,16 +43,21 @@ export class StorageManager<T extends StorageObject> implements IStorageManager<
             if(this.data[paymentHash]!=null) delete this.data[paymentHash];
             await fs.rm(this.directory+"/"+paymentHash+".json");
         } catch (e) {
-            console.error(e);
+            this.logger.error("removeData(): Error when removing data: ", e);
         }
     }
 
     async loadData(type: new(data: any) => T): Promise<T[]> {
+        if(!fsSync.existsSync(this.directory)) {
+            this.logger.debug("loadData(): Data directory not found!");
+            return;
+        }
+
         let files;
         try {
             files = await fs.readdir(this.directory);
         } catch (e) {
-            console.error(e);
+            this.logger.error("loadData(): Error when checking directory: ", e);
             return [];
         }
 

@@ -3,7 +3,7 @@ import { BitcoinRpc, IStorageManager, SpvVaultClaimEvent, SpvVaultCloseEvent, Sp
 import { SpvVaultSwap } from "./SpvVaultSwap";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
 import { ISpvVaultSigner } from "../../wallets/ISpvVaultSigner";
-import { ChainData } from "../SwapHandler";
+import { MultichainData } from "../SwapHandler";
 export declare const VAULT_DUST_AMOUNT = 600;
 export declare class SpvVaults {
     readonly vaultStorage: IStorageManager<SpvVault>;
@@ -14,14 +14,9 @@ export declare class SpvVaults {
         vaultsCheckInterval: number;
         maxUnclaimedWithdrawals?: number;
     };
-    readonly getChain: (chainId: string) => ChainData;
-    readonly logger: {
-        debug: (msg: string, ...args: any) => void;
-        info: (msg: string, ...args: any) => void;
-        warn: (msg: string, ...args: any) => void;
-        error: (msg: string, ...args: any) => void;
-    };
-    constructor(vaultStorage: IStorageManager<SpvVault>, bitcoin: IBitcoinWallet, vaultSigner: ISpvVaultSigner, bitcoinRpc: BitcoinRpc<any>, getChain: (chainId: string) => ChainData, config: {
+    readonly chains: MultichainData;
+    readonly logger: import("../../utils/Utils").LoggerType;
+    constructor(vaultStorage: IStorageManager<SpvVault>, bitcoin: IBitcoinWallet, vaultSigner: ISpvVaultSigner, bitcoinRpc: BitcoinRpc<any>, chains: MultichainData, config: {
         vaultsCheckInterval: number;
         maxUnclaimedWithdrawals?: number;
     });

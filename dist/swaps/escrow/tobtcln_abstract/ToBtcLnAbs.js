@@ -18,9 +18,10 @@ const LightningAssertions_1 = require("../../assertions/LightningAssertions");
 class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     constructor(storageDirectory, path, chainData, lightning, swapPricing, config) {
         super(storageDirectory, path, chainData, swapPricing, config);
-        this.activeSubscriptions = new Set();
         this.type = SwapHandler_1.SwapHandlerType.TO_BTCLN;
         this.swapType = base_1.ChainSwapType.HTLC;
+        this.inflightSwapStates = new Set([ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED, ToBtcLnSwapAbs_1.ToBtcLnSwapState.PAID]);
+        this.activeSubscriptions = new Set();
         this.exactInAuths = {};
         this.lightning = lightning;
         this.LightningAssertions = new LightningAssertions_1.LightningAssertions(this.logger, lightning);
@@ -292,6 +293,21 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             }
         }
         if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED) {
+            try {
+                this.checkTooManyInflightSwaps();
+            }
+            catch (e) {
+                this.swapLogger.error(swap, "processInitialized(): checking too many inflight swaps error: ", e);
+                if ((0, Utils_1.isDefinedRuntimeError)(e)) {
+                    if (swap.metadata != null)
+                        swap.metadata.payError = e;
+                    await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE);
+                    await this.saveSwapData(swap);
+                    return;
+                }
+                else
+                    throw e;
+            }
             await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
             await this.saveSwapData(swap);
             try {
@@ -521,26 +537,13 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * Checks if the newly submitted PR has the same parameters (destination, cltv_delta, routes) as the initial dummy
      *  invoice sent for exactIn swap quote
      *
-     * @param pr
+     * @param parsedRequest
      * @param parsedAuth
-     * @throws {DefinedRuntimeError} will throw an error if the details don't match
      */
-    async checkPaymentRequestMatchesInitial(pr, parsedAuth) {
-        const parsedRequest = await this.lightning.parsePaymentRequest(pr);
-        if (parsedRequest.destination !== parsedAuth.initialInvoice.destination ||
-            parsedRequest.cltvDelta !== parsedAuth.initialInvoice.cltvDelta ||
-            parsedRequest.mtokens !== parsedAuth.amount * 1000n) {
-            throw {
-                code: 20102,
-                msg: "Provided PR doesn't match initial!"
-            };
-        }
-        if (!(0, ILightningWallet_1.routesMatch)(parsedRequest.routes, parsedAuth.initialInvoice.routes)) {
-            throw {
-                code: 20102,
-                msg: "Provided PR doesn't match initial (routes)!"
-            };
-        }
+    isPaymentRequestMatchingInitial(parsedRequest, parsedAuth) {
+        return parsedRequest.destination === parsedAuth.initialInvoice.destination &&
+            parsedRequest.cltvDelta === parsedAuth.initialInvoice.cltvDelta &&
+            (0, ILightningWallet_1.routesMatch)(parsedRequest.routes, parsedAuth.initialInvoice.routes);
     }
     startRestServer(restServer) {
         restServer.use(this.path + "/payInvoiceExactIn", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
@@ -561,12 +564,31 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     msg: "Invalid request body"
                 };
             }
+            this.checkTooManyInflightSwaps();
+            const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
             const responseStream = res.responseStream;
             const abortSignal = responseStream.getAbortSignal();
             //Check request params
-            const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
             const { parsedPR, halfConfidence } = await this.checkPaymentRequest(parsedAuth.chainIdentifier, parsedBody.pr);
-            await this.checkPaymentRequestMatchesInitial(parsedBody.pr, parsedAuth);
+            if (parsedPR.mtokens !== parsedAuth.amount * 1000n)
+                throw {
+                    code: 20102,
+                    msg: "Provided PR doesn't match requested (amount)!"
+                };
+            if (!this.isPaymentRequestMatchingInitial(parsedPR, parsedAuth)) {
+                //The provided payment request doesn't match the parameters from the initial one, try to probe/route again
+                // with the same max fee parameters
+                const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
+                const { networkFee, confidence } = await this.checkAndGetNetworkFee(parsedAuth.amount, parsedAuth.quotedNetworkFee, parsedAuth.swapExpiry, currentTimestamp, parsedBody.pr, parsedAuth.metadata, abortSignal);
+                this.logger.info("REST: /payInvoiceExactIn: re-checked network fee for exact-in swap," +
+                    " reqId: " + parsedBody.reqId +
+                    " initialNetworkFee: " + parsedAuth.quotedNetworkFee.toString(10) +
+                    " newNetworkFee: " + networkFee.toString(10) +
+                    " oldConfidence: " + parsedAuth.confidence.toString(10) +
+                    " newConfidence: " + confidence.toString(10) +
+                    " invoice: " + parsedBody.pr);
+                parsedAuth.confidence = confidence;
+            }
             const metadata = parsedAuth.metadata;
             const sequence = base_1.BigIntBufferUtils.fromBuffer((0, crypto_1.randomBytes)(8));
             const { swapContract, signer } = this.getChain(parsedAuth.chainIdentifier);
@@ -637,7 +659,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
                 offerer: (val) => val != null &&
                     typeof (val) === "string" &&
-                    chainInterface.isValidAddress(val) ? val : null,
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 exactIn: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
                 amount: SchemaVerifier_1.FieldTypeEnum.BigIntOptional
             });
@@ -658,6 +680,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const responseStream = res.responseStream;
             const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
             //Check request params
+            this.checkTooManyInflightSwaps();
             this.checkAmount(parsedBody.amount, parsedBody.exactIn);
             this.checkMaxFee(parsedBody.maxFee);
             this.checkExpiry(parsedBody.expiryTimestamp, currentTimestamp);
@@ -674,9 +697,12 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const abortController = (0, Utils_1.getAbortController)(responseStream);
             //Pre-fetch
             const { pricePrefetchPromise, signDataPrefetchPromise } = this.getToBtcPrefetches(chainIdentifier, useToken, responseStream, abortController);
+            const nativeBalancePrefetch = this.prefetchNativeBalanceIfNeeded(chainIdentifier, abortController);
             //Check if prior payment has been made
             await this.LightningAssertions.checkPriorPayment(parsedPR.id, abortController.signal);
             metadata.times.priorPaymentChecked = Date.now();
+            //Check if we still have enough native balance
+            await this.checkNativeBalance(chainIdentifier, nativeBalancePrefetch, abortController.signal);
             //Check amounts
             const { amountBD, networkFeeData, totalInToken, swapFee, swapFeeInToken, networkFeeInToken } = await this.AmountAssertions.checkToBtcAmount(this.type, request, { ...requestedAmount, pricePrefetch: pricePrefetchPromise }, fees, async (amountBD) => {
                 //Check if we have enough liquidity to process the swap
@@ -819,21 +845,23 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     code: 20007,
                     msg: "Payment not found"
                 };
-            if (payment.status === "pending")
-                throw {
-                    _httpStatus: 200,
+            if (payment.status === "pending") {
+                res.status(200).json({
                     code: 20008,
                     msg: "Payment in-flight"
-                };
-            if (payment.status === "confirmed")
-                throw {
-                    _httpStatus: 200,
+                });
+                return;
+            }
+            if (payment.status === "confirmed") {
+                res.status(200).json({
                     code: 20006,
                     msg: "Already paid",
                     data: {
                         secret: payment.secret
                     }
-                };
+                });
+                return;
+            }
             if (payment.status === "failed")
                 throw {
                     _httpStatus: 200,

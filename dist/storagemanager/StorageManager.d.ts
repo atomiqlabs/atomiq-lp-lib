@@ -4,6 +4,7 @@ export declare class StorageManager<T extends StorageObject> implements IStorage
     data: {
         [key: string]: T;
     };
+    private logger;
     constructor(directory: string);
     init(): Promise<void>;
     saveData(hash: string, object: T): Promise<void>;
