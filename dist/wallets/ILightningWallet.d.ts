@@ -30,6 +30,7 @@ export type LightningNetworkChannel = {
     id: string;
     capacity: bigint;
     isActive: boolean;
+    peerPublicKey: string;
     localBalance: bigint;
     localReserve: bigint;
     remoteBalance: bigint;
@@ -37,6 +38,21 @@ export type LightningNetworkChannel = {
     unsettledBalance: bigint;
     transactionId: string;
     transactionVout: number;
+};
+export type OpenChannelRequest = {
+    amountSats: bigint;
+    peerPublicKey: string;
+    peerAddress?: string;
+    feeRate?: number;
+    channelFees?: {
+        feeRatePPM?: bigint;
+        baseFeeMsat?: bigint;
+    };
+};
+export type CloseChannelRequest = {
+    channelId: string;
+    feeRate?: number;
+    forceClose?: boolean;
 };
 export type InvoiceInit = {
     mtokens: bigint;
@@ -112,6 +128,9 @@ export interface ILightningWallet {
     parsePaymentRequest(request: string): Promise<ParsedPaymentRequest>;
     getBlockheight(): Promise<number>;
     getChannels(activeOnly?: boolean): Promise<LightningNetworkChannel[]>;
+    getPendingChannels(): Promise<LightningNetworkChannel[]>;
+    openChannel(req: OpenChannelRequest): Promise<LightningNetworkChannel>;
+    closeChannel(req: CloseChannelRequest): Promise<string>;
     getLightningBalance(): Promise<LightningBalanceResponse>;
     getIdentityPublicKey(): Promise<string>;
 }
