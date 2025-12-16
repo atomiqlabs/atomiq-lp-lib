@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { ServerParamEncoder } from "./paramcoders/server/ServerParamEncoder";
+import { Transaction } from "@scure/btc-signer";
+import { BtcTx } from "@atomiqlabs/base";
 export type LoggerType = {
     debug: (msg: string, ...args: any[]) => void;
     info: (msg: string, ...args: any[]) => void;
@@ -27,3 +29,4 @@ export declare function bigIntSorter(a: bigint, b: bigint): -1 | 0 | 1;
  * @param responseStream
  */
 export declare function getAbortController(responseStream: ServerParamEncoder): AbortController;
+export declare function parsePsbt(btcTx: Transaction): BtcTx;

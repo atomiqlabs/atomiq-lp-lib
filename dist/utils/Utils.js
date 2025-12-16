@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = exports.getLogger = void 0;
+exports.parsePsbt = exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = exports.getLogger = void 0;
+const crypto_1 = require("crypto");
+const btc_signer_1 = require("@scure/btc-signer");
 function getLogger(prefix) {
     return {
         debug: (msg, ...args) => global.atomiqLogLevel >= 3 && console.debug((typeof (prefix) === "function" ? prefix() : prefix) + msg, ...args),
@@ -87,3 +89,41 @@ function getAbortController(responseStream) {
     return abortController;
 }
 exports.getAbortController = getAbortController;
+function parsePsbt(btcTx) {
+    const txWithoutWitness = btcTx.toBytes(true, false);
+    return {
+        locktime: btcTx.lockTime,
+        version: btcTx.version,
+        blockhash: null,
+        confirmations: 0,
+        txid: (0, crypto_1.createHash)("sha256").update((0, crypto_1.createHash)("sha256").update(txWithoutWitness).digest()).digest().reverse().toString("hex"),
+        hex: Buffer.from(txWithoutWitness).toString("hex"),
+        raw: Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
+        vsize: btcTx.isFinal ? btcTx.vsize : null,
+        outs: Array.from({ length: btcTx.outputsLength }, (_, i) => i).map((index) => {
+            const output = btcTx.getOutput(index);
+            return {
+                value: Number(output.amount),
+                n: index,
+                scriptPubKey: {
+                    asm: btc_signer_1.Script.decode(output.script).map(val => typeof (val) === "object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(output.script).toString("hex")
+                }
+            };
+        }),
+        ins: Array.from({ length: btcTx.inputsLength }, (_, i) => i).map(index => {
+            const input = btcTx.getInput(index);
+            return {
+                txid: Buffer.from(input.txid).toString("hex"),
+                vout: input.index,
+                scriptSig: {
+                    asm: btc_signer_1.Script.decode(input.finalScriptSig).map(val => typeof (val) === "object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(input.finalScriptSig).toString("hex")
+                },
+                sequence: input.sequence,
+                txinwitness: input.finalScriptWitness == null ? [] : input.finalScriptWitness.map(witness => Buffer.from(witness).toString("hex"))
+            };
+        })
+    };
+}
+exports.parsePsbt = parsePsbt;

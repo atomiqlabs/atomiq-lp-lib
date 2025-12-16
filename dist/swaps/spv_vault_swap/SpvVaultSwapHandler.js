@@ -420,7 +420,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const { spvVaultContract } = this.getChain(swap.chainIdentifier);
             let data;
             try {
-                data = await spvVaultContract.getWithdrawalData(await this.bitcoin.parsePsbt(transaction));
+                data = await spvVaultContract.getWithdrawalData((0, Utils_1.parsePsbt)(transaction));
             }
             catch (e) {
                 this.swapLogger.error(swap, "REST: /postQuote: failed to parse PSBT to withdrawal tx data: ", e);
@@ -463,7 +463,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     code: 20513,
                     msg: "One or more PSBT inputs not finalized!"
                 };
-            const effectiveFeeRate = await this.bitcoinRpc.getEffectiveFeeRate(await this.bitcoin.parsePsbt(signedTx));
+            const effectiveFeeRate = await this.bitcoinRpc.getEffectiveFeeRate((0, Utils_1.parsePsbt)(signedTx));
             if (effectiveFeeRate.feeRate < 1 || Math.round(effectiveFeeRate.feeRate) < swap.btcFeeRate)
                 throw {
                     code: 20511,

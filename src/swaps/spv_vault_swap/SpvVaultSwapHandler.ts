@@ -21,7 +21,13 @@ import {ISpvVaultSigner} from "../../wallets/ISpvVaultSigner";
 import {PluginManager} from "../../plugins/PluginManager";
 import {SpvVault} from "./SpvVault";
 import {serverParamDecoder} from "../../utils/paramcoders/server/ServerParamDecoder";
-import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../utils/Utils";
+import {
+    expressHandlerWrapper,
+    getAbortController,
+    HEX_REGEX,
+    isDefinedRuntimeError,
+    parsePsbt
+} from "../../utils/Utils";
 import {IParamReader} from "../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../utils/paramcoders/server/ServerParamEncoder";
 import {FieldTypeEnum} from "../../utils/paramcoders/SchemaVerifier";
@@ -558,7 +564,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
             let data: SpvWithdrawalTransactionData;
             try {
-                data = await spvVaultContract.getWithdrawalData(await this.bitcoin.parsePsbt(transaction));
+                data = await spvVaultContract.getWithdrawalData(parsePsbt(transaction));
             } catch (e) {
                 this.swapLogger.error(swap, "REST: /postQuote: failed to parse PSBT to withdrawal tx data: ", e);
                 throw {
@@ -606,7 +612,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 msg: "One or more PSBT inputs not finalized!"
             };
 
-            const effectiveFeeRate = await this.bitcoinRpc.getEffectiveFeeRate(await this.bitcoin.parsePsbt(signedTx));
+            const effectiveFeeRate = await this.bitcoinRpc.getEffectiveFeeRate(parsePsbt(signedTx));
             if(effectiveFeeRate.feeRate < 1 || Math.round(effectiveFeeRate.feeRate) < swap.btcFeeRate) throw {
                 code: 20511,
                 msg: "Bitcoin transaction fee too low, expected minimum: "+swap.btcFeeRate+" adjusted effective fee rate: "+effectiveFeeRate.feeRate

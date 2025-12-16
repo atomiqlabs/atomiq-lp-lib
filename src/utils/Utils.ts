@@ -1,5 +1,8 @@
 import {Request, Response} from "express";
 import {ServerParamEncoder} from "./paramcoders/server/ServerParamEncoder";
+import {createHash} from "crypto";
+import {Script, Transaction} from "@scure/btc-signer";
+import {BtcTx} from "@atomiqlabs/base";
 
 export type LoggerType = {
     debug: (msg: string, ...args: any[]) => void,
@@ -101,4 +104,47 @@ export function getAbortController(responseStream: ServerParamEncoder): AbortCon
     const responseStreamAbortController = responseStream.getAbortSignal();
     responseStreamAbortController.addEventListener("abort", () => abortController.abort(responseStreamAbortController.reason));
     return abortController;
+}
+
+export function parsePsbt(btcTx: Transaction): BtcTx {
+    const txWithoutWitness = btcTx.toBytes(true, false);
+    return {
+        locktime: btcTx.lockTime,
+        version: btcTx.version,
+        blockhash: null,
+        confirmations: 0,
+        txid: createHash("sha256").update(
+            createHash("sha256").update(
+                txWithoutWitness
+            ).digest()
+        ).digest().reverse().toString("hex"),
+        hex: Buffer.from(txWithoutWitness).toString("hex"),
+        raw: Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
+        vsize: btcTx.isFinal ? btcTx.vsize : null,
+
+        outs: Array.from({length: btcTx.outputsLength}, (_, i) => i).map((index) => {
+            const output = btcTx.getOutput(index);
+            return {
+                value: Number(output.amount),
+                n: index,
+                scriptPubKey: {
+                    asm: Script.decode(output.script).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(output.script).toString("hex")
+                }
+            }
+        }),
+        ins: Array.from({length: btcTx.inputsLength}, (_, i) => i).map(index => {
+            const input = btcTx.getInput(index);
+            return {
+                txid: Buffer.from(input.txid).toString("hex"),
+                vout: input.index,
+                scriptSig: {
+                    asm: Script.decode(input.finalScriptSig).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(input.finalScriptSig).toString("hex")
+                },
+                sequence: input.sequence,
+                txinwitness: input.finalScriptWitness==null ? [] : input.finalScriptWitness.map(witness => Buffer.from(witness).toString("hex"))
+            }
+        })
+    };
 }
