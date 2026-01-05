@@ -68,14 +68,6 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     await this.saveSwapData(swap);
                 }
             }
-            //Cancel the swaps where lightning invoice is expired
-            const decodedPR = await this.lightning.parsePaymentRequest(swap.pr);
-            const isInvoiceExpired = decodedPR.expiryEpochMillis < Date.now();
-            if (isInvoiceExpired) {
-                this.swapLogger.info(swap, "processPastSwap(state=SAVED): invoice expired, cancel uncommited swap, invoice: " + swap.pr);
-                await this.removeSwapData(swap, ToBtcLnSwapAbs_1.ToBtcLnSwapState.CANCELED);
-                return;
-            }
         }
         if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED || swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.PAID) {
             //Process swaps in commited & paid state
@@ -84,7 +76,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE) {
             //Remove expired swaps (as these can already be unilaterally refunded by the client), so we don't need
             // to be able to cooperatively refund them
-            if (await swapContract.isExpired(signer.getAddress(), swap.data)) {
+            if (await swapContract.isExpired(swap.data.getOfferer(), swap.data)) {
                 this.swapLogger.info(swap, "processPastSwap(state=NON_PAYABLE): swap expired, removing swap data, invoice: " + swap.pr);
                 await this.removeSwapData(swap);
             }
@@ -806,7 +798,16 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     msg: "Invalid request body/query (paymentHash/sequence)"
                 };
             this.checkSequence(parsedBody.sequence);
-            const data = await this.storageManager.getData(parsedBody.paymentHash, parsedBody.sequence);
+            let data = await this.storageManager.getData(parsedBody.paymentHash, parsedBody.sequence);
+            if (data == null) {
+                for (let chainId in this.chains.chains) {
+                    const _data = this.getSwapByEscrowHash(chainId, parsedBody.paymentHash);
+                    if (_data != null && _data.getSequence() === parsedBody.sequence) {
+                        data = _data;
+                        break;
+                    }
+                }
+            }
             const isSwapFound = data != null;
             if (isSwapFound) {
                 const { signer, swapContract } = this.getChain(data.chainIdentifier);
