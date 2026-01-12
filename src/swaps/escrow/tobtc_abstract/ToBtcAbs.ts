@@ -223,13 +223,14 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     }
 
     protected async processBtcTx(swap: ToBtcSwapAbs, tx: BtcTx): Promise<boolean> {
-        tx.confirmations = tx.confirmations || 0;
+        tx.confirmations = tx.confirmations ?? 0;
 
         //Check transaction has enough confirmations
         const hasEnoughConfirmations = tx.confirmations>=swap.requiredConfirmations;
-        if(!hasEnoughConfirmations) {
+        if(!hasEnoughConfirmations || tx.blockhash==null) {
             return false;
         }
+        const _tx = tx as BtcTx & {blockhash: string, confirmations: number};
 
         this.swapLogger.debug(swap, "processBtcTx(): address: "+swap.address+" amount: "+swap.amount.toString(10)+" btcTx: "+tx);
 
@@ -246,7 +247,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
         if(swap.metadata!=null) swap.metadata.times.payTxConfirmed = Date.now();
 
-        const success = await this.tryClaimSwap(tx, swap, vout.n);
+        const success = await this.tryClaimSwap(_tx, swap, vout.n);
 
         return success;
     }
