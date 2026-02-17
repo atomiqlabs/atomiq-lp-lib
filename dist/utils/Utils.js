@@ -31,7 +31,8 @@ function expressHandlerWrapper(func) {
                 await func(req, res);
             }
             catch (e) {
-                expressHandlerWrapperLogger.error("Error in called function " + req.path + ": ", e);
+                if (!isDefinedRuntimeError(e) || e._httpStatus !== 200)
+                    expressHandlerWrapperLogger.error("Error in called function " + req.path + ": ", e);
                 let statusCode = 500;
                 const obj = {
                     code: 0,
