@@ -23,6 +23,7 @@ export declare abstract class IBitcoinWallet {
     readonly network: BTC_NETWORK;
     protected constructor(network: BTC_NETWORK);
     toOutputScript(address: string): Buffer;
+    fromOutputScript(outputScript: Buffer): string;
     getSignedTransaction(destination: string, amount: number, feeRate?: number, nonce?: bigint, maxAllowedFeeRate?: number): Promise<SignPsbtResponse>;
     getSignedMultiTransaction(destinations: {
         address: string;
