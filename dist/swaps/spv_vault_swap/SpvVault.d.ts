@@ -32,6 +32,7 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
      */
     getConfirmedBalance(): SpvVaultTokenBalance[];
     serialize(): any;
+    static _getIdentifier(chainId: string, data: SpvVaultData): string;
     getIdentifier(): string;
     /**
      * Returns the latest vault utxo

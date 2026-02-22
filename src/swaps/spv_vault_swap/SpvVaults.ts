@@ -1,11 +1,12 @@
 import {SpvVault, SpvVaultState} from "./SpvVault";
 import {
-    BitcoinRpc,
+    BitcoinRpc, BtcBlock, BtcTx,
     IStorageManager,
     SpvVaultClaimEvent,
     SpvVaultCloseEvent,
     SpvVaultDepositEvent,
-    SpvVaultOpenEvent, SpvWithdrawalTransactionData
+    SpvVaultOpenEvent,
+    SpvWithdrawalTransactionData
 } from "@atomiqlabs/base";
 import {SpvVaultSwap} from "./SpvVaultSwap";
 import {bigIntSorter, getLogger} from "../../utils/Utils";
@@ -27,7 +28,7 @@ export class SpvVaults {
 
     readonly bitcoin: IBitcoinWallet;
     readonly vaultSigner: ISpvVaultSigner;
-    readonly bitcoinRpc: BitcoinRpc<any>;
+    readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
     readonly config: {vaultsCheckInterval: number, maxUnclaimedWithdrawals?: number};
     readonly chains: MultichainData;
 
@@ -563,6 +564,77 @@ export class SpvVaults {
 
     async init() {
         const vaults = await this.vaultStorage.loadData(SpvVault);
+    }
+
+    /**
+     * Recovers already created vaults for a given chain from on-chain data. Requires initialized BTC wallet to
+     *  fetch wallet transactions
+     *
+     * @param chainId
+     */
+    async recoverVaults(chainId: string): Promise<SpvVault[]> {
+        const chain = this.chains.chains[chainId];
+        if(chainId==null) throw new Error(`Chain ${chainId} not found in known chains!`);
+        const vaults = await chain.spvVaultContract.getAllVaults(chain.signer.getAddress());
+
+        const recoveredVaults: SpvVault[] = [];
+        let minimumBlockheight = null;
+
+        for(let vaultData of vaults) {
+            const vaultIdentifier = SpvVault._getIdentifier(chainId, vaultData);
+            if(this.vaultStorage.data[vaultIdentifier]!=null) {
+                this.logger.info(`recoverVaults(${chainId}): Skipping vault ${vaultIdentifier}, because it is already known!`);
+                continue;
+            }
+            const [txId, voutStr] = vaultData.getUtxo().split(":");
+            const btcTx = await this.bitcoinRpc.getTransaction(txId);
+            const btcTxOutput = btcTx.outs[parseInt(voutStr)];
+            const vaultAddress = this.bitcoin.fromOutputScript(Buffer.from(btcTxOutput.scriptPubKey.hex, "hex"));
+            const vault = new SpvVault(chainId, vaultData, vaultAddress);
+            vault.state = SpvVaultState.OPENED;
+            await this.saveVault(vault);
+            if(await this.bitcoinRpc.isSpent(vaultData.getUtxo())) {
+                if(!this.bitcoin.isReady())
+                    throw new Error("Bitcoin wallet is not ready, but is required to check wallet transactions!");
+
+                //The latest smart chain UTXO is spent, we need to check if we have some further transactions
+                // spending the vault UTXO in our wallet history
+                recoveredVaults.push(vault);
+                const btcTxBlock = await this.bitcoinRpc.getBlockHeader(btcTx.blockhash);
+                minimumBlockheight = minimumBlockheight==null
+                    ? btcTxBlock.getHeight()
+                    : Math.min(minimumBlockheight, btcTxBlock.getHeight());
+            }
+        }
+
+        if(minimumBlockheight!=null) {
+            const txinMap = new Map<string, BtcTx>();
+            const txs = await this.bitcoin.getWalletTransactions(minimumBlockheight);
+            txs.forEach(tx => {
+                tx.ins.forEach(txin => {
+                    txinMap.set(txin.txid+":"+txin.vout, tx);
+                })
+            });
+
+            for(let vault of recoveredVaults) {
+                let utxo = vault.data.getUtxo();
+                let btcTx: BtcTx;
+                do {
+                    btcTx = txinMap.get(utxo);
+                    if(btcTx!=null) {
+                        const withdrawalData = await chain.spvVaultContract.getWithdrawalData(btcTx);
+                        vault.addWithdrawal(withdrawalData);
+                        utxo = withdrawalData.getCreatedVaultUtxo();
+                    }
+                } while(btcTx!=null);
+            }
+        }
+
+        for(let vault of recoveredVaults) {
+            await this.saveVault(vault);
+        }
+
+        return recoveredVaults;
     }
 
 }

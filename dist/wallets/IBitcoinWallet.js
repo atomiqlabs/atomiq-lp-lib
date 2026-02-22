@@ -25,6 +25,9 @@ class IBitcoinWallet {
         }
         throw new Error("Unrecognized address type");
     }
+    fromOutputScript(outputScript) {
+        return (0, btc_signer_1.Address)(this.network).encode(btc_signer_1.OutScript.decode(outputScript));
+    }
     getSignedTransaction(destination, amount, feeRate, nonce, maxAllowedFeeRate) {
         return this.getSignedMultiTransaction([{ address: destination, amount }], feeRate, nonce, maxAllowedFeeRate);
     }

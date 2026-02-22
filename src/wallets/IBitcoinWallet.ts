@@ -49,6 +49,10 @@ export abstract class IBitcoinWallet {
         throw new Error("Unrecognized address type");
     }
 
+    fromOutputScript(outputScript: Buffer): string {
+        return Address(this.network).encode(OutScript.decode(outputScript));
+    }
+
     getSignedTransaction(destination: string, amount: number, feeRate?: number, nonce?: bigint, maxAllowedFeeRate?: number): Promise<SignPsbtResponse> {
         return this.getSignedMultiTransaction([{address: destination, amount}], feeRate, nonce, maxAllowedFeeRate);
     }

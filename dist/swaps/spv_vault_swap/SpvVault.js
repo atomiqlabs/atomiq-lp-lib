@@ -120,8 +120,11 @@ class SpvVault extends base_1.Lockable {
             scOpenTxs: this.scOpenTxs
         };
     }
+    static _getIdentifier(chainId, data) {
+        return chainId + "_" + data.getOwner() + "_" + data.getVaultId().toString(10);
+    }
     getIdentifier() {
-        return this.chainId + "_" + this.data.getOwner() + "_" + this.data.getVaultId().toString(10);
+        return SpvVault._getIdentifier(this.chainId, this.data);
     }
     /**
      * Returns the latest vault utxo

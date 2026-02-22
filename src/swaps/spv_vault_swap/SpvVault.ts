@@ -152,8 +152,12 @@ export class SpvVault<
         }
     }
 
+    static _getIdentifier(chainId: string, data: SpvVaultData): string {
+        return chainId+"_"+data.getOwner()+"_"+data.getVaultId().toString(10);
+    }
+
     getIdentifier(): string {
-        return this.chainId+"_"+this.data.getOwner()+"_"+this.data.getVaultId().toString(10);
+        return SpvVault._getIdentifier(this.chainId, this.data);
     }
 
     /**

@@ -1,5 +1,5 @@
 import { SpvVault } from "./SpvVault";
-import { BitcoinRpc, IStorageManager, SpvVaultClaimEvent, SpvVaultCloseEvent, SpvVaultDepositEvent, SpvVaultOpenEvent, SpvWithdrawalTransactionData } from "@atomiqlabs/base";
+import { BitcoinRpc, BtcBlock, IStorageManager, SpvVaultClaimEvent, SpvVaultCloseEvent, SpvVaultDepositEvent, SpvVaultOpenEvent, SpvWithdrawalTransactionData } from "@atomiqlabs/base";
 import { SpvVaultSwap } from "./SpvVaultSwap";
 import { IBitcoinWallet } from "../../wallets/IBitcoinWallet";
 import { ISpvVaultSigner } from "../../wallets/ISpvVaultSigner";
@@ -9,7 +9,7 @@ export declare class SpvVaults {
     readonly vaultStorage: IStorageManager<SpvVault>;
     readonly bitcoin: IBitcoinWallet;
     readonly vaultSigner: ISpvVaultSigner;
-    readonly bitcoinRpc: BitcoinRpc<any>;
+    readonly bitcoinRpc: BitcoinRpc<BtcBlock>;
     readonly config: {
         vaultsCheckInterval: number;
         maxUnclaimedWithdrawals?: number;
@@ -60,4 +60,11 @@ export declare class SpvVaults {
     saveVault(vault: SpvVault): Promise<void>;
     startVaultsWatchdog(): Promise<void>;
     init(): Promise<void>;
+    /**
+     * Recovers already created vaults for a given chain from on-chain data. Requires initialized BTC wallet to
+     *  fetch wallet transactions
+     *
+     * @param chainId
+     */
+    recoverVaults(chainId: string): Promise<SpvVault[]>;
 }
