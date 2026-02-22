@@ -61,7 +61,8 @@ export type OpenChannelRequest = {
     channelFees?: {
         feeRatePPM?: bigint,
         baseFeeMsat?: bigint
-    }
+    },
+    private?: boolean
 }
 
 export type CloseChannelRequest = {

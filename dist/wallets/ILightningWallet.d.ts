@@ -48,6 +48,7 @@ export type OpenChannelRequest = {
         feeRatePPM?: bigint;
         baseFeeMsat?: bigint;
     };
+    private?: boolean;
 };
 export type CloseChannelRequest = {
     channelId: string;
