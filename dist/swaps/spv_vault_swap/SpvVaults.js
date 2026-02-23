@@ -511,9 +511,9 @@ class SpvVaults {
             const btcTxOutput = btcTx.outs[parseInt(voutStr)];
             const vaultAddress = this.bitcoin.fromOutputScript(Buffer.from(btcTxOutput.scriptPubKey.hex, "hex"));
             const vault = new SpvVault_1.SpvVault(chainId, vaultData, vaultAddress);
-            vault.state = SpvVault_1.SpvVaultState.OPENED;
+            vault.state = vaultData.isOpened() ? SpvVault_1.SpvVaultState.OPENED : SpvVault_1.SpvVaultState.CLOSED;
             recoveredVaults.push(vault);
-            if (await this.bitcoinRpc.isSpent(vaultData.getUtxo())) {
+            if (vaultData.isOpened() && await this.bitcoinRpc.isSpent(vaultData.getUtxo())) {
                 if (!this.bitcoin.isReady())
                     throw new Error("Bitcoin wallet is not ready, but is required to check wallet transactions!");
                 //The latest smart chain UTXO is spent, we need to check if we have some further transactions

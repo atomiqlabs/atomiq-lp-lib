@@ -1,6 +1,8 @@
 import {SpvVault, SpvVaultState} from "./SpvVault";
 import {
-    BitcoinRpc, BtcBlock, BtcTx,
+    BitcoinRpc,
+    BtcBlock,
+    BtcTx,
     IStorageManager,
     SpvVaultClaimEvent,
     SpvVaultCloseEvent,
@@ -591,9 +593,9 @@ export class SpvVaults {
             const btcTxOutput = btcTx.outs[parseInt(voutStr)];
             const vaultAddress = this.bitcoin.fromOutputScript(Buffer.from(btcTxOutput.scriptPubKey.hex, "hex"));
             const vault = new SpvVault(chainId, vaultData, vaultAddress);
-            vault.state = SpvVaultState.OPENED;
+            vault.state = vaultData.isOpened() ? SpvVaultState.OPENED : SpvVaultState.CLOSED;
             recoveredVaults.push(vault);
-            if(await this.bitcoinRpc.isSpent(vaultData.getUtxo())) {
+            if(vaultData.isOpened() && await this.bitcoinRpc.isSpent(vaultData.getUtxo())) {
                 if(!this.bitcoin.isReady())
                     throw new Error("Bitcoin wallet is not ready, but is required to check wallet transactions!");
 
