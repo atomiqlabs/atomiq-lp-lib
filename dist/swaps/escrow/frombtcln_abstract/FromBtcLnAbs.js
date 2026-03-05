@@ -430,22 +430,6 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 code: 10001,
                 msg: "Invoice expired/canceled"
             };
-        const arr = invoice.description.split("-");
-        if (arr.length < 2)
-            throw {
-                _httpStatus: 200,
-                code: 10001,
-                msg: "Invoice expired/canceled"
-            };
-        const chainIdentifier = arr[0];
-        const address = arr[1];
-        const { chainInterface } = this.getChain(chainIdentifier);
-        if (!chainInterface.isValidAddress(address, true))
-            throw {
-                _httpStatus: 200,
-                code: 10001,
-                msg: "Invoice expired/canceled"
-            };
         switch (invoice.status) {
             case "canceled":
                 throw {
