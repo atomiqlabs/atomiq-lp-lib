@@ -17,7 +17,6 @@ export type FromBtcLnRequestType = {
     paymentHash: string;
     amount: bigint;
     token: string;
-    description?: string;
     descriptionHash?: string;
     exactOut?: boolean;
 };

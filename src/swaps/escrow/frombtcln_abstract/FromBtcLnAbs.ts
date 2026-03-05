@@ -27,7 +27,6 @@ import {
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
-import {FromBtcLnAutoSwapState} from "../frombtcln_autoinit/FromBtcLnAutoSwap";
 
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -40,7 +39,6 @@ export type FromBtcLnRequestType = {
     paymentHash: string,
     amount: bigint,
     token: string,
-    description?: string,
     descriptionHash?: string,
     exactOut?: boolean
 }
@@ -618,7 +616,6 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
-                description: FieldTypeEnum.StringOptional,
                 descriptionHash: FieldTypeEnum.StringOptional,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
@@ -627,6 +624,11 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 msg: "Invalid request body"
             };
             metadata.request = parsedBody;
+
+            const descriptionBodyPart = req.paramReader.getExistingParamsOrNull({
+                description: FieldTypeEnum.StringOptional
+            });
+            const description = descriptionBodyPart?.description;
 
             const requestedAmount = {input: !parsedBody.exactOut, amount: parsedBody.amount, token: parsedBody.token};
             const request = {
@@ -639,7 +641,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
 
             //Check request params
             this.checkTooManyInflightSwaps();
-            this.checkDescription(parsedBody.description);
+            this.checkDescription(description);
             this.checkDescriptionHash(parsedBody.descriptionHash);
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -692,7 +694,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
 
             //Create swap
             const hodlInvoiceObj: HodlInvoiceInit = {
-                description: parsedBody.description ?? (chainIdentifier+"-"+parsedBody.address),
+                description: description ?? (chainIdentifier+"-"+parsedBody.address),
                 cltvDelta:  Number(this.config.minCltv) + 5,
                 expiresAt: Date.now()+(this.config.invoiceTimeoutSeconds*1000),
                 id: parsedBody.paymentHash,

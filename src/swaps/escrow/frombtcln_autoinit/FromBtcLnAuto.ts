@@ -35,7 +35,6 @@ export type FromBtcLnAutoRequestType = {
     gasToken: string,
     gasAmount: bigint,
     claimerBounty: bigint,
-    description?: string,
     descriptionHash?: string,
     exactOut?: boolean
 }
@@ -623,7 +622,6 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
-                description: FieldTypeEnum.StringOptional,
                 descriptionHash: FieldTypeEnum.StringOptional,
                 exactOut: FieldTypeEnum.BooleanOptional,
                 gasToken: (val: string) => val!=null &&
@@ -636,6 +634,11 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                 code: 20100,
                 msg: "Invalid request body"
             };
+
+            const descriptionBodyPart = req.paramReader.getExistingParamsOrNull({
+                description: FieldTypeEnum.StringOptional
+            });
+            const description = descriptionBodyPart?.description;
 
             if(parsedBody.gasToken!==chainInterface.getNativeCurrencyAddress()) throw {
                 code: 20290,
@@ -668,7 +671,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             const gasToken = parsedBody.gasToken;
 
             //Check request params
-            this.checkDescription(parsedBody.description);
+            this.checkDescription(description);
             this.checkDescriptionHash(parsedBody.descriptionHash);
             this.checkTooManyInflightSwaps();
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
@@ -727,7 +730,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
             //Create swap
             const hodlInvoiceObj: HodlInvoiceInit = {
-                description: parsedBody.description ?? (chainIdentifier+"-"+parsedBody.address),
+                description: description ?? (chainIdentifier+"-"+parsedBody.address),
                 cltvDelta:  Number(this.config.minCltv) + 5,
                 expiresAt: Date.now()+(this.config.invoiceTimeoutSeconds*1000),
                 id: parsedBody.paymentHash,

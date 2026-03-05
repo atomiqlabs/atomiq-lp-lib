@@ -23,7 +23,6 @@ export type FromBtcLnAutoRequestType = {
     gasToken: string;
     gasAmount: bigint;
     claimerBounty: bigint;
-    description?: string;
     descriptionHash?: string;
     exactOut?: boolean;
 };

@@ -500,7 +500,6 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
-                description: SchemaVerifier_1.FieldTypeEnum.StringOptional,
                 descriptionHash: SchemaVerifier_1.FieldTypeEnum.StringOptional,
                 exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional
             });
@@ -510,6 +509,10 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     msg: "Invalid request body"
                 };
             metadata.request = parsedBody;
+            const descriptionBodyPart = req.paramReader.getExistingParamsOrNull({
+                description: SchemaVerifier_1.FieldTypeEnum.StringOptional
+            });
+            const description = descriptionBodyPart?.description;
             const requestedAmount = { input: !parsedBody.exactOut, amount: parsedBody.amount, token: parsedBody.token };
             const request = {
                 chainIdentifier,
@@ -520,7 +523,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const useToken = parsedBody.token;
             //Check request params
             this.checkTooManyInflightSwaps();
-            this.checkDescription(parsedBody.description);
+            this.checkDescription(description);
             this.checkDescriptionHash(parsedBody.descriptionHash);
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -551,7 +554,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             metadata.times.balanceChecked = Date.now();
             //Create swap
             const hodlInvoiceObj = {
-                description: parsedBody.description ?? (chainIdentifier + "-" + parsedBody.address),
+                description: description ?? (chainIdentifier + "-" + parsedBody.address),
                 cltvDelta: Number(this.config.minCltv) + 5,
                 expiresAt: Date.now() + (this.config.invoiceTimeoutSeconds * 1000),
                 id: parsedBody.paymentHash,
