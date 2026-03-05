@@ -17,6 +17,7 @@ export type FromBtcLnRequestType = {
     paymentHash: string;
     amount: bigint;
     token: string;
+    description?: string;
     descriptionHash?: string;
     exactOut?: boolean;
 };
@@ -50,6 +51,13 @@ export declare class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAb
      * @param invoice
      */
     private htlcReceived;
+    /**
+     * Checks invoice description
+     *
+     * @param description
+     * @throws {DefinedRuntimeError} will throw an error if the description is invalid
+     */
+    private checkDescription;
     /**
      * Checks invoice description hash
      *

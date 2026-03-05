@@ -361,6 +361,20 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         return true;
     }
     /**
+     * Checks invoice description
+     *
+     * @param description
+     * @throws {DefinedRuntimeError} will throw an error if the description is invalid
+     */
+    checkDescription(description) {
+        if (description != null && Buffer.byteLength(description, "utf8") > 500) {
+            throw {
+                code: 20100,
+                msg: "Invalid request body (description)"
+            };
+        }
+    }
+    /**
      * Checks invoice description hash
      *
      * @param descriptionHash
@@ -454,22 +468,6 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 code: 10001,
                 msg: "Invoice expired/canceled"
             };
-        const arr = invoice.description.split("-");
-        if (arr.length < 2)
-            throw {
-                _httpStatus: 200,
-                code: 10001,
-                msg: "Invoice expired/canceled"
-            };
-        const chainIdentifier = arr[0];
-        const address = arr[1];
-        const { chainInterface } = this.getChain(chainIdentifier);
-        if (!chainInterface.isValidAddress(address, true))
-            throw {
-                _httpStatus: 200,
-                code: 10001,
-                msg: "Invoice expired/canceled"
-            };
         switch (invoice.status) {
             case "canceled":
                 throw {
@@ -511,6 +509,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
              * amount: string               amount (in sats) of the invoice
              * token: string                Desired token to swap
              * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
+             * description: string          Description of the invoice (max 500 bytes)
              * descriptionHash: string      Description hash of the invoice
              * gasAmount: string            Desired amount in gas token to also get
              * gasToken: string
@@ -528,6 +527,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
+                description: SchemaVerifier_1.FieldTypeEnum.StringOptional,
                 descriptionHash: SchemaVerifier_1.FieldTypeEnum.StringOptional,
                 exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
                 gasToken: (val) => val != null &&
@@ -572,6 +572,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const useToken = parsedBody.token;
             const gasToken = parsedBody.gasToken;
             //Check request params
+            this.checkDescription(parsedBody.description);
             this.checkDescriptionHash(parsedBody.descriptionHash);
             this.checkTooManyInflightSwaps();
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount, gasTokenAmount);
@@ -606,7 +607,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             metadata.times.balanceChecked = Date.now();
             //Create swap
             const hodlInvoiceObj = {
-                description: chainIdentifier + "-" + parsedBody.address,
+                description: parsedBody.description ?? (chainIdentifier + "-" + parsedBody.address),
                 cltvDelta: Number(this.config.minCltv) + 5,
                 expiresAt: Date.now() + (this.config.invoiceTimeoutSeconds * 1000),
                 id: parsedBody.paymentHash,

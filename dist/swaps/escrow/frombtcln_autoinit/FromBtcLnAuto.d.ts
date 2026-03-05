@@ -23,6 +23,7 @@ export type FromBtcLnAutoRequestType = {
     gasToken: string;
     gasAmount: bigint;
     claimerBounty: bigint;
+    description?: string;
     descriptionHash?: string;
     exactOut?: boolean;
 };
@@ -63,6 +64,13 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
      */
     private htlcReceived;
     private offerHtlc;
+    /**
+     * Checks invoice description
+     *
+     * @param description
+     * @throws {DefinedRuntimeError} will throw an error if the description is invalid
+     */
+    private checkDescription;
     /**
      * Checks invoice description hash
      *

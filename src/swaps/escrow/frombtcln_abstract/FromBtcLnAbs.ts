@@ -40,6 +40,7 @@ export type FromBtcLnRequestType = {
     paymentHash: string,
     amount: bigint,
     token: string,
+    description?: string,
     descriptionHash?: string,
     exactOut?: boolean
 }
@@ -400,6 +401,21 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
     }
 
     /**
+     * Checks invoice description
+     *
+     * @param description
+     * @throws {DefinedRuntimeError} will throw an error if the description is invalid
+     */
+    private checkDescription(description: string) {
+        if(description!=null && Buffer.byteLength(description, "utf8") > 500) {
+            throw {
+                code: 20100,
+                msg: "Invalid request body (description)"
+            };
+        }
+    }
+
+    /**
      * Checks invoice description hash
      *
      * @param descriptionHash
@@ -535,22 +551,6 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             msg: "Invoice expired/canceled"
         };
 
-        const arr = invoice.description.split("-");
-        if(arr.length<2) throw {
-            _httpStatus: 200,
-            code: 10001,
-            msg: "Invoice expired/canceled"
-        };
-        const chainIdentifier = arr[0];
-        const address = arr[1];
-
-        const {chainInterface} = this.getChain(chainIdentifier);
-        if(!chainInterface.isValidAddress(address, true)) throw {
-            _httpStatus: 200,
-            code: 10001,
-            msg: "Invoice expired/canceled"
-        };
-
         switch(invoice.status) {
             case "canceled":
                 throw {
@@ -600,6 +600,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
              * amount: string               amount (in sats) of the invoice
              * token: string                Desired token to swap
              * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
+             * description: string          Description of the invoice (max 500 bytes)
              * descriptionHash: string      Description hash of the invoice
              *
              *Sent later:
@@ -617,6 +618,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
+                description: FieldTypeEnum.StringOptional,
                 descriptionHash: FieldTypeEnum.StringOptional,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
@@ -637,6 +639,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
 
             //Check request params
             this.checkTooManyInflightSwaps();
+            this.checkDescription(parsedBody.description);
             this.checkDescriptionHash(parsedBody.descriptionHash);
             const fees = await this.AmountAssertions.preCheckFromBtcAmounts(this.type, request, requestedAmount);
             metadata.times.requestChecked = Date.now();
@@ -689,7 +692,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
 
             //Create swap
             const hodlInvoiceObj: HodlInvoiceInit = {
-                description: chainIdentifier+"-"+parsedBody.address,
+                description: parsedBody.description ?? (chainIdentifier+"-"+parsedBody.address),
                 cltvDelta:  Number(this.config.minCltv) + 5,
                 expiresAt: Date.now()+(this.config.invoiceTimeoutSeconds*1000),
                 id: parsedBody.paymentHash,
