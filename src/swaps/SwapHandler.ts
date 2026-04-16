@@ -179,8 +179,8 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
      * @param ultimateState set the ultimate state of the swap before removing
      */
     protected async removeSwapData(swap: V, ultimateState?: S) {
-        this.inflightSwaps.delete(swap.getIdentifier());
-        this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+        if(this.inflightSwaps.delete(swap.getIdentifier()))
+            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
         if(ultimateState!=null) await swap.setState(ultimateState);
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
@@ -188,12 +188,15 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     }
 
     protected async saveSwapData(swap: V) {
+        const identifier = swap.getIdentifier();
         if(this.inflightSwapStates.has(swap.state)) {
-            this.inflightSwaps.add(swap.getIdentifier());
-            this.logger.debug("removeSwapData(): Adding in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+            if(!this.inflightSwaps.has(identifier)) {
+                this.inflightSwaps.add(identifier);
+                this.logger.debug("saveSwapData(): Adding in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+            }
         } else {
-            this.inflightSwaps.delete(swap.getIdentifier());
-            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+            if(this.inflightSwaps.delete(identifier))
+                this.logger.debug("saveSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
         }
         await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
     }
@@ -232,8 +235,13 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
         const minNativeTokenReserve: bigint = this.config.minNativeBalances?.[chainIdentifier] ?? 0n;
         if(minNativeTokenReserve===0n) return;
         const balance = await balancePrefetch;
+        if(signal!=null) signal.throwIfAborted();
 
-        if(balance==null || balance < minNativeTokenReserve) {
+        if(balance==null) {
+            throw new Error("Failed to fetch native token balance!");
+        }
+
+        if(balance < minNativeTokenReserve) {
             throw {
                 code: 20012,
                 msg: "LP ran out of native token to cover gas fees"

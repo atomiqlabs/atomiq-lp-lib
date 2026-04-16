@@ -1,10 +1,11 @@
 {
   "name": "@atomiqlabs/lp-lib",
-  "version": "17.1.1",
+  "version": "17.1.2",
   "description": "Main functionality implementation for atomiq LP node",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
   "scripts": {
+    "build": "npx -y -p typescript@4.9 tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "files": [
