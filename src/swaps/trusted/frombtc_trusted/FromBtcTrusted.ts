@@ -11,6 +11,7 @@ import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamE
 import {FieldTypeEnum, verifySchema} from "../../../utils/paramcoders/SchemaVerifier";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {FromBtcAmountAssertions} from "../../assertions/FromBtcAmountAssertions";
+import {isQuoteThrow} from "../../../plugins/IPlugin";
 
 export type FromBtcTrustedConfig = SwapBaseConfig & {
     doubleSpendCheckInterval: number,
@@ -67,49 +68,51 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
     }
 
     private async refundSwap(swap: FromBtcTrustedSwap) {
-        if(swap.refundAddress==null) {
-            if(swap.state!==FromBtcTrustedSwapState.REFUNDABLE) {
-                await swap.setState(FromBtcTrustedSwapState.REFUNDABLE);
-                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
-            }
-            return;
+        if(swap.state!==FromBtcTrustedSwapState.REFUNDABLE) {
+            await swap.setState(FromBtcTrustedSwapState.REFUNDABLE);
+            await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
         }
 
-        let unlock = swap.lock(30*1000);
+        if(swap.refundAddress==null) return;
+
+        let unlock = swap.lock(Infinity);
         if(unlock==null) return;
 
-        const feeRate = await this.bitcoin.getFeeRate();
+        try {
+            const feeRate = await this.bitcoin.getFeeRate();
 
-        const ourOutput = swap.btcTx.outs[swap.vout];
+            const ourOutput = swap.btcTx.outs[swap.vout];
 
-        const resp = await this.bitcoin.drainAll(swap.refundAddress, [{
-            type: this.bitcoin.getAddressType(),
-            confirmations: swap.btcTx.confirmations,
-            outputScript: Buffer.from(ourOutput.scriptPubKey.hex, "hex"),
-            value: ourOutput.value,
-            txId: swap.btcTx.txid,
-            vout: swap.vout
-        }], feeRate);
+            const resp = await this.bitcoin.drainAll(swap.refundAddress, [{
+                type: this.bitcoin.getAddressType(),
+                confirmations: swap.btcTx.confirmations,
+                outputScript: Buffer.from(ourOutput.scriptPubKey.hex, "hex"),
+                value: ourOutput.value,
+                txId: swap.btcTx.txid,
+                vout: swap.vout
+            }], feeRate);
 
-        if(resp==null) {
-            this.swapLogger.error(swap, "refundSwap(): cannot refund swap because of dust limit, txId: "+swap.txId);
+            if(resp==null) {
+                this.swapLogger.error(swap, "refundSwap(): cannot refund swap because of dust limit, txId: "+swap.txId);
+                unlock();
+                return;
+            }
+
+            if(swap.metadata!=null) swap.metadata.times.refundSignPSBT = Date.now();
+            this.swapLogger.debug(swap, "refundSwap(): signed raw transaction: "+resp.raw);
+
+            const refundTxId = resp.txId;
+            swap.refundTxId = refundTxId;
+
+            //Send the refund TX
+            await this.bitcoin.sendRawTransaction(resp.raw);
+            this.swapLogger.debug(swap, "refundSwap(): sent refund transaction: "+refundTxId);
+
+            this.refundedSwaps.set(swap.getIdentifierHash(), refundTxId);
+            await this.removeSwapData(swap, FromBtcTrustedSwapState.REFUNDED);
+        } finally {
             unlock();
-            return;
         }
-
-        if(swap.metadata!=null) swap.metadata.times.refundSignPSBT = Date.now();
-        this.swapLogger.debug(swap, "refundSwap(): signed raw transaction: "+resp.raw);
-
-        const refundTxId = resp.txId;
-        swap.refundTxId = refundTxId;
-
-        //Send the refund TX
-        await this.bitcoin.sendRawTransaction(resp.raw);
-        this.swapLogger.debug(swap, "refundSwap(): sent refund transaction: "+refundTxId);
-
-        this.refundedSwaps.set(swap.getIdentifierHash(), refundTxId);
-        await this.removeSwapData(swap, FromBtcTrustedSwapState.REFUNDED);
-        unlock();
     }
 
     private async burn(swap: FromBtcTrustedSwap) {
@@ -293,10 +296,27 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
 
             if(swap.state!==FromBtcTrustedSwapState.BTC_CONFIRMED) return;
 
+            const txns = await chainInterface.txsTransfer(signer.getAddress(), swap.token, swap.adjustedOutput, swap.dstAddress);
+
             let unlock = swap.lock(30*1000);
             if(unlock==null) return;
 
-            const txns = await chainInterface.txsTransfer(signer.getAddress(), swap.token, swap.adjustedOutput, swap.dstAddress);
+            const pluginCheckResult = await PluginManager.onHandlePreFromBtcExecute(
+                SwapHandlerType.FROM_BTC_TRUSTED,
+                swap
+            );
+            if(isQuoteThrow(pluginCheckResult)) {
+                this.swapLogger.error(swap, "processPastSwap(): Error, got negative response from plugin: ", pluginCheckResult);
+                await this.refundSwap(swap);
+                unlock();
+                return;
+            }
+
+            if(swap.state!==FromBtcTrustedSwapState.BTC_CONFIRMED) {
+                unlock();
+                return;
+            }
+
             await chainInterface.sendAndConfirm(signer, txns, true, null, false, async (txId: string, rawTx: string) => {
                 swap.txIds = {init: txId};
                 swap.scRawTx = rawTx;

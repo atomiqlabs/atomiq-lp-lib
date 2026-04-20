@@ -16,7 +16,8 @@ import {
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
 import {FromBtcAmountAssertions} from "../../assertions/FromBtcAmountAssertions";
-import { LightningAssertions } from "../../assertions/LightningAssertions";
+import {LightningAssertions} from "../../assertions/LightningAssertions";
+import {isQuoteThrow} from "../../../plugins/IPlugin";
 
 export type SwapForGasServerConfig = SwapBaseConfig & {
     minCltv: bigint,
@@ -226,6 +227,24 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
 
             let unlock = invoiceData.lock(Infinity);
             if(unlock==null) return;
+
+            const pluginCheckResult = await PluginManager.onHandlePreFromBtcExecute(
+                SwapHandlerType.FROM_BTCLN_TRUSTED,
+                invoiceData
+            );
+            if(isQuoteThrow(pluginCheckResult)) {
+                await this.cancelSwapAndInvoice(invoiceData);
+                unlock();
+                throw {
+                    code: 29999,
+                    msg: pluginCheckResult.message
+                };
+            }
+
+            if(invoiceData.state!==FromBtcLnTrustedSwapState.RECEIVED) {
+                unlock();
+                return;
+            }
 
             const result = await chainInterface.sendAndConfirm(signer, txns, true, null, false, async (txId: string, rawTx: string) => {
                 invoiceData.txIds = {init: txId};

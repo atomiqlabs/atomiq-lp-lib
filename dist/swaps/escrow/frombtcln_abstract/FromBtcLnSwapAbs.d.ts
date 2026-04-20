@@ -30,4 +30,5 @@ export declare class FromBtcLnSwapAbs<T extends SwapData = SwapData> extends Fro
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;
+    getDestinationAddress(): string;
 }

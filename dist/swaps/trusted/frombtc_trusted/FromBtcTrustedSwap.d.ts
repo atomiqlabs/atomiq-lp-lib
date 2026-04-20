@@ -49,4 +49,5 @@ export declare class FromBtcTrustedSwap extends SwapHandlerSwap<FromBtcTrustedSw
     isInitiated(): boolean;
     isSuccess(): boolean;
     getIdentifierHash(): string;
+    getDestinationAddress(): string;
 }

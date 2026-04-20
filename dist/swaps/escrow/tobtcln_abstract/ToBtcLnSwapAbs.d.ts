@@ -21,4 +21,5 @@ export declare class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtc
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;
+    getDestinationAddress(): string;
 }

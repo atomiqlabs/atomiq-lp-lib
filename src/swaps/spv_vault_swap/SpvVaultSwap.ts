@@ -225,4 +225,8 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
         return this.state===SpvVaultSwapState.CLAIMED;
     }
 
+    getDestinationAddress(): string {
+        return this.recipient;
+    }
+
 }

@@ -28,6 +28,8 @@ import {
     routesMatch
 } from "../../../wallets/ILightningWallet";
 import { LightningAssertions } from "../../assertions/LightningAssertions";
+import {isQuoteThrow} from "../../../plugins/IPlugin";
+import {ToBtcSwapState} from "../tobtc_abstract/ToBtcSwapAbs";
 
 export type ToBtcLnConfig = ToBtcBaseConfig & {
     routingFeeMultiplier: bigint,
@@ -305,7 +307,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         return true;
     }
 
-    private async sendLightningPayment(swap: ToBtcLnSwapAbs): Promise<void> {
+    private async sendLightningPayment(swap: ToBtcLnSwapAbs): Promise<boolean> {
         const decodedPR = await this.lightning.parsePaymentRequest(swap.pr);
         const expiryTimestamp: bigint = swap.data.getExpiry();
         const currentTimestamp: bigint = BigInt(Math.floor(Date.now()/1000));
@@ -336,6 +338,19 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
         const blockHeight = await this.lightning.getBlockheight();
 
+        const pluginCheckResult = await PluginManager.onHandlePreToBtcExecute(
+            SwapHandlerType.TO_BTCLN,
+            swap
+        );
+        if(isQuoteThrow(pluginCheckResult)) {
+            throw {
+                code: 29999,
+                msg: pluginCheckResult.message
+            };
+        }
+
+        if(swap.state!==ToBtcLnSwapState.COMMITED) return false;
+
         swap.payInitiated = true;
         await this.saveSwapData(swap);
         try {
@@ -354,6 +369,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             }
         }
         if(swap.metadata!=null) swap.metadata.times.payComplete = Date.now();
+
+        return true;
     }
 
     /**
@@ -404,7 +421,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             await swap.setState(ToBtcLnSwapState.COMMITED);
             await this.saveSwapData(swap);
             try {
-                await this.sendLightningPayment(swap);
+                if(!await this.sendLightningPayment(swap)) return;
             } catch (e) {
                 this.swapLogger.error(swap, "processInitialized(): lightning payment error", e);
                 if(isDefinedRuntimeError(e)) {

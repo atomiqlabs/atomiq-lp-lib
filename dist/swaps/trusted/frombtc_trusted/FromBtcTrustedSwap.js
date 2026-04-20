@@ -114,5 +114,8 @@ class FromBtcTrustedSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     getIdentifierHash() {
         return (0, crypto_1.createHash)("sha256").update(this.btcAddress).digest().toString("hex");
     }
+    getDestinationAddress() {
+        return this.dstAddress;
+    }
 }
 exports.FromBtcTrustedSwap = FromBtcTrustedSwap;

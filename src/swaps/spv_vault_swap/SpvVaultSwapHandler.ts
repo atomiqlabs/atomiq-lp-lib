@@ -37,6 +37,7 @@ import {Transaction} from "@scure/btc-signer";
 import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
 import {isLegacyInput} from "../../utils/BitcoinUtils";
 import {AmountAssertions} from "../assertions/AmountAssertions";
+import {isQuoteThrow} from "../../plugins/IPlugin";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
@@ -599,7 +600,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             if(swap.vaultUtxo!==vault.getLatestUtxo()) {
                 throw {
                     code: 20510,
-                    msg: "Vault UTXO already spent, please try again!"
+                    msg: "Vault UTXO already spent, please get another quote and try again!"
                 };
             }
 
@@ -624,11 +625,25 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 msg: "Bitcoin transaction size too large, maximum: "+TX_MAX_VSIZE+" actual: "+txVsize
             };
 
+            const pluginCheckResult = await PluginManager.onHandlePreFromBtcExecute(
+                SwapHandlerType.FROM_BTC_SPV,
+                swap
+            );
+            if(isQuoteThrow(pluginCheckResult)) {
+                const error = {
+                    code: 29999,
+                    msg: pluginCheckResult.message
+                }
+                if(swap.metadata!=null) swap.metadata.postQuoteError = error;
+                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                throw error;
+            }
+
             await this.Vaults.checkVaultReplacedTransactions(vault, true);
             if(swap.vaultUtxo!==vault.getLatestUtxo()) {
                 throw {
                     code: 20510,
-                    msg: "Vault UTXO already spent, please try again!"
+                    msg: "Vault UTXO already spent, please get another quote and try again!"
                 };
             }
 

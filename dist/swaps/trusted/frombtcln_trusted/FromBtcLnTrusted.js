@@ -9,6 +9,7 @@ const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const PluginManager_1 = require("../../../plugins/PluginManager");
 const FromBtcAmountAssertions_1 = require("../../assertions/FromBtcAmountAssertions");
 const LightningAssertions_1 = require("../../assertions/LightningAssertions");
+const IPlugin_1 = require("../../../plugins/IPlugin");
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
@@ -183,6 +184,19 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             let unlock = invoiceData.lock(Infinity);
             if (unlock == null)
                 return;
+            const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTCLN_TRUSTED, invoiceData);
+            if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
+                await this.cancelSwapAndInvoice(invoiceData);
+                unlock();
+                throw {
+                    code: 29999,
+                    msg: pluginCheckResult.message
+                };
+            }
+            if (invoiceData.state !== FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED) {
+                unlock();
+                return;
+            }
             const result = await chainInterface.sendAndConfirm(signer, txns, true, null, false, async (txId, rawTx) => {
                 invoiceData.txIds = { init: txId };
                 invoiceData.scRawTx = rawTx;

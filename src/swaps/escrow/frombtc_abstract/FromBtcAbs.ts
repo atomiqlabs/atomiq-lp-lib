@@ -20,6 +20,8 @@ import {IParamReader} from "../../../utils/paramcoders/IParamReader";
 import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamEncoder";
 import {FromBtcBaseConfig, FromBtcBaseSwapHandler} from "../FromBtcBaseSwapHandler";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
+import {isQuoteThrow} from "../../../plugins/IPlugin";
+import {FromBtcLnSwapState} from "../frombtcln_abstract/FromBtcLnSwapAbs";
 
 export type FromBtcConfig = FromBtcBaseConfig & {
     confirmations: number,
@@ -408,6 +410,15 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             createdSwap.timeout = sigData.timeout;
             createdSwap.signature = sigData.signature;
             createdSwap.feeRate = sigData.feeRate;
+
+            const pluginCheckResult = await PluginManager.onHandlePreFromBtcExecute(
+                SwapHandlerType.FROM_BTC,
+                createdSwap
+            );
+            if(isQuoteThrow(pluginCheckResult)) throw {
+                code: 29999,
+                msg: pluginCheckResult.message
+            };
 
             await PluginManager.swapCreate(createdSwap);
             await this.saveSwapData(createdSwap);

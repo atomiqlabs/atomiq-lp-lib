@@ -1,6 +1,6 @@
 import { BitcoinRpc, SwapData } from "@atomiqlabs/base";
 import { IPlugin, PluginQuote, QuoteAmountTooHigh, QuoteAmountTooLow, QuoteSetFees, QuoteThrow, ToBtcPluginQuote } from "./IPlugin";
-import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
+import { FromBtcLnAutoSwap, FromBtcLnRequestType, FromBtcLnSwapAbs, FromBtcLnTrustedSwap, FromBtcRequestType, FromBtcSwapAbs, FromBtcTrustedRequestType, FromBtcTrustedSwap, ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcLnSwapAbs, ToBtcRequestType, ToBtcSwapAbs } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
 import { IBitcoinWallet } from "../wallets/IBitcoinWallet";
@@ -73,6 +73,7 @@ export declare class PluginManager {
         amount: bigint;
         token: string;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
+    static onHandlePreFromBtcExecute(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV | SwapHandlerType.FROM_BTCLN_AUTO, swap: FromBtcLnSwapAbs | FromBtcSwapAbs | FromBtcLnTrustedSwap | FromBtcTrustedSwap | SpvVaultSwap | FromBtcLnAutoSwap): Promise<QuoteThrow | null>;
     static onHandlePostToBtcQuote<T extends {
         networkFee: bigint;
     }>(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
@@ -101,6 +102,7 @@ export declare class PluginManager {
         baseFeeInBtc: bigint;
         feePPM: bigint;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh>;
+    static onHandlePreToBtcExecute(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, swap: ToBtcLnSwapAbs | ToBtcSwapAbs): Promise<QuoteThrow | null>;
     static onHandlePostedFromBtcQuote(swapType: SwapHandlerType.FROM_BTC_SPV, request: RequestData<SpvVaultPostQuote>, swap: SpvVaultSwap): Promise<QuoteThrow | null>;
     static onVaultSelection(chainIdentifier: string, totalSats: bigint, requestedAmount: {
         amount: bigint;

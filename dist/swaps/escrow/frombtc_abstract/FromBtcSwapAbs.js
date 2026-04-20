@@ -46,5 +46,8 @@ class FromBtcSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     getTotalInputAmount() {
         return this.amount;
     }
+    getDestinationAddress() {
+        return this.data.getClaimer();
+    }
 }
 exports.FromBtcSwapAbs = FromBtcSwapAbs;

@@ -19,6 +19,7 @@ import {
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
+import {isQuoteThrow} from "../../../plugins/IPlugin";
 
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -419,6 +420,20 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             timeout: invoiceData.timeout,
             signature: invoiceData.signature
         }, true);
+
+        const pluginCheckResult = await PluginManager.onHandlePreFromBtcExecute(
+            SwapHandlerType.FROM_BTCLN_AUTO,
+            invoiceData
+        );
+        if(isQuoteThrow(pluginCheckResult)) {
+            const error = {
+                code: 29999,
+                msg: pluginCheckResult.message
+            };
+            if(invoiceData.metadata!=null) invoiceData.metadata.htlcOfferError = error;
+            if(invoiceData.state===FromBtcLnAutoSwapState.RECEIVED) await this.cancelSwapAndInvoice(invoiceData);
+            throw error;
+        }
 
         if(invoiceData.state===FromBtcLnAutoSwapState.RECEIVED) {
             //Re-check the current HTLC count

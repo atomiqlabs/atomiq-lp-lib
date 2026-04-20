@@ -14,6 +14,7 @@ const btc_signer_1 = require("@scure/btc-signer");
 const SpvVaults_1 = require("./SpvVaults");
 const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 const AmountAssertions_1 = require("../assertions/AmountAssertions");
+const IPlugin_1 = require("../../plugins/IPlugin");
 const TX_MAX_VSIZE = 16 * 1024;
 class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config) {
@@ -452,7 +453,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             if (swap.vaultUtxo !== vault.getLatestUtxo()) {
                 throw {
                     code: 20510,
-                    msg: "Vault UTXO already spent, please try again!"
+                    msg: "Vault UTXO already spent, please get another quote and try again!"
                 };
             }
             //Create abortController for parallel prefetches
@@ -475,11 +476,22 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     code: 20516,
                     msg: "Bitcoin transaction size too large, maximum: " + TX_MAX_VSIZE + " actual: " + txVsize
                 };
+            const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTC_SPV, swap);
+            if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
+                const error = {
+                    code: 29999,
+                    msg: pluginCheckResult.message
+                };
+                if (swap.metadata != null)
+                    swap.metadata.postQuoteError = error;
+                await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                throw error;
+            }
             await this.Vaults.checkVaultReplacedTransactions(vault, true);
             if (swap.vaultUtxo !== vault.getLatestUtxo()) {
                 throw {
                     code: 20510,
-                    msg: "Vault UTXO already spent, please try again!"
+                    msg: "Vault UTXO already spent, please get another quote and try again!"
                 };
             }
             try {

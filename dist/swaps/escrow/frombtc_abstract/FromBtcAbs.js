@@ -10,6 +10,7 @@ const PluginManager_1 = require("../../../plugins/PluginManager");
 const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const ServerParamDecoder_1 = require("../../../utils/paramcoders/server/ServerParamDecoder");
 const FromBtcBaseSwapHandler_1 = require("../FromBtcBaseSwapHandler");
+const IPlugin_1 = require("../../../plugins/IPlugin");
 /**
  * Swap handler handling from BTC swaps using PTLCs (proof-time locked contracts) and btc relay (on-chain bitcoin SPV)
  */
@@ -281,6 +282,12 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             createdSwap.timeout = sigData.timeout;
             createdSwap.signature = sigData.signature;
             createdSwap.feeRate = sigData.feeRate;
+            const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTC, createdSwap);
+            if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult))
+                throw {
+                    code: 29999,
+                    msg: pluginCheckResult.message
+                };
             await PluginManager_1.PluginManager.swapCreate(createdSwap);
             await this.saveSwapData(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: " + receiveAddress + " amount: " + amountBD.toString(10));

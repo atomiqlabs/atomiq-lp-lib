@@ -23,6 +23,8 @@ import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamE
 import {ToBtcBaseConfig, ToBtcBaseSwapHandler} from "../ToBtcBaseSwapHandler";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {checkTransactionReplaced} from "../../../utils/BitcoinUtils";
+import {isQuoteThrow} from "../../../plugins/IPlugin";
+import {FromBtcLnAutoSwapState} from "../frombtcln_autoinit/FromBtcLnAutoSwap";
 
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
 
@@ -435,8 +437,32 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         }
 
         if(swap.state===ToBtcSwapState.COMMITED) {
-            const unlock: () => boolean = swap.lock(60);
+            const unlock: () => boolean = swap.lock(Infinity);
             if(unlock==null) return;
+
+            const pluginCheckResult = await PluginManager.onHandlePreToBtcExecute(
+                SwapHandlerType.TO_BTC,
+                swap
+            );
+            if(isQuoteThrow(pluginCheckResult)) {
+                const error = {
+                    code: 29999,
+                    msg: pluginCheckResult.message
+                };
+                this.swapLogger.error(swap, "processInitialized(state=COMMITED): setting state to NON_PAYABLE due to send bitcoin payment error", error);
+                if(swap.metadata!=null) swap.metadata.payError = error;
+                unlock();
+                if(swap.state===ToBtcSwapState.COMMITED) {
+                    await swap.setState(ToBtcSwapState.NON_PAYABLE);
+                    await this.saveSwapData(swap);
+                }
+                return;
+            }
+
+            if(swap.state!==ToBtcSwapState.COMMITED) {
+                unlock();
+                return;
+            }
 
             this.swapLogger.debug(swap, "processInitialized(state=COMMITED): sending bitcoin transaction, address: "+swap.address);
 
@@ -453,9 +479,9 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     this.swapLogger.error(swap, "processInitialized(state=COMMITED): send bitcoin payment error", e);
                     throw e;
                 }
+            } finally {
+                unlock();
             }
-
-            unlock();
         }
 
         if(swap.state===ToBtcSwapState.NON_PAYABLE) return;

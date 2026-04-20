@@ -11,6 +11,7 @@ const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const ServerParamDecoder_1 = require("../../../utils/paramcoders/server/ServerParamDecoder");
 const FromBtcBaseSwapHandler_1 = require("../FromBtcBaseSwapHandler");
 const LightningAssertions_1 = require("../../assertions/LightningAssertions");
+const IPlugin_1 = require("../../../plugins/IPlugin");
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
@@ -291,6 +292,18 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         //No need to check abortController anymore since all pending promises are resolved by now
         if (invoiceData.metadata != null)
             invoiceData.metadata.times.htlcSwapSigned = Date.now();
+        const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTCLN, invoiceData);
+        if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
+            const error = {
+                code: 29999,
+                msg: pluginCheckResult.message
+            };
+            if (invoiceData.metadata != null)
+                invoiceData.metadata.htlcReceiveError = error;
+            if (invoiceData.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.CREATED)
+                await this.cancelSwapAndInvoice(invoiceData);
+            throw error;
+        }
         //Important to prevent race condition and issuing 2 signed init messages at the same time
         if (invoiceData.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.CREATED) {
             //Re-check right before signing
@@ -662,17 +675,24 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     code: 10004,
                     msg: "Invoice already committed"
                 };
-            res.status(200).json({
-                code: 10000,
-                msg: "Success",
-                data: {
-                    address: signer.getAddress(),
-                    data: swap.data.serialize(),
-                    prefix: swap.prefix,
-                    timeout: swap.timeout,
-                    signature: swap.signature
-                }
-            });
+            if (swap.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED)
+                throw {
+                    _httpStatus: 200,
+                    code: 10005,
+                    msg: "Invoice already committed & claimed"
+                };
+            if (swap.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.RECEIVED)
+                res.status(200).json({
+                    code: 10000,
+                    msg: "Success",
+                    data: {
+                        address: signer.getAddress(),
+                        data: swap.data.serialize(),
+                        prefix: swap.prefix,
+                        timeout: swap.timeout,
+                        signature: swap.signature
+                    }
+                });
         });
         restServer.post(this.path + "/getInvoicePaymentAuth", getInvoicePaymentAuth);
         restServer.get(this.path + "/getInvoicePaymentAuth", getInvoicePaymentAuth);

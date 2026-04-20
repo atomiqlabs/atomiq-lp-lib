@@ -60,5 +60,8 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
     isSuccess() {
         return this.state === ToBtcSwapState.CLAIMED;
     }
+    getDestinationAddress() {
+        return this.address;
+    }
 }
 exports.ToBtcSwapAbs = ToBtcSwapAbs;

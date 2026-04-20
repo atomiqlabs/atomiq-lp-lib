@@ -11,6 +11,7 @@ const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const ServerParamDecoder_1 = require("../../../utils/paramcoders/server/ServerParamDecoder");
 const FromBtcBaseSwapHandler_1 = require("../FromBtcBaseSwapHandler");
 const LightningAssertions_1 = require("../../assertions/LightningAssertions");
+const IPlugin_1 = require("../../../plugins/IPlugin");
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
@@ -340,6 +341,18 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             timeout: invoiceData.timeout,
             signature: invoiceData.signature
         }, true);
+        const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTCLN_AUTO, invoiceData);
+        if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
+            const error = {
+                code: 29999,
+                msg: pluginCheckResult.message
+            };
+            if (invoiceData.metadata != null)
+                invoiceData.metadata.htlcOfferError = error;
+            if (invoiceData.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED)
+                await this.cancelSwapAndInvoice(invoiceData);
+            throw error;
+        }
         if (invoiceData.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED) {
             //Re-check the current HTLC count
             try {
