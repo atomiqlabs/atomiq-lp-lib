@@ -359,11 +359,11 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 this.swapLogger.error(swap, "processInitialized(state=COMMITED): setting state to NON_PAYABLE due to send bitcoin payment error", error);
                 if (swap.metadata != null)
                     swap.metadata.payError = error;
+                unlock();
                 if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.COMMITED) {
                     await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.NON_PAYABLE);
                     await this.saveSwapData(swap);
                 }
-                unlock();
                 return;
             }
             if (swap.state !== ToBtcSwapAbs_1.ToBtcSwapState.COMMITED) {

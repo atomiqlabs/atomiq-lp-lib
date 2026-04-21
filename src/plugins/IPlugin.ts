@@ -21,7 +21,7 @@ export type QuoteThrow = {
 }
 
 export function isQuoteThrow(obj: any): obj is QuoteThrow {
-    return obj.type==="throw" && typeof(obj.message)==="string";
+    return obj!=null && obj.type==="throw" && typeof(obj.message)==="string";
 }
 
 export type QuoteSetFees = {
@@ -33,7 +33,8 @@ export type QuoteSetFees = {
 };
 
 export function isQuoteSetFees(obj: any): obj is QuoteSetFees {
-    return obj.type==="fees" &&
+    return obj!=null &&
+        obj.type==="fees" &&
         (obj.baseFee==null || typeof(obj.baseFee) === "bigint") &&
         (obj.feePPM==null || typeof(obj.feePPM) === "bigint") &&
         (obj.securityDepositApyPPM==null || typeof(obj.securityDepositApyPPM) === "bigint") &&
@@ -46,7 +47,7 @@ export type QuoteAmountTooLow = {
 }
 
 export function isQuoteAmountTooLow(obj: any): obj is QuoteAmountTooLow {
-    return obj.type==="low" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
+    return obj!=null && obj.type==="low" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type QuoteAmountTooHigh = {
@@ -55,7 +56,7 @@ export type QuoteAmountTooHigh = {
 }
 
 export function isQuoteAmountTooHigh(obj: any): obj is QuoteAmountTooHigh {
-    return obj.type==="high" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
+    return obj!=null && obj.type==="high" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type PluginQuote = {
@@ -65,7 +66,7 @@ export type PluginQuote = {
 };
 
 export function isPluginQuote(obj: any): obj is PluginQuote {
-    return obj.type==="success" &&
+    return obj!=null && obj.type==="success" &&
         typeof(obj.amount)==="object" && typeof(obj.amount.input)==="boolean" && typeof(obj.amount.amount)==="bigint" &&
         typeof(obj.swapFee)==="object" && typeof(obj.swapFee.inInputTokens)==="bigint" && typeof(obj.swapFee.inOutputTokens)==="bigint";
 }
@@ -75,7 +76,7 @@ export type ToBtcPluginQuote = PluginQuote & {
 }
 
 export function isToBtcPluginQuote(obj: any): obj is ToBtcPluginQuote {
-    return typeof(obj.networkFee)==="object" && typeof(obj.networkFee.inInputTokens)==="bigint" && typeof(obj.networkFee.inOutputTokens)==="bigint" &&
+    return obj!=null && typeof(obj.networkFee)==="object" && typeof(obj.networkFee.inInputTokens)==="bigint" && typeof(obj.networkFee.inOutputTokens)==="bigint" &&
         isPluginQuote(obj);
 }
 
