@@ -836,7 +836,6 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             };
 
             if (
-                swap.state === FromBtcLnAutoSwapState.RECEIVED ||
                 swap.state === FromBtcLnAutoSwapState.TXS_SENT ||
                 swap.state === FromBtcLnAutoSwapState.COMMITED
             ) {

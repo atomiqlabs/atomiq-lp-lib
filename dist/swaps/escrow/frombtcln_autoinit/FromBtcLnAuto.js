@@ -680,8 +680,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     code: 10001,
                     msg: "Invoice expired/canceled"
                 };
-            if (swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.RECEIVED ||
-                swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.TXS_SENT ||
+            if (swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.TXS_SENT ||
                 swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.COMMITED) {
                 res.status(200).json({
                     code: 10000,
