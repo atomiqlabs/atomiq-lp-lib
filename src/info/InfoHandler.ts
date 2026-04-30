@@ -16,7 +16,8 @@ type InfoHandlerResponse = {
     chains: {
         [chainIdentifier: string]: {
             address: string,
-            signature: string
+            signature: string,
+            contractVersion: string
         }
     }
 }
@@ -74,14 +75,16 @@ export class InfoHandler {
             const chains: {
                 [chainIdentifier: string]: {
                     address: string,
-                    signature: string
+                    signature: string,
+                    contractVersion: string
                 }
             } = {};
             for(let chainIdentifier in this.chainData.chains) {
                 const singleChain = this.chainData.chains[chainIdentifier];
                 chains[chainIdentifier] = {
                     address: singleChain.signer.getAddress(),
-                    signature: await singleChain.swapContract.getDataSignature(singleChain.signer, envelopeBuffer)
+                    signature: await singleChain.swapContract.getDataSignature(singleChain.signer, envelopeBuffer),
+                    contractVersion: singleChain.contractVersion ?? "v1"
                 };
             }
 
