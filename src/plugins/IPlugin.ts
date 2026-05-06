@@ -47,7 +47,7 @@ export type QuoteAmountTooLow = {
 }
 
 export function isQuoteAmountTooLow(obj: any): obj is QuoteAmountTooLow {
-    return obj!=null && obj.type==="low" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
+    return obj!=null && obj.type==="low" && obj.data!=null && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type QuoteAmountTooHigh = {
@@ -56,7 +56,7 @@ export type QuoteAmountTooHigh = {
 }
 
 export function isQuoteAmountTooHigh(obj: any): obj is QuoteAmountTooHigh {
-    return obj!=null && obj.type==="high" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
+    return obj!=null && obj.type==="high" && obj.data!=null && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type PluginQuote = {
@@ -67,8 +67,8 @@ export type PluginQuote = {
 
 export function isPluginQuote(obj: any): obj is PluginQuote {
     return obj!=null && obj.type==="success" &&
-        typeof(obj.amount)==="object" && typeof(obj.amount.input)==="boolean" && typeof(obj.amount.amount)==="bigint" &&
-        typeof(obj.swapFee)==="object" && typeof(obj.swapFee.inInputTokens)==="bigint" && typeof(obj.swapFee.inOutputTokens)==="bigint";
+        obj.amount!=null && typeof(obj.amount)==="object" && typeof(obj.amount.input)==="boolean" && typeof(obj.amount.amount)==="bigint" &&
+        obj.swapFee!=null && typeof(obj.swapFee)==="object" && typeof(obj.swapFee.inInputTokens)==="bigint" && typeof(obj.swapFee.inOutputTokens)==="bigint";
 }
 
 export type ToBtcPluginQuote = PluginQuote & {
@@ -76,7 +76,7 @@ export type ToBtcPluginQuote = PluginQuote & {
 }
 
 export function isToBtcPluginQuote(obj: any): obj is ToBtcPluginQuote {
-    return obj!=null && typeof(obj.networkFee)==="object" && typeof(obj.networkFee.inInputTokens)==="bigint" && typeof(obj.networkFee.inOutputTokens)==="bigint" &&
+    return obj!=null && obj.networkFee!=null && typeof(obj.networkFee)==="object" && typeof(obj.networkFee.inInputTokens)==="bigint" && typeof(obj.networkFee.inOutputTokens)==="bigint" &&
         isPluginQuote(obj);
 }
 

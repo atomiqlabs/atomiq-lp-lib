@@ -15,21 +15,21 @@ function isQuoteSetFees(obj) {
 }
 exports.isQuoteSetFees = isQuoteSetFees;
 function isQuoteAmountTooLow(obj) {
-    return obj != null && obj.type === "low" && typeof (obj.data) === "object" && typeof (obj.data.min) === "bigint" && typeof (obj.data.max) === "bigint";
+    return obj != null && obj.type === "low" && obj.data != null && typeof (obj.data) === "object" && typeof (obj.data.min) === "bigint" && typeof (obj.data.max) === "bigint";
 }
 exports.isQuoteAmountTooLow = isQuoteAmountTooLow;
 function isQuoteAmountTooHigh(obj) {
-    return obj != null && obj.type === "high" && typeof (obj.data) === "object" && typeof (obj.data.min) === "bigint" && typeof (obj.data.max) === "bigint";
+    return obj != null && obj.type === "high" && obj.data != null && typeof (obj.data) === "object" && typeof (obj.data.min) === "bigint" && typeof (obj.data.max) === "bigint";
 }
 exports.isQuoteAmountTooHigh = isQuoteAmountTooHigh;
 function isPluginQuote(obj) {
     return obj != null && obj.type === "success" &&
-        typeof (obj.amount) === "object" && typeof (obj.amount.input) === "boolean" && typeof (obj.amount.amount) === "bigint" &&
-        typeof (obj.swapFee) === "object" && typeof (obj.swapFee.inInputTokens) === "bigint" && typeof (obj.swapFee.inOutputTokens) === "bigint";
+        obj.amount != null && typeof (obj.amount) === "object" && typeof (obj.amount.input) === "boolean" && typeof (obj.amount.amount) === "bigint" &&
+        obj.swapFee != null && typeof (obj.swapFee) === "object" && typeof (obj.swapFee.inInputTokens) === "bigint" && typeof (obj.swapFee.inOutputTokens) === "bigint";
 }
 exports.isPluginQuote = isPluginQuote;
 function isToBtcPluginQuote(obj) {
-    return obj != null && typeof (obj.networkFee) === "object" && typeof (obj.networkFee.inInputTokens) === "bigint" && typeof (obj.networkFee.inOutputTokens) === "bigint" &&
+    return obj != null && obj.networkFee != null && typeof (obj.networkFee) === "object" && typeof (obj.networkFee.inInputTokens) === "bigint" && typeof (obj.networkFee.inOutputTokens) === "bigint" &&
         isPluginQuote(obj);
 }
 exports.isToBtcPluginQuote = isToBtcPluginQuote;
