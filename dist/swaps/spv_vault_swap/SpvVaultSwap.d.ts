@@ -65,4 +65,5 @@ export declare class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     isFailed(): boolean;
     isInitiated(): boolean;
     isSuccess(): boolean;
+    getDestinationAddress(): string;
 }

@@ -12,6 +12,7 @@ const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const ToBtcBaseSwapHandler_1 = require("../ToBtcBaseSwapHandler");
 const ILightningWallet_1 = require("../../../wallets/ILightningWallet");
 const LightningAssertions_1 = require("../../assertions/LightningAssertions");
+const IPlugin_1 = require("../../../plugins/IPlugin");
 /**
  * Swap handler handling to BTCLN swaps using submarine swaps
  */
@@ -229,6 +230,15 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             " maxFee: " + maxFee.toString(10) +
             " invoice: " + swap.pr);
         const blockHeight = await this.lightning.getBlockheight();
+        const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreToBtcExecute(SwapHandler_1.SwapHandlerType.TO_BTCLN, swap);
+        if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
+            throw {
+                code: 29999,
+                msg: pluginCheckResult.message
+            };
+        }
+        if (swap.state !== ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED)
+            return false;
         swap.payInitiated = true;
         await this.saveSwapData(swap);
         try {
@@ -249,6 +259,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         }
         if (swap.metadata != null)
             swap.metadata.times.payComplete = Date.now();
+        return true;
     }
     /**
      * Begins a lightning network payment attempt, if not attempted already
@@ -303,7 +314,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
             await this.saveSwapData(swap);
             try {
-                await this.sendLightningPayment(swap);
+                if (!await this.sendLightningPayment(swap))
+                    return;
             }
             catch (e) {
                 this.swapLogger.error(swap, "processInitialized(): lightning payment error", e);

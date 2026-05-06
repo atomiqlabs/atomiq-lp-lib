@@ -43,7 +43,8 @@ class InfoHandler {
                 const singleChain = this.chainData.chains[chainIdentifier];
                 chains[chainIdentifier] = {
                     address: singleChain.signer.getAddress(),
-                    signature: await singleChain.swapContract.getDataSignature(singleChain.signer, envelopeBuffer)
+                    signature: await singleChain.swapContract.getDataSignature(singleChain.signer, envelopeBuffer),
+                    contractVersion: singleChain.contractVersion ?? "v1"
                 };
             }
             const response = {

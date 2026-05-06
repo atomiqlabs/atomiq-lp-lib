@@ -11,6 +11,7 @@ const SchemaVerifier_1 = require("../../../utils/paramcoders/SchemaVerifier");
 const ServerParamDecoder_1 = require("../../../utils/paramcoders/server/ServerParamDecoder");
 const ToBtcBaseSwapHandler_1 = require("../ToBtcBaseSwapHandler");
 const BitcoinUtils_1 = require("../../../utils/BitcoinUtils");
+const IPlugin_1 = require("../../../plugins/IPlugin");
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
 const MAX_PARALLEL_TX_PROCESSED = 10;
 /**
@@ -346,9 +347,29 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             await this.saveSwapData(swap);
         }
         if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.COMMITED) {
-            const unlock = swap.lock(60);
+            const unlock = swap.lock(Infinity);
             if (unlock == null)
                 return;
+            const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreToBtcExecute(SwapHandler_1.SwapHandlerType.TO_BTC, swap);
+            if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
+                const error = {
+                    code: 29999,
+                    msg: pluginCheckResult.message
+                };
+                this.swapLogger.error(swap, "processInitialized(state=COMMITED): setting state to NON_PAYABLE due to send bitcoin payment error", error);
+                if (swap.metadata != null)
+                    swap.metadata.payError = error;
+                unlock();
+                if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.COMMITED) {
+                    await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.NON_PAYABLE);
+                    await this.saveSwapData(swap);
+                }
+                return;
+            }
+            if (swap.state !== ToBtcSwapAbs_1.ToBtcSwapState.COMMITED) {
+                unlock();
+                return;
+            }
             this.swapLogger.debug(swap, "processInitialized(state=COMMITED): sending bitcoin transaction, address: " + swap.address);
             try {
                 await this.sendBitcoinPayment(swap);
@@ -367,7 +388,9 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     throw e;
                 }
             }
-            unlock();
+            finally {
+                unlock();
+            }
         }
         if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.NON_PAYABLE)
             return;

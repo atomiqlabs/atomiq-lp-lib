@@ -27,6 +27,8 @@ import {
     LightningNetworkInvoice
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
+import {isQuoteThrow} from "../../../plugins/IPlugin";
+import {FromBtcLnAutoSwapState} from "../frombtcln_autoinit/FromBtcLnAutoSwap";
 
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -373,6 +375,20 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         );
         //No need to check abortController anymore since all pending promises are resolved by now
         if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcSwapSigned = Date.now();
+
+        const pluginCheckResult = await PluginManager.onHandlePreFromBtcExecute(
+            SwapHandlerType.FROM_BTCLN,
+            invoiceData
+        );
+        if(isQuoteThrow(pluginCheckResult)) {
+            const error = {
+                code: 29999,
+                msg: pluginCheckResult.message
+            };
+            if(invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = error;
+            if(invoiceData.state===FromBtcLnSwapState.CREATED) await this.cancelSwapAndInvoice(invoiceData);
+            throw error;
+        }
 
         //Important to prevent race condition and issuing 2 signed init messages at the same time
         if(invoiceData.state===FromBtcLnSwapState.CREATED) {
@@ -836,7 +852,13 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 msg: "Invoice already committed"
             };
 
-            res.status(200).json({
+            if (swap.state === FromBtcLnSwapState.CLAIMED) throw {
+                _httpStatus: 200,
+                code: 10005,
+                msg: "Invoice already committed & claimed"
+            };
+
+            if (swap.state === FromBtcLnSwapState.RECEIVED) res.status(200).json({
                 code: 10000,
                 msg: "Success",
                 data: {

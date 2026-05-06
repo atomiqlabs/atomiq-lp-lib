@@ -116,5 +116,8 @@ class FromBtcLnAutoSwap extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     isSuccess() {
         return this.state === FromBtcLnAutoSwapState.SETTLED;
     }
+    getDestinationAddress() {
+        return this.claimer;
+    }
 }
 exports.FromBtcLnAutoSwap = FromBtcLnAutoSwap;

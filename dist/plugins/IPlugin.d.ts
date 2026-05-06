@@ -1,5 +1,5 @@
 import { BitcoinRpc } from "@atomiqlabs/base";
-import { FromBtcLnRequestType, FromBtcRequestType, FromBtcTrustedRequestType, ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcRequestType } from "..";
+import { FromBtcLnAutoSwap, FromBtcLnRequestType, FromBtcLnSwapAbs, FromBtcLnTrustedSwap, FromBtcRequestType, FromBtcSwapAbs, FromBtcTrustedRequestType, FromBtcTrustedSwap, ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType, SwapHandler, SwapHandlerType, ToBtcLnRequestType, ToBtcLnSwapAbs, ToBtcRequestType, ToBtcSwapAbs } from "..";
 import { SwapHandlerSwap } from "../swaps/SwapHandlerSwap";
 import { Command } from "@atomiqlabs/server-base";
 import { FromBtcLnTrustedRequestType } from "../swaps/trusted/frombtcln_trusted/FromBtcLnTrusted";
@@ -104,6 +104,19 @@ export interface IPlugin {
         token: string;
         pricePrefetch?: Promise<bigint>;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
+    /**
+     * Triggered when the quote is about to get executed, this means:
+     * - FROM_BTCLN - lightning network payment received and the LP is about to sign an authorization allowing the user to settle
+     * - FROM_BTC - triggered on quote request, before the final authorization is given to the user
+     * - FROM_BTCLN_TRUSTED - triggered when the LP receives the funds on the source chain and before destination funds are sent
+     * - FROM_BTC_TRUSTED - triggered when the LP receives the funds on the source chain and before destination funds are sent
+     * - FROM_BTC_SPV - triggered before LP broadcasts the co-signed swap PSBT
+     * - FROM_BTCLN_AUTO - lightning network payment received and the LP is about to offer an HTLC to the user
+     *
+     * @param swapType
+     * @param swap
+     */
+    onHandlePreFromBtcExecute?(swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV | SwapHandlerType.FROM_BTCLN_AUTO, swap: FromBtcLnSwapAbs | FromBtcSwapAbs | FromBtcLnTrustedSwap | FromBtcTrustedSwap | SpvVaultSwap | FromBtcLnAutoSwap): Promise<QuoteThrow | null>;
     onHandlePreToBtcQuote?(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, request: RequestData<ToBtcLnRequestType | ToBtcRequestType>, requestedAmount: {
         input: boolean;
         amount: bigint;
@@ -128,6 +141,7 @@ export interface IPlugin {
         feePPM: bigint;
         networkFeeGetter: (amount: bigint) => Promise<bigint>;
     }): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
+    onHandlePreToBtcExecute?(swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC, swap: ToBtcLnSwapAbs | ToBtcSwapAbs): Promise<QuoteThrow | null>;
     onHandlePostedFromBtcQuote?(swapType: SwapHandlerType.FROM_BTC_SPV, request: RequestData<SpvVaultPostQuote>, swap: SpvVaultSwap): Promise<QuoteThrow | null>;
     onVaultSelection?(chainIdentifier: string, totalSats: bigint, requestedAmount: {
         amount: bigint;

@@ -139,4 +139,6 @@ export abstract class SwapHandlerSwap<S = any> extends Lockable implements Stora
      */
     abstract getSwapFee(): {inInputToken: bigint, inOutputToken: bigint};
 
+    abstract getDestinationAddress(): string;
+
 }

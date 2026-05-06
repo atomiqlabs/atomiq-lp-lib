@@ -152,6 +152,21 @@ class PluginManager {
         }
         return null;
     }
+    static async onHandlePreFromBtcExecute(swapType, swap) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHandlePreFromBtcExecute != null) {
+                    const result = await plugin.onHandlePreFromBtcExecute(swapType, swap);
+                    if (result != null && (0, IPlugin_1.isQuoteThrow)(result))
+                        return result;
+                }
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "onHandlePreFromBtcExecute(): plugin error", e);
+            }
+        }
+        return null;
+    }
     static async onHandlePostToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees) {
         for (let plugin of PluginManager.plugins.values()) {
             try {
@@ -210,6 +225,21 @@ class PluginManager {
             }
             catch (e) {
                 pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
+    }
+    static async onHandlePreToBtcExecute(swapType, swap) {
+        for (let plugin of PluginManager.plugins.values()) {
+            try {
+                if (plugin.onHandlePreToBtcExecute != null) {
+                    const result = await plugin.onHandlePreToBtcExecute(swapType, swap);
+                    if (result != null && (0, IPlugin_1.isQuoteThrow)(result))
+                        return result;
+                }
+            }
+            catch (e) {
+                pluginLogger.error(plugin, "onHandlePreToBtcExecute(): plugin error", e);
             }
         }
         return null;

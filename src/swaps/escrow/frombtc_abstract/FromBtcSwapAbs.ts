@@ -58,4 +58,8 @@ export class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromBtcBaseSw
         return this.amount;
     }
 
+    getDestinationAddress(): string {
+        return this.data.getClaimer();
+    }
+
 }

@@ -52,4 +52,5 @@ export declare class FromBtcLnAutoSwap<T extends SwapData = SwapData> extends Fr
     isInitiated(): boolean;
     isFailed(): boolean;
     isSuccess(): boolean;
+    getDestinationAddress(): string;
 }

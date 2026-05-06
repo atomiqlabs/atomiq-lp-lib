@@ -154,5 +154,8 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
     isSuccess() {
         return this.state === SpvVaultSwapState.CLAIMED;
     }
+    getDestinationAddress() {
+        return this.recipient;
+    }
 }
 exports.SpvVaultSwap = SpvVaultSwap;

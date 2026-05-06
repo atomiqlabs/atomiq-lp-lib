@@ -62,7 +62,8 @@ export type ChainData<T extends ChainType = ChainType> = {
     allowedTokens: string[],
     tokenMultipliers?: {[tokenAddress: string]: bigint},
     allowedDepositTokens?: string[],
-    btcRelay?: T["BtcRelay"]
+    btcRelay?: T["BtcRelay"],
+    contractVersion?: string
 }
 
 export type RequestData<T> = {

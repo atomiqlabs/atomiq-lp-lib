@@ -76,4 +76,5 @@ export declare abstract class SwapHandlerSwap<S = any> extends Lockable implemen
         inInputToken: bigint;
         inOutputToken: bigint;
     };
+    abstract getDestinationAddress(): string;
 }

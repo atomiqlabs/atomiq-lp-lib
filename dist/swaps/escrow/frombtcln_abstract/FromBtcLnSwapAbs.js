@@ -87,5 +87,8 @@ class FromBtcLnSwapAbs extends FromBtcBaseSwap_1.FromBtcBaseSwap {
     isSuccess() {
         return this.state === FromBtcLnSwapState.SETTLED;
     }
+    getDestinationAddress() {
+        return this.claimer;
+    }
 }
 exports.FromBtcLnSwapAbs = FromBtcLnSwapAbs;

@@ -78,4 +78,8 @@ export class ToBtcLnSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap
         return this.state===ToBtcLnSwapState.CLAIMED;
     }
 
+    getDestinationAddress(): string {
+        return this.pr;
+    }
+
 }

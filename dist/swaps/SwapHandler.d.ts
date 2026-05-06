@@ -59,6 +59,7 @@ export type ChainData<T extends ChainType = ChainType> = {
     };
     allowedDepositTokens?: string[];
     btcRelay?: T["BtcRelay"];
+    contractVersion?: string;
 };
 export type RequestData<T> = {
     chainIdentifier: string;

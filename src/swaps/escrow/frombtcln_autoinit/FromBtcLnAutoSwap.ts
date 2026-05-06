@@ -193,4 +193,8 @@ export class FromBtcLnAutoSwap<T extends SwapData = SwapData> extends FromBtcBas
         return this.state===FromBtcLnAutoSwapState.SETTLED;
     }
 
+    getDestinationAddress(): string {
+        return this.claimer
+    }
+
 }

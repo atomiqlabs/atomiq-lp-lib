@@ -18,4 +18,5 @@ export declare class FromBtcSwapAbs<T extends SwapData = SwapData> extends FromB
     isFailed(): boolean;
     isSuccess(): boolean;
     getTotalInputAmount(): bigint;
+    getDestinationAddress(): string;
 }

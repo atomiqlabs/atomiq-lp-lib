@@ -1,11 +1,12 @@
 import {BitcoinRpc} from "@atomiqlabs/base";
 import {
-    FromBtcLnRequestType,
-    FromBtcRequestType, FromBtcTrustedRequestType,
+    FromBtcLnAbs, FromBtcLnAutoSwap,
+    FromBtcLnRequestType, FromBtcLnSwapAbs, FromBtcLnTrustedSwap,
+    FromBtcRequestType, FromBtcSwapAbs, FromBtcTrustedRequestType, FromBtcTrustedSwap,
     ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType,
     SwapHandler, SwapHandlerType,
-    ToBtcLnRequestType,
-    ToBtcRequestType
+    ToBtcLnRequestType, ToBtcLnSwapAbs,
+    ToBtcRequestType, ToBtcSwapAbs
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
 import {Command} from "@atomiqlabs/server-base";
@@ -20,7 +21,7 @@ export type QuoteThrow = {
 }
 
 export function isQuoteThrow(obj: any): obj is QuoteThrow {
-    return obj.type==="throw" && typeof(obj.message)==="string";
+    return obj!=null && obj.type==="throw" && typeof(obj.message)==="string";
 }
 
 export type QuoteSetFees = {
@@ -32,7 +33,8 @@ export type QuoteSetFees = {
 };
 
 export function isQuoteSetFees(obj: any): obj is QuoteSetFees {
-    return obj.type==="fees" &&
+    return obj!=null &&
+        obj.type==="fees" &&
         (obj.baseFee==null || typeof(obj.baseFee) === "bigint") &&
         (obj.feePPM==null || typeof(obj.feePPM) === "bigint") &&
         (obj.securityDepositApyPPM==null || typeof(obj.securityDepositApyPPM) === "bigint") &&
@@ -45,7 +47,7 @@ export type QuoteAmountTooLow = {
 }
 
 export function isQuoteAmountTooLow(obj: any): obj is QuoteAmountTooLow {
-    return obj.type==="low" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
+    return obj!=null && obj.type==="low" && obj.data!=null && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type QuoteAmountTooHigh = {
@@ -54,7 +56,7 @@ export type QuoteAmountTooHigh = {
 }
 
 export function isQuoteAmountTooHigh(obj: any): obj is QuoteAmountTooHigh {
-    return obj.type==="high" && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
+    return obj!=null && obj.type==="high" && obj.data!=null && typeof(obj.data)==="object" && typeof(obj.data.min)==="bigint" && typeof(obj.data.max)==="bigint";
 }
 
 export type PluginQuote = {
@@ -64,9 +66,9 @@ export type PluginQuote = {
 };
 
 export function isPluginQuote(obj: any): obj is PluginQuote {
-    return obj.type==="success" &&
-        typeof(obj.amount)==="object" && typeof(obj.amount.input)==="boolean" && typeof(obj.amount.amount)==="bigint" &&
-        typeof(obj.swapFee)==="object" && typeof(obj.swapFee.inInputTokens)==="bigint" && typeof(obj.swapFee.inOutputTokens)==="bigint";
+    return obj!=null && obj.type==="success" &&
+        obj.amount!=null && typeof(obj.amount)==="object" && typeof(obj.amount.input)==="boolean" && typeof(obj.amount.amount)==="bigint" &&
+        obj.swapFee!=null && typeof(obj.swapFee)==="object" && typeof(obj.swapFee.inInputTokens)==="bigint" && typeof(obj.swapFee.inOutputTokens)==="bigint";
 }
 
 export type ToBtcPluginQuote = PluginQuote & {
@@ -74,7 +76,7 @@ export type ToBtcPluginQuote = PluginQuote & {
 }
 
 export function isToBtcPluginQuote(obj: any): obj is ToBtcPluginQuote {
-    return typeof(obj.networkFee)==="object" && typeof(obj.networkFee.inInputTokens)==="bigint" && typeof(obj.networkFee.inOutputTokens)==="bigint" &&
+    return obj!=null && obj.networkFee!=null && typeof(obj.networkFee)==="object" && typeof(obj.networkFee.inInputTokens)==="bigint" && typeof(obj.networkFee.inOutputTokens)==="bigint" &&
         isPluginQuote(obj);
 }
 
@@ -133,6 +135,22 @@ export interface IPlugin {
         fees: {baseFeeInBtc: bigint, feePPM: bigint},
         gasTokenAmount?: {input: false, amount: bigint, token: string, pricePrefetch?: Promise<bigint>}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote>;
+    /**
+     * Triggered when the quote is about to get executed, this means:
+     * - FROM_BTCLN - lightning network payment received and the LP is about to sign an authorization allowing the user to settle
+     * - FROM_BTC - triggered on quote request, before the final authorization is given to the user
+     * - FROM_BTCLN_TRUSTED - triggered when the LP receives the funds on the source chain and before destination funds are sent
+     * - FROM_BTC_TRUSTED - triggered when the LP receives the funds on the source chain and before destination funds are sent
+     * - FROM_BTC_SPV - triggered before LP broadcasts the co-signed swap PSBT
+     * - FROM_BTCLN_AUTO - lightning network payment received and the LP is about to offer an HTLC to the user
+     *
+     * @param swapType
+     * @param swap
+     */
+    onHandlePreFromBtcExecute?(
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV | SwapHandlerType.FROM_BTCLN_AUTO,
+        swap: FromBtcLnSwapAbs | FromBtcSwapAbs | FromBtcLnTrustedSwap | FromBtcTrustedSwap | SpvVaultSwap | FromBtcLnAutoSwap
+    ): Promise<QuoteThrow | null>;
 
     onHandlePreToBtcQuote?(
         swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
@@ -150,6 +168,10 @@ export interface IPlugin {
         constraints: {minInBtc: bigint, maxInBtc: bigint},
         fees: {baseFeeInBtc: bigint, feePPM: bigint, networkFeeGetter: (amount: bigint) => Promise<bigint>}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | ToBtcPluginQuote>;
+    onHandlePreToBtcExecute?(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
+        swap: ToBtcLnSwapAbs | ToBtcSwapAbs
+    ): Promise<QuoteThrow | null>;
 
     onHandlePostedFromBtcQuote?(
         swapType: SwapHandlerType.FROM_BTC_SPV,

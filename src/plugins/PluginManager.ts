@@ -8,12 +8,13 @@ import {
     QuoteThrow, ToBtcPluginQuote
 } from "./IPlugin";
 import {
-    FromBtcLnRequestType,
-    FromBtcRequestType, FromBtcTrustedRequestType,
+    FromBtcLnAutoSwap,
+    FromBtcLnRequestType, FromBtcLnSwapAbs, FromBtcLnTrustedSwap,
+    FromBtcRequestType, FromBtcSwapAbs, FromBtcTrustedRequestType, FromBtcTrustedSwap,
     ISwapPrice, MultichainData, RequestData, SpvVaultPostQuote, SpvVaultSwap, SpvVaultSwapRequestType,
     SwapHandler, SwapHandlerType,
-    ToBtcLnRequestType,
-    ToBtcRequestType
+    ToBtcLnRequestType, ToBtcLnSwapAbs,
+    ToBtcRequestType, ToBtcSwapAbs
 } from "..";
 import {SwapHandlerSwap} from "../swaps/SwapHandlerSwap";
 import * as fs from "fs";
@@ -224,6 +225,23 @@ export class PluginManager {
         return null;
     }
 
+    static async onHandlePreFromBtcExecute(
+        swapType: SwapHandlerType.FROM_BTCLN | SwapHandlerType.FROM_BTC | SwapHandlerType.FROM_BTCLN_TRUSTED | SwapHandlerType.FROM_BTC_TRUSTED | SwapHandlerType.FROM_BTC_SPV | SwapHandlerType.FROM_BTCLN_AUTO,
+        swap: FromBtcLnSwapAbs | FromBtcSwapAbs | FromBtcLnTrustedSwap | FromBtcTrustedSwap | SpvVaultSwap | FromBtcLnAutoSwap
+    ): Promise<QuoteThrow | null> {
+        for(let plugin of PluginManager.plugins.values()) {
+            try {
+                if(plugin.onHandlePreFromBtcExecute!=null) {
+                    const result = await plugin.onHandlePreFromBtcExecute(swapType, swap);
+                    if(result!=null && isQuoteThrow(result)) return result;
+                }
+            } catch (e) {
+                pluginLogger.error(plugin, "onHandlePreFromBtcExecute(): plugin error", e);
+            }
+        }
+        return null;
+    }
+
     static async onHandlePostToBtcQuote<T extends {networkFee: bigint}>(
         swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
@@ -286,6 +304,23 @@ export class PluginManager {
                 }
             } catch (e) {
                 pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+            }
+        }
+        return null;
+    }
+
+    static async onHandlePreToBtcExecute(
+        swapType: SwapHandlerType.TO_BTCLN | SwapHandlerType.TO_BTC,
+        swap: ToBtcLnSwapAbs | ToBtcSwapAbs
+    ): Promise<QuoteThrow | null> {
+        for(let plugin of PluginManager.plugins.values()) {
+            try {
+                if(plugin.onHandlePreToBtcExecute!=null) {
+                    const result = await plugin.onHandlePreToBtcExecute(swapType, swap);
+                    if(result!=null && isQuoteThrow(result)) return result;
+                }
+            } catch (e) {
+                pluginLogger.error(plugin, "onHandlePreToBtcExecute(): plugin error", e);
             }
         }
         return null;
