@@ -24,8 +24,8 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             AmountAssertions_1.AmountAssertions.handlePluginErrorResponses(res);
             if ((0, IPlugin_1.isQuoteSetFees)(res)) {
                 return {
-                    baseFee: res.baseFee || this.config.baseFee,
-                    feePPM: res.feePPM || this.config.feePPM,
+                    baseFee: res.baseFee ?? this.config.baseFee,
+                    feePPM: res.feePPM ?? this.config.feePPM,
                     securityDepositApyPPM: res.securityDepositApyPPM,
                     securityDepositBaseMultiplierPPM: res.securityDepositBaseMultiplierPPM
                 };

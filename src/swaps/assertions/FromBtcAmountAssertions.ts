@@ -55,8 +55,8 @@ export class FromBtcAmountAssertions extends AmountAssertions {
             AmountAssertions.handlePluginErrorResponses(res);
             if(isQuoteSetFees(res)) {
                 return {
-                    baseFee: res.baseFee || this.config.baseFee,
-                    feePPM: res.feePPM || this.config.feePPM,
+                    baseFee: res.baseFee ?? this.config.baseFee,
+                    feePPM: res.feePPM ?? this.config.feePPM,
                     securityDepositApyPPM: res.securityDepositApyPPM,
                     securityDepositBaseMultiplierPPM: res.securityDepositBaseMultiplierPPM
                 }
