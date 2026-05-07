@@ -28,8 +28,8 @@ export declare class PluginManager {
     static registerPlugin(name: string, plugin: IPlugin): void;
     static unregisterPlugin(name: string): boolean;
     static enable<T extends SwapData>(chainsData: MultichainData, bitcoinRpc: BitcoinRpc<any>, bitcoinWallet: IBitcoinWallet, lightningWallet: ILightningWallet, swapPricing: ISwapPrice, tokens: {
-        [ticker: string]: {
-            [chainId: string]: {
+        [chainId: string]: {
+            [ticker: string]: {
                 address: string;
                 decimals: number;
             };

@@ -59,8 +59,8 @@ export interface IPlugin {
     author: string;
     description: string;
     onEnable(chainsData: MultichainData, bitcoinRpc: BitcoinRpc<any>, bitcoinWallet: IBitcoinWallet, lightningWallet: ILightningWallet, swapPricing: ISwapPrice, tokens: {
-        [ticker: string]: {
-            [chainId: string]: {
+        [chainId: string]: {
+            [ticker: string]: {
                 address: string;
                 decimals: number;
             };

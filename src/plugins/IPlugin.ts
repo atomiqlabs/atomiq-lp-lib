@@ -96,8 +96,8 @@ export interface IPlugin {
 
         swapPricing: ISwapPrice,
         tokens: {
-            [ticker: string]: {
-                [chainId: string]: {
+            [chainId: string]: {
+                [ticker: string]: {
                     address: string,
                     decimals: number
                 }
