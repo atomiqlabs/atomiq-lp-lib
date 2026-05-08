@@ -53,6 +53,9 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
 
     btcTxId: string;
 
+    saveStickyAddress?: boolean;
+    hasStickyAddress?: boolean;
+
     constructor(
         chainIdentifier: string, quoteId: string, expiry: number,
         vault: SpvVault, vaultUtxo: string,
@@ -129,6 +132,8 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             this.tokenMultiplier = deserializeBN(chainIdentifierOrObj.tokenMultiplier);
             this.gasTokenMultiplier = deserializeBN(chainIdentifierOrObj.gasTokenMultiplier);
             this.btcTxId = chainIdentifierOrObj.btcTxId;
+            this.hasStickyAddress = chainIdentifierOrObj.hasStickyAddress;
+            this.saveStickyAddress = chainIdentifierOrObj.saveStickyAddress;
         }
         this.type = SwapHandlerType.FROM_BTC_SPV;
     }
@@ -161,7 +166,9 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             gasToken: this.gasToken,
             tokenMultiplier: serializeBN(this.tokenMultiplier),
             gasTokenMultiplier: serializeBN(this.gasTokenMultiplier),
-            btcTxId: this.btcTxId
+            btcTxId: this.btcTxId,
+            hasStickyAddress: this.hasStickyAddress,
+            saveStickyAddress: this.saveStickyAddress
         };
     }
 

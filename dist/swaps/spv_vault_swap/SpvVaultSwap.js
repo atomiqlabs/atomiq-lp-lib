@@ -75,6 +75,8 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.tokenMultiplier = (0, Utils_1.deserializeBN)(chainIdentifierOrObj.tokenMultiplier);
             this.gasTokenMultiplier = (0, Utils_1.deserializeBN)(chainIdentifierOrObj.gasTokenMultiplier);
             this.btcTxId = chainIdentifierOrObj.btcTxId;
+            this.hasStickyAddress = chainIdentifierOrObj.hasStickyAddress;
+            this.saveStickyAddress = chainIdentifierOrObj.saveStickyAddress;
         }
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_SPV;
     }
@@ -106,7 +108,9 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             gasToken: this.gasToken,
             tokenMultiplier: (0, Utils_1.serializeBN)(this.tokenMultiplier),
             gasTokenMultiplier: (0, Utils_1.serializeBN)(this.gasTokenMultiplier),
-            btcTxId: this.btcTxId
+            btcTxId: this.btcTxId,
+            hasStickyAddress: this.hasStickyAddress,
+            saveStickyAddress: this.saveStickyAddress
         };
     }
     getIdentifierHash() {

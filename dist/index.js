@@ -54,5 +54,6 @@ __exportStar(require("./wallets/ILightningWallet"), exports);
 __exportStar(require("./wallets/ISpvVaultSigner"), exports);
 __exportStar(require("./swaps/spv_vault_swap/SpvVaults"), exports);
 __exportStar(require("./swaps/spv_vault_swap/SpvVault"), exports);
+__exportStar(require("./swaps/spv_vault_swap/StickyAddress"), exports);
 __exportStar(require("./swaps/spv_vault_swap/SpvVaultSwap"), exports);
 __exportStar(require("./swaps/spv_vault_swap/SpvVaultSwapHandler"), exports);

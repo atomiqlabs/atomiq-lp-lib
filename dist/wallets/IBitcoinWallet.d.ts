@@ -64,6 +64,11 @@ export declare abstract class IBitcoinWallet {
      */
     abstract getAddress(): Promise<string>;
     /**
+     * Whether a provided address is controlled by this wallet
+     * @param address
+     */
+    isOwnedAddress?(address: string): Promise<boolean>;
+    /**
      * Adds previously returned address (with getAddress call), to the pool of unused addresses
      * @param address
      */

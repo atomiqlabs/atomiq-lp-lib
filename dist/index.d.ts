@@ -38,5 +38,6 @@ export * from "./wallets/ILightningWallet";
 export * from "./wallets/ISpvVaultSigner";
 export * from "./swaps/spv_vault_swap/SpvVaults";
 export * from "./swaps/spv_vault_swap/SpvVault";
+export * from "./swaps/spv_vault_swap/StickyAddress";
 export * from "./swaps/spv_vault_swap/SpvVaultSwap";
 export * from "./swaps/spv_vault_swap/SpvVaultSwapHandler";
