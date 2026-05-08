@@ -38,6 +38,7 @@ import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
 import {isLegacyInput} from "../../utils/BitcoinUtils";
 import {AmountAssertions} from "../assertions/AmountAssertions";
 import {isQuoteThrow} from "../../plugins/IPlugin";
+import {StickyAddress} from "./StickyAddress";
 
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number,
@@ -78,6 +79,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
     config: SpvVaultSwapHandlerConfig;
 
+    readonly stickyAddresses?: IStorageManager<StickyAddress>;
+
     constructor(
         storageDirectory: IIntermediaryStorage<SpvVaultSwap>,
         vaultStorage: IStorageManager<SpvVault>,
@@ -87,7 +90,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         bitcoin: IBitcoinWallet,
         bitcoinRpc: BitcoinRpc<BtcBlock>,
         spvVaultSigner: ISpvVaultSigner,
-        config: SpvVaultSwapHandlerConfig
+        config: SpvVaultSwapHandlerConfig,
+        stickyAddresses?: IStorageManager<StickyAddress>
     ) {
         super(storageDirectory, path, chainsData, swapPricing);
         this.bitcoinRpc = bitcoinRpc;
@@ -96,6 +100,52 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         this.config = config;
         this.AmountAssertions = new FromBtcAmountAssertions(config, swapPricing);
         this.Vaults = new SpvVaults(vaultStorage, bitcoin, spvVaultSigner, bitcoinRpc, this.chains, config);
+        this.stickyAddresses = stickyAddresses;
+    }
+
+    private async getStickyAddress(chainId: string, address: string): Promise<string | undefined> {
+        if(this.stickyAddresses==null) throw new Error("Sticky addresses are not supported!");
+
+        const {chainInterface} = this.getChain(chainId);
+        const normalizedAddress = chainInterface.normalizeAddress(address);
+
+        const addressIdentifier = chainId+"-"+normalizedAddress;
+
+        const result = this.stickyAddresses.data[addressIdentifier];
+        if(result==null) return;
+
+        const btcAddress = result.address;
+
+        if(this.bitcoin.isOwnedAddress!=null) {
+            if(!(await this.bitcoin.isOwnedAddress(btcAddress))) {
+                this.logger.warn(`getStickyAddress(): Failed to get sticky address, address ${btcAddress} is not controlled by our bitcoin wallet!`);
+                return;
+            }
+        }
+
+        return btcAddress;
+    }
+
+    async addStickyAddress(chainId: string, address: string, btcAddress: string) {
+        if(this.stickyAddresses==null) throw new Error("Sticky addresses are not supported!");
+
+        const {chainInterface} = this.getChain(chainId);
+        const normalizedAddress = chainInterface.normalizeAddress(address);
+
+        if(this.bitcoin.isOwnedAddress!=null) {
+            if(!(await this.bitcoin.isOwnedAddress(btcAddress))) {
+                this.logger.warn(`addStickyAddress(): Failed to create sticky address, address ${btcAddress} is not controlled by our bitcoin wallet!`);
+                return;
+            }
+        }
+
+        const addressIdentifier = chainId+"-"+normalizedAddress;
+
+        if(this.stickyAddresses.data[addressIdentifier]!=null) {
+            this.logger.warn(`addStickyAddress(): Failed to create sticky address, address sticky address already exists for ${addressIdentifier}!`);
+            return;
+        }
+        await this.stickyAddresses.saveData(addressIdentifier, new StickyAddress(btcAddress));
     }
 
     protected async processClaimEvent(swap: SpvVaultSwap | null, event: SpvVaultClaimEvent): Promise<void> {
@@ -103,6 +153,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         //Update swap
         swap.txIds.claim = event.meta?.txId;
         await this.removeSwapData(swap, SpvVaultSwapState.CLAIMED);
+        if(swap.saveStickyAddress) try {
+            await this.addStickyAddress(swap.chainIdentifier, swap.recipient, swap.btcAddress);
+        } catch (e) {
+            this.logger.error(`processClaimEvent(): Failed to create the sticky address for swap ${swap.getIdentifier()}`);
+        }
     }
 
     /**
@@ -161,6 +216,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             if(swap.btcTxId!=null) this.btcTxIdIndex.set(swap.btcTxId, swap);
         }
         await this.Vaults.init();
+        if(this.stickyAddresses!=null) {
+            await this.stickyAddresses.init();
+            await this.stickyAddresses.loadData(StickyAddress);
+        }
         this.subscribeToEvents();
         await PluginManager.serviceInitialize(this);
     }
@@ -169,7 +228,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         if(swap.state===SpvVaultSwapState.CREATED) {
             if(swap.expiry < Date.now()/1000) {
                 await this.removeSwapData(swap, SpvVaultSwapState.EXPIRED);
-                await this.bitcoin.addUnusedAddress(swap.btcAddress);
+                if(!swap.hasStickyAddress) await this.bitcoin.addUnusedAddress(swap.btcAddress);
             }
         }
 
@@ -260,10 +319,14 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             metadata.times.requestReceived = Date.now();
 
             /**
+             * address: string              smart chain address of the recipient
              * token: string                Desired token to use
              * gasToken: string
              */
             const preFetchParsedBody = await req.paramReader.getParams({
+                address: (val: string) => val!=null &&
+                    typeof(val)==="string" &&
+                    chainInterface.isValidAddress(val, true) ? val : null,
                 token: (val: string) => val!=null &&
                     typeof(val)==="string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -275,6 +338,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 code: 20100,
                 msg: "Invalid request body"
             };
+
+            const stickyAddressObject = req.paramReader.getExistingParamsOrNull({
+                stickyAddress: FieldTypeEnum.BooleanOptional
+            });
+            const useStickyAddress = stickyAddressObject?.stickyAddress;
 
             //Create abortController for parallel prefetches
             const responseStream = res.responseStream;
@@ -293,7 +361,15 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
             //Listener that re-adds the returned bitcoin address to the unused address list if request fails or closes
             let abortAddUnusedAddressListener: () => void;
-            const bitcoinAddressPrefetch = this.bitcoin.getAddress().then(value => {
+
+            const bitcoinAddressPrefetch: Promise<{address: string, isStickyAddress: boolean} | null> = (async () => {
+                if(useStickyAddress) {
+                    const result = await this.getStickyAddress(chainIdentifier, preFetchParsedBody.address);
+                    if(result!=null) return {address: result, isStickyAddress: true};
+                }
+
+                const value = await this.bitcoin.getAddress();
+
                 //Already aborted
                 if(abortController.signal.aborted) {
                     this.bitcoin.addUnusedAddress(value);
@@ -303,14 +379,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 abortController.signal.addEventListener("abort", abortAddUnusedAddressListener = () => {
                     this.bitcoin.addUnusedAddress(value);
                 });
-                return value;
-            }).catch(e => {
+                return {address: value, isStickyAddress: false};
+            })().catch(e => {
                 abortController.abort(e);
                 return null;
             });
 
             /**
-             * address: string              smart chain address of the recipient
              * amount: string               amount (in sats)
              * gasAmount: string            Desired amount in gas token to also get
              * exactOut: boolean            Whether the swap should be an exact out instead of exact in swap
@@ -318,9 +393,6 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
              * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
              */
             const actualParsedBody = await req.paramReader.getParams({
-                address: (val: string) => val!=null &&
-                    typeof(val)==="string" &&
-                    chainInterface.isValidAddress(val, true) ? val : null,
                 amount: FieldTypeEnum.BigInt,
                 gasAmount: FieldTypeEnum.BigInt,
                 exactOut: FieldTypeEnum.BooleanOptional,
@@ -411,9 +483,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
             //Create swap receive bitcoin address
             const btcFeeRate = await btcFeeRatePrefetch;
-            const receiveAddress = await bitcoinAddressPrefetch;
+            const btcAddressObject = await bitcoinAddressPrefetch;
             abortController.signal.throwIfAborted();
             metadata.times.addressCreated = Date.now();
+
+            const receiveAddress = btcAddressObject.address;
+            const hasStickyAddress = btcAddressObject.isStickyAddress;
 
             //Adjust the amounts based on passed fees
             if(parsedBody.exactOut) {
@@ -445,6 +520,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 useToken, gasToken
             );
             swap.metadata = metadata;
+            swap.saveStickyAddress = useStickyAddress && !hasStickyAddress
+            swap.hasStickyAddress = hasStickyAddress;
 
             //We can remove the listener to add unused address now, as we are about to save the swap
             abortController.signal.removeEventListener("abort", abortAddUnusedAddressListener);

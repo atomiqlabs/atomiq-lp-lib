@@ -9,6 +9,7 @@ import { ISpvVaultSigner } from "../../wallets/ISpvVaultSigner";
 import { SpvVault } from "./SpvVault";
 import { FromBtcAmountAssertions } from "../assertions/FromBtcAmountAssertions";
 import { SpvVaults } from "./SpvVaults";
+import { StickyAddress } from "./StickyAddress";
 export type SpvVaultSwapHandlerConfig = SwapBaseConfig & {
     vaultsCheckInterval: number;
     gasTokenMax: {
@@ -40,7 +41,10 @@ export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVa
     readonly AmountAssertions: FromBtcAmountAssertions;
     readonly Vaults: SpvVaults;
     config: SpvVaultSwapHandlerConfig;
-    constructor(storageDirectory: IIntermediaryStorage<SpvVaultSwap>, vaultStorage: IStorageManager<SpvVault>, path: string, chainsData: MultichainData, swapPricing: ISwapPrice, bitcoin: IBitcoinWallet, bitcoinRpc: BitcoinRpc<BtcBlock>, spvVaultSigner: ISpvVaultSigner, config: SpvVaultSwapHandlerConfig);
+    readonly stickyAddresses?: IStorageManager<StickyAddress>;
+    constructor(storageDirectory: IIntermediaryStorage<SpvVaultSwap>, vaultStorage: IStorageManager<SpvVault>, path: string, chainsData: MultichainData, swapPricing: ISwapPrice, bitcoin: IBitcoinWallet, bitcoinRpc: BitcoinRpc<BtcBlock>, spvVaultSigner: ISpvVaultSigner, config: SpvVaultSwapHandlerConfig, stickyAddresses?: IStorageManager<StickyAddress>);
+    private getStickyAddress;
+    addStickyAddress(chainId: string, address: string, btcAddress: string): Promise<void>;
     protected processClaimEvent(swap: SpvVaultSwap | null, event: SpvVaultClaimEvent): Promise<void>;
     /**
      * Chain event processor
