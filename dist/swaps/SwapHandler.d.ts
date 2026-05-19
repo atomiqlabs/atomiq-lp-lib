@@ -37,10 +37,16 @@ export type SwapBaseConfig = {
     bitcoinBlocktime: bigint;
     baseFee: bigint;
     feePPM: bigint;
-    max: bigint;
-    min: bigint;
     safetyFactor: bigint;
     swapCheckInterval: number;
+    max: bigint;
+    min: bigint;
+    minMaxOverrides?: {
+        [chainIdentifier: string]: {
+            min: bigint;
+            max: bigint;
+        };
+    };
 };
 export type MultichainData = {
     chains: {

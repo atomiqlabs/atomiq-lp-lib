@@ -21,12 +21,15 @@ export class ToBtcAmountAssertions extends AmountAssertions {
         request: RequestData<ToBtcLnRequestType | ToBtcRequestType>,
         requestedAmount: {input: boolean, amount: bigint, token: string}
     ): Promise<{baseFee: bigint, feePPM: bigint}> {
+        const min = this.getSwapMinimum(request.chainIdentifier);
+        const max = this.getSwapMaximum(request.chainIdentifier);
+
         const res = await PluginManager.onHandlePreToBtcQuote(
             swapType,
             request,
             requestedAmount,
             request.chainIdentifier,
-            {minInBtc: this.config.min, maxInBtc: this.config.max},
+            {minInBtc: min, maxInBtc: max},
             {baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM},
         );
         if(res!=null) {
@@ -39,7 +42,7 @@ export class ToBtcAmountAssertions extends AmountAssertions {
             }
         }
         if(!requestedAmount.input) {
-            this.checkBtcAmountInBounds(requestedAmount.amount);
+            this.checkBtcAmountInBounds(requestedAmount.amount, request.chainIdentifier);
         }
         return {
             baseFee: this.config.baseFee,
@@ -77,12 +80,15 @@ export class ToBtcAmountAssertions extends AmountAssertions {
     }> {
         const chainIdentifier = request.chainIdentifier;
 
+        const min = this.getSwapMinimum(chainIdentifier);
+        const max = this.getSwapMaximum(chainIdentifier);
+
         const res = await PluginManager.onHandlePostToBtcQuote<T>(
             swapType,
             request,
             requestedAmount,
             request.chainIdentifier,
-            {minInBtc: this.config.min, maxInBtc: this.config.max},
+            {minInBtc: min, maxInBtc: max},
             {baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM, networkFeeGetter: getNetworkFee}
         );
         signal.throwIfAborted();
@@ -128,18 +134,18 @@ export class ToBtcAmountAssertions extends AmountAssertions {
             amountBD = amountBD - fees.baseFee;
 
             //If it's already smaller than minimum, set it to minimum so we can calculate the network fee
-            if(amountBD < (this.config.min * 95n / 100n)) {
-                amountBD = this.config.min;
+            if(amountBD < (min * 95n / 100n)) {
+                amountBD = min;
                 tooLow = true;
             }
             //If it's already larger than maximum, set it to maximum so we can calculate the network fee
-            if(amountBD > (this.config.max * 105n / 100n)) {
-                amountBD = this.config.max;
+            if(amountBD > (max * 105n / 100n)) {
+                amountBD = max;
                 tooHigh = true;
             }
         } else {
             amountBD = requestedAmount.amount;
-            this.checkBtcAmountInBounds(amountBD);
+            this.checkBtcAmountInBounds(amountBD, chainIdentifier);
         }
 
         const resp = await getNetworkFee(amountBD);
@@ -152,12 +158,12 @@ export class ToBtcAmountAssertions extends AmountAssertions {
             //Decrease by percentage fee
             amountBD = amountBD * 1000000n / (fees.feePPM + 1000000n);
 
-            tooHigh ||= amountBD > (this.config.max * 105n / 100n);
-            tooLow ||= amountBD < (this.config.min * 95n / 100n);
+            tooHigh ||= amountBD > (max * 105n / 100n);
+            tooLow ||= amountBD < (min * 95n / 100n);
             if(tooLow || tooHigh) {
                 //Compute min/max
-                let adjustedMin = this.config.min * (fees.feePPM + 1000000n) / 1000000n;
-                let adjustedMax = this.config.max * (fees.feePPM + 1000000n) / 1000000n;
+                let adjustedMin = min * (fees.feePPM + 1000000n) / 1000000n;
+                let adjustedMax = max * (fees.feePPM + 1000000n) / 1000000n;
                 adjustedMin = adjustedMin + fees.baseFee + resp.networkFee;
                 adjustedMax = adjustedMax + fees.baseFee + resp.networkFee;
                 const minIn = await this.swapPricing.getFromBtcSwapAmount(

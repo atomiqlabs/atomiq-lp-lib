@@ -4,19 +4,28 @@ export type AmountAssertionsConfig = {
     max: bigint;
     baseFee: bigint;
     feePPM: bigint;
+    minMaxOverrides?: {
+        [chainIdentifier: string]: {
+            min: bigint;
+            max: bigint;
+        };
+    };
 };
 export declare abstract class AmountAssertions {
     readonly config: AmountAssertionsConfig;
     readonly swapPricing: ISwapPrice;
     constructor(config: AmountAssertionsConfig, swapPricing: ISwapPrice);
+    getSwapMinimum(chainIdentifier: string): bigint;
+    getSwapMaximum(chainIdentifier: string): bigint;
     /**
      * Checks whether the bitcoin amount is within specified min/max bounds
      *
      * @param amount
+     * @param chainIdentifier
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    protected checkBtcAmountInBounds(amount: bigint): void;
+    protected checkBtcAmountInBounds(amount: bigint, chainIdentifier: string): void;
     /**
      * Handles and throws plugin errors
      *

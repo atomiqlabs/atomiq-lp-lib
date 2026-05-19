@@ -42,12 +42,15 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         securityDepositApyPPM?: bigint,
         securityDepositBaseMultiplierPPM?: bigint,
     }> {
+        const min = this.getSwapMinimum(request.chainIdentifier);
+        const max = this.getSwapMaximum(request.chainIdentifier);
+
         const res = await PluginManager.onHandlePreFromBtcQuote(
             swapType,
             request,
             requestedAmount,
             request.chainIdentifier,
-            {minInBtc: this.config.min, maxInBtc: this.config.max},
+            {minInBtc: min, maxInBtc: max},
             {baseFeeInBtc: this.config.baseFee, feePPM: this.config.feePPM},
             gasAmount
         );
@@ -62,7 +65,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
                 }
             }
         }
-        if(requestedAmount.input) this.checkBtcAmountInBounds(requestedAmount.amount);
+        if(requestedAmount.input) this.checkBtcAmountInBounds(requestedAmount.amount, request.chainIdentifier);
 
         if(gasAmount!=null && gasAmount.amount!==0n) {
             if(gasAmount.amount > (this.config.gasTokenMax?.[request.chainIdentifier] ?? 0n)) {
@@ -117,12 +120,15 @@ export class FromBtcAmountAssertions extends AmountAssertions {
         let securityDepositApyPPM: bigint;
         let securityDepositBaseMultiplierPPM: bigint;
 
+        const min = this.getSwapMinimum(chainIdentifier);
+        const max = this.getSwapMaximum(chainIdentifier);
+
         const res = await PluginManager.onHandlePostFromBtcQuote(
             swapType,
             request,
             requestedAmount,
             chainIdentifier,
-            {minInBtc: this.config.min, maxInBtc: this.config.max},
+            {minInBtc: min, maxInBtc: max},
             {baseFeeInBtc: fees.baseFee, feePPM: fees.feePPM},
             gasTokenAmount
         );
@@ -177,11 +183,11 @@ export class FromBtcAmountAssertions extends AmountAssertions {
             swapFee = _amountBD - amountBD;
             amountBD = _amountBD;
 
-            const tooLow = amountBD < (this.config.min * 95n / 100n);
-            const tooHigh = amountBD > (this.config.max * 105n / 100n);
+            const tooLow = amountBD < (min * 95n / 100n);
+            const tooHigh = amountBD > (max * 105n / 100n);
             if(tooLow || tooHigh) {
-                const adjustedMin = this.config.min * (1000000n - fees.feePPM) / (1000000n - fees.baseFee);
-                const adjustedMax = this.config.max * (1000000n - fees.feePPM) / (1000000n - fees.baseFee);
+                const adjustedMin = min * (1000000n - fees.feePPM) / (1000000n - fees.baseFee);
+                const adjustedMax = max * (1000000n - fees.feePPM) / (1000000n - fees.baseFee);
                 const minIn = await this.swapPricing.getFromBtcSwapAmount(
                     adjustedMin, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch
                 );
@@ -198,7 +204,7 @@ export class FromBtcAmountAssertions extends AmountAssertions {
                 };
             }
         } else {
-            this.checkBtcAmountInBounds(requestedAmount.amount);
+            this.checkBtcAmountInBounds(requestedAmount.amount, chainIdentifier);
             amountBD = requestedAmount.amount - amountBDgas;
             swapFee = fees.baseFee + ((amountBD * fees.feePPM + 999_999n) / 1000000n);
             if(amountBD - swapFee < 0n) {
@@ -206,8 +212,8 @@ export class FromBtcAmountAssertions extends AmountAssertions {
                     code: 20003,
                     msg: "Amount too low!",
                     data: {
-                        min: this.config.min.toString(10),
-                        max: this.config.max.toString(10)
+                        min: min.toString(10),
+                        max: max.toString(10)
                     }
                 };
             }

@@ -7,31 +7,40 @@ class AmountAssertions {
         this.config = config;
         this.swapPricing = swapPricing;
     }
+    getSwapMinimum(chainIdentifier) {
+        return this.config.minMaxOverrides?.[chainIdentifier]?.min ?? this.config.min;
+    }
+    getSwapMaximum(chainIdentifier) {
+        return this.config.minMaxOverrides?.[chainIdentifier]?.max ?? this.config.max;
+    }
     /**
      * Checks whether the bitcoin amount is within specified min/max bounds
      *
      * @param amount
+     * @param chainIdentifier
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    checkBtcAmountInBounds(amount) {
-        if (amount < this.config.min) {
+    checkBtcAmountInBounds(amount, chainIdentifier) {
+        const min = this.getSwapMinimum(chainIdentifier);
+        const max = this.getSwapMaximum(chainIdentifier);
+        if (amount < min) {
             throw {
                 code: 20003,
                 msg: "Amount too low!",
                 data: {
-                    min: this.config.min.toString(10),
-                    max: this.config.max.toString(10)
+                    min: min.toString(10),
+                    max: max.toString(10)
                 }
             };
         }
-        if (amount > this.config.max) {
+        if (amount > max) {
             throw {
                 code: 20004,
                 msg: "Amount too high!",
                 data: {
-                    min: this.config.min.toString(10),
-                    max: this.config.max.toString(10)
+                    min: min.toString(10),
+                    max: max.toString(10)
                 }
             };
         }

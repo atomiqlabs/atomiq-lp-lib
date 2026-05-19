@@ -1,7 +1,16 @@
 import {ISwapPrice} from "../../prices/ISwapPrice";
 import {isQuoteAmountTooHigh, isQuoteAmountTooLow, isQuoteThrow} from "../../plugins/IPlugin";
 
-export type AmountAssertionsConfig = {min: bigint, max: bigint, baseFee: bigint, feePPM: bigint};
+export type AmountAssertionsConfig = {
+    min: bigint,
+    max: bigint,
+    baseFee: bigint,
+    feePPM: bigint,
+
+    minMaxOverrides?: {
+        [chainIdentifier: string]: {min: bigint, max: bigint}
+    }
+};
 
 export abstract class AmountAssertions {
 
@@ -13,32 +22,43 @@ export abstract class AmountAssertions {
         this.swapPricing = swapPricing;
     }
 
+    getSwapMinimum(chainIdentifier: string) {
+        return this.config.minMaxOverrides?.[chainIdentifier]?.min ?? this.config.min;
+    }
+
+    getSwapMaximum(chainIdentifier: string) {
+        return this.config.minMaxOverrides?.[chainIdentifier]?.max ?? this.config.max;
+    }
+
     /**
      * Checks whether the bitcoin amount is within specified min/max bounds
      *
      * @param amount
+     * @param chainIdentifier
      * @protected
      * @throws {DefinedRuntimeError} will throw an error if the amount is outside minimum/maximum bounds
      */
-    protected checkBtcAmountInBounds(amount: bigint): void {
-        if (amount < this.config.min) {
+    protected checkBtcAmountInBounds(amount: bigint, chainIdentifier: string): void {
+        const min = this.getSwapMinimum(chainIdentifier);
+        const max = this.getSwapMaximum(chainIdentifier);
+        if (amount < min) {
             throw {
                 code: 20003,
                 msg: "Amount too low!",
                 data: {
-                    min: this.config.min.toString(10),
-                    max: this.config.max.toString(10)
+                    min: min.toString(10),
+                    max: max.toString(10)
                 }
             };
         }
 
-        if(amount > this.config.max) {
+        if(amount > max) {
             throw {
                 code: 20004,
                 msg: "Amount too high!",
                 data: {
-                    min: this.config.min.toString(10),
-                    max: this.config.max.toString(10)
+                    min: min.toString(10),
+                    max: max.toString(10)
                 }
             };
         }

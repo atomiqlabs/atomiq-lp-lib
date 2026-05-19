@@ -185,8 +185,8 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                 swap.adjustedOutput = swap.outputTokens;
             } else {
                 //If lower than minimum then ignore
-                if(sentSats < this.config.min) return;
-                if(sentSats > this.config.max) {
+                if(sentSats < this.AmountAssertions.getSwapMinimum(swap.chainIdentifier)) return;
+                if(sentSats > this.AmountAssertions.getSwapMaximum(swap.chainIdentifier)) {
                     swap.adjustedInput = sentSats;
                     swap.btcTx = tx;
                     swap.txId = tx.txid;
