@@ -17,6 +17,17 @@ const AmountAssertions_1 = require("../assertions/AmountAssertions");
 const IPlugin_1 = require("../../plugins/IPlugin");
 const StickyAddress_1 = require("./StickyAddress");
 const TX_MAX_VSIZE = 16 * 1024;
+function parseAmountAdjustUtxos(amountAdjustUtxos) {
+    if (!Array.isArray(amountAdjustUtxos))
+        return null;
+    if (amountAdjustUtxos.length > 250)
+        return null;
+    const validArray = amountAdjustUtxos.every(value => value != null && typeof (value) === "object" && typeof (value.value) === "number" && typeof (value.vSize) === "number" &&
+        (value.cpfp == null || (typeof (value.cpfp) === "object" && typeof (value.cpfp.effectiveVSize) === "number" && typeof (value.cpfp.effectiveFeeRate) === "number")));
+    if (!validArray)
+        return null;
+    return amountAdjustUtxos;
+}
 class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
     constructor(storageDirectory, vaultStorage, path, chainsData, swapPricing, bitcoin, bitcoinRpc, spvVaultSigner, config, stickyAddresses) {
         super(storageDirectory, path, chainsData, swapPricing);
@@ -309,6 +320,23 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     code: 20100,
                     msg: "Invalid request body"
                 };
+            const inputAmountAdjustments = req.paramReader.getExistingParamsOrNull({
+                amountUtxos: SchemaVerifier_1.FieldTypeEnum.AnyOptional,
+                amountFeeRate: SchemaVerifier_1.FieldTypeEnum.NumberOptional
+            });
+            if (inputAmountAdjustments == null)
+                throw {
+                    code: 20100,
+                    msg: "Invalid request body"
+                };
+            const clientInputUtxos = inputAmountAdjustments?.amountUtxos != null
+                ? parseAmountAdjustUtxos(inputAmountAdjustments.amountUtxos)
+                : null;
+            if (inputAmountAdjustments?.amountUtxos != null && clientInputUtxos == null)
+                throw {
+                    code: 20100,
+                    msg: "Invalid request body (amountUtxos)"
+                };
             const parsedBody = { ...preFetchParsedBody, ...actualParsedBody };
             metadata.request = parsedBody;
             if (parsedBody.gasToken !== chainInterface.getNativeCurrencyAddress())
@@ -333,6 +361,44 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     parsedBody.amount,
                 token: parsedBody.token
             };
+            if (clientInputUtxos != null) {
+                if (parsedBody.exactOut)
+                    throw {
+                        code: 20193,
+                        msg: "amountAdjustUtxos cannot be specified for exactOut swaps!"
+                    };
+                let btcFeeRate = await btcFeeRatePrefetch;
+                if (inputAmountAdjustments.amountFeeRate != null && inputAmountAdjustments.amountFeeRate > btcFeeRate)
+                    btcFeeRate = inputAmountAdjustments.amountFeeRate;
+                let feeAccumulator = 0;
+                let valueAccumulator = 0;
+                for (let utxo of clientInputUtxos) {
+                    const cpfpAdditionalFee = utxo.cpfp == null ? 0 : Math.ceil(utxo.cpfp.effectiveVSize * Math.max(0, btcFeeRate - utxo.cpfp.effectiveFeeRate));
+                    const spendFee = utxo.vSize * btcFeeRate;
+                    const totalFee = cpfpAdditionalFee + spendFee;
+                    if (totalFee > utxo.value)
+                        continue; //Skip detrimental UTXO
+                    feeAccumulator += totalFee;
+                    valueAccumulator += utxo.value;
+                }
+                let baseTxVSize = 10.5; // 4b version, 1b inputs, 1b outputs, 4b locktime, 0.5vB witness flag + witness elements count
+                //vault input and output
+                baseTxVSize += 32 + 4 + 1 + 4; //Input base
+                baseTxVSize += this.vaultSigner.getAddressType() === "p2tr" ? (1 + 1 + 65) / 4 : (1 + 1 + 72 + 1 + 33) / 4;
+                baseTxVSize += 8 + 1; //Output base
+                baseTxVSize += this.vaultSigner.getAddressType() === "p2tr" ? 34 : 22;
+                //opreturn output
+                baseTxVSize += 8 + 1; //Output base
+                const opReturnDataSize = spvVaultContract.toOpReturnData(parsedBody.address, parsedBody.gasAmount > 0 ? [0xffffffffffffffffn, 0xffffffffffffffffn] : [0xffffffffffffffffn]).length;
+                baseTxVSize += (opReturnDataSize <= 0x4b ? 2 : 3 /*Needs an OP_PUSHDATA1 opcode*/) + opReturnDataSize;
+                //LP output
+                baseTxVSize += 8 + 1; //Output base
+                baseTxVSize += this.bitcoin.getAddressType() === "p2tr" ? 34 : this.bitcoin.getAddressType() === "p2wpkh" ? 22 : 23;
+                const baseTxFee = Math.ceil(baseTxVSize) * btcFeeRate;
+                feeAccumulator += baseTxFee;
+                const amount = Math.floor(valueAccumulator - Math.ceil(feeAccumulator));
+                requestedAmount.amount = BigInt(amount);
+            }
             const gasTokenAmount = {
                 input: false,
                 amount: parsedBody.gasAmount * (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate) / 100000n,
@@ -420,7 +486,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     gasSwapFee: gasSwapFeeInToken.toString(10),
                     callerFeeShare: callerFeeShare.toString(10),
                     frontingFeeShare: frontingFeeShare.toString(10),
-                    executionFeeShare: executionFeeShare.toString(10)
+                    executionFeeShare: executionFeeShare.toString(10),
+                    usedUtxoInputCalculation: clientInputUtxos != null
                 }
             });
         }));
