@@ -26,6 +26,12 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         this.config.invoiceTimeoutSeconds = this.config.invoiceTimeoutSeconds || 90;
         this.lightning = lightning;
         this.LightningAssertions = new LightningAssertions_1.LightningAssertions(this.logger, lightning);
+        for (let chain in this.allowedTokens) {
+            //Remove chains that don't support from btcln auto swaps
+            const { swapContract } = this.getChain(chain);
+            if (!swapContract.supportsInitWithoutClaimer)
+                this.allowedTokens[chain].clear();
+        }
     }
     async processPastSwap(swap) {
         const { swapContract, signer } = this.getChain(swap.chainIdentifier);

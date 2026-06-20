@@ -41,6 +41,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         this.AmountAssertions = new FromBtcAmountAssertions_1.FromBtcAmountAssertions(config, swapPricing);
         this.Vaults = new SpvVaults_1.SpvVaults(vaultStorage, bitcoin, spvVaultSigner, bitcoinRpc, this.chains, config);
         this.stickyAddresses = stickyAddresses;
+        for (let chain in this.allowedTokens) {
+            //Remove chains that don't support spv vault swaps
+            const { spvVaultContract } = this.getChain(chain);
+            if (spvVaultContract == null)
+                this.allowedTokens[chain].clear();
+        }
     }
     async getStickyAddress(chainId, address) {
         if (this.stickyAddresses == null)
