@@ -27,7 +27,7 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
     }
 
     /**
-     * Returns coin price in µSat (sats-per-token * 1_000_000)
+     * Returns coin price in uSat (sats-per-token * 1_000_000)
      *
      * @param coin
      */

@@ -13,7 +13,7 @@ export abstract class ISwapPrice<T extends {decimals: number} = {decimals: numbe
     }
 
     /**
-     * Returns coin price in µSat (sats-per-token * 1_000_000)
+     * Returns coin price in uSat (sats-per-token * 1_000_000)
      *
      * @param tokenData
      */
