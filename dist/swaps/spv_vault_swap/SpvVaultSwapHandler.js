@@ -328,13 +328,36 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 };
             const inputAmountAdjustments = req.paramReader.getExistingParamsOrNull({
                 amountUtxos: SchemaVerifier_1.FieldTypeEnum.AnyOptional,
-                amountFeeRate: SchemaVerifier_1.FieldTypeEnum.NumberOptional
+                amountFeeRate: SchemaVerifier_1.FieldTypeEnum.NumberOptional,
+                amountSkipDetrimental: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
+                amountChangeValue: SchemaVerifier_1.FieldTypeEnum.BigIntOptional,
+                amountChangeVSize: SchemaVerifier_1.FieldTypeEnum.NumberOptional
             });
             if (inputAmountAdjustments == null)
                 throw {
                     code: 20100,
                     msg: "Invalid request body"
                 };
+            const amountSkipDetrimental = inputAmountAdjustments.amountSkipDetrimental ?? true;
+            const amountChangeValue = inputAmountAdjustments.amountChangeValue;
+            const amountChangeVSize = inputAmountAdjustments.amountChangeVSize;
+            if (amountChangeValue != null) {
+                if (amountChangeVSize == null)
+                    throw {
+                        code: 20100,
+                        msg: "Invalid request body (amountChangeVSize needs to be set with amountChangeValue)"
+                    };
+                if (amountChangeValue <= 0n)
+                    throw {
+                        code: 20100,
+                        msg: "Invalid request body (amountChangeValue negative or zero)"
+                    };
+                if (isNaN(amountChangeVSize) || !isFinite(amountChangeVSize) || amountChangeVSize <= 0)
+                    throw {
+                        code: 20100,
+                        msg: "Invalid request body (amountChangeVSize negative, zero, NaN or infinity)"
+                    };
+            }
             const clientInputUtxos = inputAmountAdjustments?.amountUtxos != null
                 ? parseAmountAdjustUtxos(inputAmountAdjustments.amountUtxos)
                 : null;
@@ -377,17 +400,21 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 if (inputAmountAdjustments.amountFeeRate != null && inputAmountAdjustments.amountFeeRate > btcFeeRate)
                     btcFeeRate = inputAmountAdjustments.amountFeeRate;
                 let feeAccumulator = 0;
-                let valueAccumulator = 0;
+                let valueAccumulator = 0n;
                 for (let utxo of clientInputUtxos) {
                     const cpfpAdditionalFee = utxo.cpfp == null ? 0 : Math.ceil(utxo.cpfp.effectiveVSize * Math.max(0, btcFeeRate - utxo.cpfp.effectiveFeeRate));
                     const spendFee = utxo.vSize * btcFeeRate;
                     const totalFee = cpfpAdditionalFee + spendFee;
-                    if (totalFee > utxo.value)
+                    if (amountSkipDetrimental && totalFee > utxo.value)
                         continue; //Skip detrimental UTXO
                     feeAccumulator += totalFee;
-                    valueAccumulator += utxo.value;
+                    valueAccumulator += BigInt(utxo.value);
                 }
                 let baseTxVSize = 10.5; // 4b version, 1b inputs, 1b outputs, 4b locktime, 0.5vB witness flag + witness elements count
+                if (amountChangeValue != null) {
+                    valueAccumulator -= amountChangeValue;
+                    baseTxVSize += amountChangeVSize;
+                }
                 //vault input and output
                 baseTxVSize += 32 + 4 + 1 + 4; //Input base
                 baseTxVSize += this.vaultSigner.getAddressType() === "p2tr" ? (1 + 1 + 65) / 4 : (1 + 1 + 72 + 1 + 33) / 4;
@@ -402,8 +429,13 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 baseTxVSize += this.bitcoin.getAddressType() === "p2tr" ? 34 : this.bitcoin.getAddressType() === "p2wpkh" ? 22 : 23;
                 const baseTxFee = Math.ceil(baseTxVSize) * btcFeeRate;
                 feeAccumulator += baseTxFee;
-                const amount = Math.floor(valueAccumulator - Math.ceil(feeAccumulator));
-                requestedAmount.amount = BigInt(amount);
+                const amount = valueAccumulator - BigInt(Math.ceil(feeAccumulator));
+                if (amount <= 0n)
+                    throw {
+                        code: 20194,
+                        msg: "Resulting UTXO-adjustment amount too low!"
+                    };
+                requestedAmount.amount = amount;
             }
             const gasTokenAmount = {
                 input: false,

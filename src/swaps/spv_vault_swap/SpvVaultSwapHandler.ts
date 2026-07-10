@@ -433,12 +433,32 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
             const inputAmountAdjustments = req.paramReader.getExistingParamsOrNull({
                 amountUtxos: FieldTypeEnum.AnyOptional,
-                amountFeeRate: FieldTypeEnum.NumberOptional
+                amountFeeRate: FieldTypeEnum.NumberOptional,
+                amountSkipDetrimental: FieldTypeEnum.BooleanOptional, //Default to true
+                amountChangeValue: FieldTypeEnum.BigIntOptional,
+                amountChangeVSize: FieldTypeEnum.NumberOptional
             });
             if(inputAmountAdjustments==null) throw {
                 code: 20100,
                 msg: "Invalid request body"
             };
+            const amountSkipDetrimental = inputAmountAdjustments.amountSkipDetrimental ?? true;
+            const amountChangeValue = inputAmountAdjustments.amountChangeValue;
+            const amountChangeVSize = inputAmountAdjustments.amountChangeVSize;
+            if(amountChangeValue!=null) {
+                if(amountChangeVSize==null) throw {
+                    code: 20100,
+                    msg: "Invalid request body (amountChangeVSize needs to be set with amountChangeValue)"
+                };
+                if(amountChangeValue<=0n) throw {
+                    code: 20100,
+                    msg: "Invalid request body (amountChangeValue negative or zero)"
+                };
+                if(isNaN(amountChangeVSize) || !isFinite(amountChangeVSize) || amountChangeVSize<=0) throw {
+                    code: 20100,
+                    msg: "Invalid request body (amountChangeVSize negative, zero, NaN or infinity)"
+                };
+            }
 
             const clientInputUtxos: AmountAdjustUtxo[] | null = inputAmountAdjustments?.amountUtxos!=null
                 ? parseAmountAdjustUtxos(inputAmountAdjustments.amountUtxos)
@@ -483,17 +503,21 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                     btcFeeRate = inputAmountAdjustments.amountFeeRate;
 
                 let feeAccumulator: number = 0;
-                let valueAccumulator: number = 0;
+                let valueAccumulator: bigint = 0n;
                 for(let utxo of clientInputUtxos) {
                     const cpfpAdditionalFee: number = utxo.cpfp==null ? 0 : Math.ceil(utxo.cpfp.effectiveVSize * Math.max(0, btcFeeRate - utxo.cpfp.effectiveFeeRate));
                     const spendFee: number = utxo.vSize * btcFeeRate;
                     const totalFee: number = cpfpAdditionalFee + spendFee;
-                    if(totalFee > utxo.value) continue; //Skip detrimental UTXO
+                    if(amountSkipDetrimental && totalFee > utxo.value) continue; //Skip detrimental UTXO
                     feeAccumulator += totalFee;
-                    valueAccumulator += utxo.value;
+                    valueAccumulator += BigInt(utxo.value);
                 }
 
                 let baseTxVSize: number = 10.5; // 4b version, 1b inputs, 1b outputs, 4b locktime, 0.5vB witness flag + witness elements count
+                if(amountChangeValue!=null) {
+                    valueAccumulator -= amountChangeValue;
+                    baseTxVSize += amountChangeVSize;
+                }
                 //vault input and output
                 baseTxVSize += 32 + 4 + 1 + 4; //Input base
                 baseTxVSize += this.vaultSigner.getAddressType()==="p2tr" ? (1+1+65)/4 : (1+1+72+1+33)/4;
@@ -510,8 +534,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 const baseTxFee = Math.ceil(baseTxVSize) * btcFeeRate;
                 feeAccumulator += baseTxFee;
 
-                const amount = Math.floor(valueAccumulator - Math.ceil(feeAccumulator));
-                requestedAmount.amount = BigInt(amount);
+                const amount = valueAccumulator - BigInt(Math.ceil(feeAccumulator));
+                if(amount <= 0n) throw {
+                    code: 20194,
+                    msg: "Resulting UTXO-adjustment amount too low!"
+                };
+                requestedAmount.amount = amount;
             }
 
             const gasTokenAmount = {
