@@ -13,7 +13,7 @@ export declare abstract class ISwapPrice<T extends {
     protected coinsMap: ISwapPriceCoinsMap<T>;
     protected constructor(coinsMap: ISwapPriceCoinsMap<T>);
     /**
-     * Returns coin price in mSat
+     * Returns coin price in uSat (sats-per-token * 1_000_000)
      *
      * @param tokenData
      */

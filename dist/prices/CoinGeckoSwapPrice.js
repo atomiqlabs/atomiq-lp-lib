@@ -10,7 +10,7 @@ class CoinGeckoSwapPrice extends ISwapPrice_1.ISwapPrice {
         this.url = url || "https://api.coingecko.com/api/v3";
     }
     /**
-     * Returns coin price in mSat
+     * Returns coin price in uSat (sats-per-token * 1_000_000)
      *
      * @param coin
      */
@@ -18,7 +18,7 @@ class CoinGeckoSwapPrice extends ISwapPrice_1.ISwapPrice {
         const coinId = coin.coinId;
         if (coinId.startsWith("$fixed-")) {
             const amt = parseFloat(coinId.substring(7));
-            return BigInt(Math.floor(amt * 1000));
+            return BigInt(Math.floor(amt * 1000000));
         }
         const cachedValue = this.cache[coinId];
         if (cachedValue != null && cachedValue.expiry > Date.now()) {
@@ -40,7 +40,7 @@ class CoinGeckoSwapPrice extends ISwapPrice_1.ISwapPrice {
         }
         let jsonBody = await response.json();
         const amt = jsonBody[coinId].sats;
-        const result = BigInt(Math.floor(amt * 1000));
+        const result = BigInt(Math.floor(amt * 1000000));
         this.cache[coinId] = {
             price: result,
             expiry: Date.now() + CACHE_DURATION

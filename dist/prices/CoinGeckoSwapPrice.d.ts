@@ -23,7 +23,7 @@ export declare class CoinGeckoSwapPrice extends ISwapPrice<{
         decimals: number;
     }>);
     /**
-     * Returns coin price in mSat
+     * Returns coin price in uSat (sats-per-token * 1_000_000)
      *
      * @param coin
      */
