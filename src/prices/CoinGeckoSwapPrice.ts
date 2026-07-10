@@ -27,7 +27,7 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
     }
 
     /**
-     * Returns coin price in mSat
+     * Returns coin price in uSat (sats-per-token * 1_000_000)
      *
      * @param coin
      */
@@ -35,7 +35,7 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
         const coinId = coin.coinId;
         if(coinId.startsWith("$fixed-")) {
             const amt: number = parseFloat(coinId.substring(7));
-            return BigInt(Math.floor(amt*1000));
+            return BigInt(Math.floor(amt*1000000));
         }
 
         const cachedValue = this.cache[coinId];
@@ -62,7 +62,7 @@ export class CoinGeckoSwapPrice extends ISwapPrice<{coinId: string, decimals: nu
 
         const amt: number = jsonBody[coinId].sats;
 
-        const result = BigInt(Math.floor(amt*1000));
+        const result = BigInt(Math.floor(amt*1000000));
 
         this.cache[coinId] = {
             price: result,
