@@ -399,7 +399,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 let btcFeeRate = await btcFeeRatePrefetch;
                 if (inputAmountAdjustments.amountFeeRate != null && inputAmountAdjustments.amountFeeRate > btcFeeRate)
                     btcFeeRate = inputAmountAdjustments.amountFeeRate;
-                let feeAccumulator = 0;
+                let cpfpAddFee = 0;
+                let txVsize = 0;
                 let valueAccumulator = 0n;
                 for (let utxo of clientInputUtxos) {
                     const cpfpAdditionalFee = utxo.cpfp == null ? 0 : Math.ceil(utxo.cpfp.effectiveVSize * Math.max(0, btcFeeRate - utxo.cpfp.effectiveFeeRate));
@@ -407,29 +408,29 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     const totalFee = cpfpAdditionalFee + spendFee;
                     if (amountSkipDetrimental && totalFee > utxo.value)
                         continue; //Skip detrimental UTXO
-                    feeAccumulator += totalFee;
+                    cpfpAddFee += cpfpAdditionalFee;
                     valueAccumulator += BigInt(utxo.value);
+                    txVsize += utxo.vSize;
                 }
-                let baseTxVSize = 10.5; // 4b version, 1b inputs, 1b outputs, 4b locktime, 0.5vB witness flag + witness elements count
+                txVsize += 10.5; // 4b version, 1b inputs, 1b outputs, 4b locktime, 0.5vB witness flag + witness elements count
                 if (amountChangeValue != null) {
                     valueAccumulator -= amountChangeValue;
-                    baseTxVSize += amountChangeVSize;
+                    txVsize += amountChangeVSize;
                 }
                 //vault input and output
-                baseTxVSize += 32 + 4 + 1 + 4; //Input base
-                baseTxVSize += this.vaultSigner.getAddressType() === "p2tr" ? (1 + 1 + 65) / 4 : (1 + 1 + 72 + 1 + 33) / 4;
-                baseTxVSize += 8 + 1; //Output base
-                baseTxVSize += this.vaultSigner.getAddressType() === "p2tr" ? 34 : 22;
+                txVsize += 32 + 4 + 1 + 4; //Input base
+                txVsize += this.vaultSigner.getAddressType() === "p2tr" ? (1 + 1 + 65) / 4 : (1 + 1 + 72 + 1 + 33) / 4;
+                txVsize += 8 + 1; //Output base
+                txVsize += this.vaultSigner.getAddressType() === "p2tr" ? 34 : 22;
                 //opreturn output
-                baseTxVSize += 8 + 1; //Output base
+                txVsize += 8 + 1; //Output base
                 const opReturnDataSize = spvVaultContract.toOpReturnData(parsedBody.address, parsedBody.gasAmount > 0 ? [0xffffffffffffffffn, 0xffffffffffffffffn] : [0xffffffffffffffffn]).length;
-                baseTxVSize += (opReturnDataSize <= 0x4b ? 2 : 3 /*Needs an OP_PUSHDATA1 opcode*/) + opReturnDataSize;
+                txVsize += (opReturnDataSize <= 0x4b ? 2 : 3 /*Needs an OP_PUSHDATA1 opcode*/) + opReturnDataSize;
                 //LP output
-                baseTxVSize += 8 + 1; //Output base
-                baseTxVSize += this.bitcoin.getAddressType() === "p2tr" ? 34 : this.bitcoin.getAddressType() === "p2wpkh" ? 22 : 23;
-                const baseTxFee = Math.ceil(baseTxVSize) * btcFeeRate;
-                feeAccumulator += baseTxFee;
-                const amount = valueAccumulator - BigInt(Math.ceil(feeAccumulator));
+                txVsize += 8 + 1; //Output base
+                txVsize += this.bitcoin.getAddressType() === "p2tr" ? 34 : this.bitcoin.getAddressType() === "p2wpkh" ? 22 : 23;
+                const txFee = Math.ceil((txVsize * btcFeeRate) + cpfpAddFee);
+                const amount = valueAccumulator - BigInt(txFee);
                 if (amount <= 0n)
                     throw {
                         code: 20194,
