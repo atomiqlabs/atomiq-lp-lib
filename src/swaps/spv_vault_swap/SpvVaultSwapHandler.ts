@@ -533,7 +533,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 txVsize += 8 + 1; //Output base
                 txVsize += this.bitcoin.getAddressType()==="p2tr" ? 34 : this.bitcoin.getAddressType()==="p2wpkh" ? 22 : 23;
 
-                const txFee = Math.ceil((txVsize * btcFeeRate) + cpfpAddFee);
+                const txFee = Math.ceil((Math.ceil(txVsize) * btcFeeRate) + cpfpAddFee);
                 const amount = valueAccumulator - BigInt(txFee);
 
                 if(amount <= 0n) throw {
