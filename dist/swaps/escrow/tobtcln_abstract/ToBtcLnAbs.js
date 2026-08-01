@@ -497,7 +497,9 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 " fee mtokens: " + probeOrRouteResp.feeMtokens.toString(10));
         }
         const safeFeeTokens = (probeOrRouteResp.feeMtokens + 999n) / 1000n;
-        let actualRoutingFee = safeFeeTokens * this.config.routingFeeMultiplier;
+        let actualRoutingFee = safeFeeTokens
+            * BigInt(Math.floor(Number(this.config.routingFeeMultiplier) * 1000000))
+            / 1000000n;
         const minRoutingFee = (amountBD * this.config.minLnRoutingFeePPM / 1000000n) + this.config.minLnBaseFee;
         if (actualRoutingFee < minRoutingFee) {
             actualRoutingFee = minRoutingFee;

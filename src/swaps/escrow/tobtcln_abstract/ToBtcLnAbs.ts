@@ -32,7 +32,7 @@ import {isQuoteThrow} from "../../../plugins/IPlugin";
 import {ToBtcSwapState} from "../tobtc_abstract/ToBtcSwapAbs";
 
 export type ToBtcLnConfig = ToBtcBaseConfig & {
-    routingFeeMultiplier: bigint,
+    routingFeeMultiplier: bigint | number,
 
     minSendCltv: bigint,
 
@@ -625,7 +625,9 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
         const safeFeeTokens = (probeOrRouteResp.feeMtokens + 999n) / 1000n;
 
-        let actualRoutingFee: bigint = safeFeeTokens * this.config.routingFeeMultiplier;
+        let actualRoutingFee: bigint = safeFeeTokens
+            * BigInt(Math.floor(Number(this.config.routingFeeMultiplier) * 1_000_000))
+            / 1_000_000n;
 
         const minRoutingFee: bigint = (amountBD * this.config.minLnRoutingFeePPM / 1000000n)  + this.config.minLnBaseFee;
         if(actualRoutingFee < minRoutingFee) {

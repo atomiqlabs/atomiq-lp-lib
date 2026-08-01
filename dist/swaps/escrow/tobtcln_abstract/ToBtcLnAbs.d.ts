@@ -8,7 +8,7 @@ import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { ILightningWallet, ParsedPaymentRequest } from "../../../wallets/ILightningWallet";
 import { LightningAssertions } from "../../assertions/LightningAssertions";
 export type ToBtcLnConfig = ToBtcBaseConfig & {
-    routingFeeMultiplier: bigint;
+    routingFeeMultiplier: bigint | number;
     minSendCltv: bigint;
     allowProbeFailedSwaps: boolean;
     allowShortExpiry: boolean;
