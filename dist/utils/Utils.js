@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.parsePsbt = exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = exports.getLogger = void 0;
+exports.bigIntCeilDivision = exports.parsePsbt = exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = exports.getLogger = void 0;
 const crypto_1 = require("crypto");
 const btc_signer_1 = require("@scure/btc-signer");
 function getLogger(prefix) {
@@ -128,3 +128,11 @@ function parsePsbt(btcTx) {
     };
 }
 exports.parsePsbt = parsePsbt;
+function bigIntCeilDivision(a, b) {
+    if (b <= 0)
+        throw new Error("Division by zero or negative value!");
+    if (a < 0)
+        throw new Error("a must be non-negative!");
+    return (a + b - 1n) / b;
+}
+exports.bigIntCeilDivision = bigIntCeilDivision;

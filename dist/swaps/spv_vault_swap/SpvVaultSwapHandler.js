@@ -241,6 +241,13 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             });
         return { pricePrefetchPromise, gasTokenPricePrefetchPromise };
     }
+    checkFeeRate(rate, errorCode, errorText) {
+        if (rate < 0n || rate >= 2n ** 20n)
+            throw {
+                code: errorCode,
+                msg: errorText
+            };
+    }
     startRestServer(restServer) {
         restServer.use(this.path + "/getQuote", (0, ServerParamDecoder_1.serverParamDecoder)(10 * 1000));
         restServer.post(this.path + "/getQuote", (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
@@ -326,6 +333,22 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     code: 20100,
                     msg: "Invalid request body"
                 };
+            //Optionally exact fees in output token (if exactOut=true) or input token (if exactOut=false)
+            /**
+             * callerFee: string            Caller/watchtower fee (in the token that the quote is requested in)
+             * frontingFee: string          Fronting fee (in the token that the quote is requested in)
+             */
+            //NOTE: In exactOut=false mode the fees are applied on the input amount and can therefore deviate
+            // slightly due to the LP fee being applied afterwards
+            const exactFees = req.paramReader.getExistingParamsOrNull({
+                callerFee: SchemaVerifier_1.FieldTypeEnum.BigIntOptional,
+                frontingFee: SchemaVerifier_1.FieldTypeEnum.BigIntOptional
+            });
+            if (exactFees == null)
+                throw {
+                    code: 20100,
+                    msg: "Invalid request body"
+                };
             const inputAmountAdjustments = req.paramReader.getExistingParamsOrNull({
                 amountUtxos: SchemaVerifier_1.FieldTypeEnum.AnyOptional,
                 amountFeeRate: SchemaVerifier_1.FieldTypeEnum.NumberOptional,
@@ -373,20 +396,20 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     code: 20190,
                     msg: "Unsupported gas token"
                 };
-            if (parsedBody.callerFeeRate < 0n || parsedBody.callerFeeRate >= 2n ** 20n)
-                throw {
-                    code: 20191,
-                    msg: "Invalid caller fee rate"
-                };
-            if (parsedBody.frontingFeeRate < 0n || parsedBody.frontingFeeRate >= 2n ** 20n)
-                throw {
-                    code: 20192,
-                    msg: "Invalid fronting fee rate"
-                };
+            let callerFeeRate = parsedBody.callerFeeRate;
+            let frontingFeeRate = parsedBody.frontingFeeRate;
+            if (parsedBody.exactOut) {
+                if (exactFees.callerFee != null)
+                    callerFeeRate = (0, Utils_1.bigIntCeilDivision)(exactFees.callerFee * 100000n, parsedBody.amount);
+                if (exactFees.frontingFee != null)
+                    frontingFeeRate = (0, Utils_1.bigIntCeilDivision)(exactFees.frontingFee * 100000n, parsedBody.amount);
+            }
+            this.checkFeeRate(callerFeeRate, 20191, "Invalid caller fee rate");
+            this.checkFeeRate(frontingFeeRate, 20192, "Invalid fronting fee rate");
             const requestedAmount = {
                 input: !parsedBody.exactOut,
                 amount: parsedBody.exactOut ?
-                    (parsedBody.amount * (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate) / 100000n) :
+                    (parsedBody.amount * (100000n + callerFeeRate + frontingFeeRate) / 100000n) :
                     parsedBody.amount,
                 token: parsedBody.token
             };
@@ -438,9 +461,19 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     };
                 requestedAmount.amount = amount;
             }
+            if (!parsedBody.exactOut) {
+                let totalFee = (exactFees.callerFee ?? callerFeeRate * requestedAmount.amount / 100000n) +
+                    (exactFees.frontingFee ?? frontingFeeRate * requestedAmount.amount / 100000n);
+                if (exactFees.callerFee != null)
+                    callerFeeRate = (0, Utils_1.bigIntCeilDivision)(exactFees.callerFee * 100000n, requestedAmount.amount - totalFee);
+                if (exactFees.frontingFee != null)
+                    frontingFeeRate = (0, Utils_1.bigIntCeilDivision)(exactFees.frontingFee * 100000n, requestedAmount.amount - totalFee);
+            }
+            this.checkFeeRate(callerFeeRate, 20191, "Invalid caller fee rate");
+            this.checkFeeRate(frontingFeeRate, 20192, "Invalid fronting fee rate");
             const gasTokenAmount = {
                 input: false,
-                amount: parsedBody.gasAmount * (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate) / 100000n,
+                amount: parsedBody.gasAmount * (100000n + callerFeeRate + frontingFeeRate) / 100000n,
                 token: parsedBody.gasToken
             };
             const request = {
@@ -479,20 +512,18 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 totalInToken = parsedBody.amount;
             }
             else {
-                totalInToken = (totalInToken * 100000n / (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
+                totalInToken = (totalInToken * 100000n / (100000n + callerFeeRate + frontingFeeRate));
             }
-            totalInGasToken = (totalInGasToken * 100000n / (100000n + parsedBody.callerFeeRate + parsedBody.frontingFeeRate));
+            totalInGasToken = (totalInGasToken * 100000n / (100000n + callerFeeRate + frontingFeeRate));
             //Calculate raw amounts
             const [rawTokenAmount, rawGasTokenAmount] = vault.toRawAmounts([totalInToken, totalInGasToken]);
             [totalInToken, totalInGasToken] = vault.fromRawAmounts([rawTokenAmount, rawGasTokenAmount]);
             const expiry = Math.floor(Date.now() / 1000) + this.getInitAuthorizationTimeout(chainIdentifier);
             //Get PSBT data
-            const callerFeeShare = parsedBody.callerFeeRate;
-            const frontingFeeShare = parsedBody.frontingFeeRate;
             const executionFeeShare = 0n;
             const utxo = vault.getLatestUtxo();
             const quoteId = (0, crypto_1.randomBytes)(32).toString("hex");
-            const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, quoteId, expiry, vault, utxo, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, useToken, gasToken);
+            const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, quoteId, expiry, vault, utxo, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeRate, frontingFeeRate, executionFeeShare, useToken, gasToken);
             swap.metadata = metadata;
             swap.saveStickyAddress = useStickyAddress && !hasStickyAddress;
             swap.hasStickyAddress = hasStickyAddress;
@@ -523,10 +554,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     swapFee: swapFeeInToken.toString(10),
                     gasSwapFeeBtc: gasSwapFee.toString(10),
                     gasSwapFee: gasSwapFeeInToken.toString(10),
-                    callerFeeShare: callerFeeShare.toString(10),
-                    frontingFeeShare: frontingFeeShare.toString(10),
+                    callerFeeShare: callerFeeRate.toString(10),
+                    frontingFeeShare: frontingFeeRate.toString(10),
                     executionFeeShare: executionFeeShare.toString(10),
-                    usedUtxoInputCalculation: clientInputUtxos != null
+                    usedUtxoInputCalculation: clientInputUtxos != null,
+                    usedExactFeeCalculation: exactFees.frontingFee != null || exactFees.callerFee != null
                 }
             });
         }));

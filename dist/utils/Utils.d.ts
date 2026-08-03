@@ -30,3 +30,4 @@ export declare function bigIntSorter(a: bigint, b: bigint): -1 | 0 | 1;
  */
 export declare function getAbortController(responseStream: ServerParamEncoder): AbortController;
 export declare function parsePsbt(btcTx: Transaction): BtcTx;
+export declare function bigIntCeilDivision(a: bigint, b: bigint): bigint;

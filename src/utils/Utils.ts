@@ -150,3 +150,9 @@ export function parsePsbt(btcTx: Transaction): BtcTx {
         })
     };
 }
+
+export function bigIntCeilDivision(a: bigint, b: bigint) {
+    if(b <= 0) throw new Error("Division by zero or negative value!");
+    if(a < 0) throw new Error("a must be non-negative!");
+    return (a + b - 1n) / b;
+}

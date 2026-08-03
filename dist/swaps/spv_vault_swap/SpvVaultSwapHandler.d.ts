@@ -65,6 +65,7 @@ export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVa
         pricePrefetchPromise: Promise<bigint>;
         gasTokenPricePrefetchPromise: Promise<bigint>;
     };
+    protected checkFeeRate(rate: bigint, errorCode: number, errorText: string): void;
     startRestServer(restServer: Express): void;
     getInfoData(): any;
     protected saveSwapData(swap: SpvVaultSwap): Promise<void>;
