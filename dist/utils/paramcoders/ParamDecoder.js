@@ -118,51 +118,8 @@ class ParamDecoder {
         const resultSchema = {};
         for (let fieldName in schema) {
             const val = await this.getParam(fieldName);
-            const type = schema[fieldName];
-            if (typeof (type) === "function") {
-                const result = type(val);
-                if (result == null)
-                    return null;
-                resultSchema[fieldName] = result;
-                continue;
-            }
-            if (val == null && type >= 100) {
-                resultSchema[fieldName] = null;
-                continue;
-            }
-            if (type === SchemaVerifier_1.FieldTypeEnum.Any || type === SchemaVerifier_1.FieldTypeEnum.AnyOptional) {
-                resultSchema[fieldName] = val;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.Boolean || type === SchemaVerifier_1.FieldTypeEnum.BooleanOptional) {
-                if (typeof (val) !== "boolean")
-                    return null;
-                resultSchema[fieldName] = val;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.Number || type === SchemaVerifier_1.FieldTypeEnum.NumberOptional) {
-                if (typeof (val) !== "number")
-                    return null;
-                if (isNaN(val))
-                    return null;
-                resultSchema[fieldName] = val;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.BigInt || type === SchemaVerifier_1.FieldTypeEnum.BigIntOptional) {
-                const result = (0, SchemaVerifier_1.parseBigInt)(val);
-                if (result == null)
-                    return null;
-                resultSchema[fieldName] = result;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.String || type === SchemaVerifier_1.FieldTypeEnum.StringOptional) {
-                if (typeof (val) !== "string")
-                    return null;
-                resultSchema[fieldName] = val;
-            }
-            else {
-                //Probably another request schema
-                const result = (0, SchemaVerifier_1.verifySchema)(val, type);
-                if (result == null)
-                    return null;
-                resultSchema[fieldName] = result;
-            }
+            if (!(0, SchemaVerifier_1.verifySchemaField)(val, schema[fieldName], fieldName, resultSchema))
+                return null;
         }
         return resultSchema;
     }
@@ -174,47 +131,8 @@ class ParamDecoder {
                 resultSchema[fieldName] = null;
                 continue;
             }
-            const type = schema[fieldName];
-            if (typeof (type) === "function") {
-                const result = type(val);
-                if (result == null)
-                    return null;
-                resultSchema[fieldName] = result;
-                continue;
-            }
-            if (type === SchemaVerifier_1.FieldTypeEnum.Any || type === SchemaVerifier_1.FieldTypeEnum.AnyOptional) {
-                resultSchema[fieldName] = val;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.Boolean || type === SchemaVerifier_1.FieldTypeEnum.BooleanOptional) {
-                if (typeof (val) !== "boolean")
-                    return null;
-                resultSchema[fieldName] = val;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.Number || type === SchemaVerifier_1.FieldTypeEnum.NumberOptional) {
-                if (typeof (val) !== "number")
-                    return null;
-                if (isNaN(val))
-                    return null;
-                resultSchema[fieldName] = val;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.BigInt || type === SchemaVerifier_1.FieldTypeEnum.BigIntOptional) {
-                const result = (0, SchemaVerifier_1.parseBigInt)(val);
-                if (result == null)
-                    return null;
-                resultSchema[fieldName] = result;
-            }
-            else if (type === SchemaVerifier_1.FieldTypeEnum.String || type === SchemaVerifier_1.FieldTypeEnum.StringOptional) {
-                if (typeof (val) !== "string")
-                    return null;
-                resultSchema[fieldName] = val;
-            }
-            else {
-                //Probably another request schema
-                const result = (0, SchemaVerifier_1.verifySchema)(val, type);
-                if (result == null)
-                    return null;
-                resultSchema[fieldName] = result;
-            }
+            if (!(0, SchemaVerifier_1.verifySchemaField)(val, schema[fieldName], fieldName, resultSchema))
+                return null;
         }
         return resultSchema;
     }
