@@ -130,8 +130,13 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             }
         ]);
         for (let { obj: swap } of queriedData) {
-            if (await this.processPastSwap(swap))
-                cancelInvoices.push(swap);
+            try {
+                if (await this.processPastSwap(swap))
+                    cancelInvoices.push(swap);
+            }
+            catch (e) {
+                this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e);
+            }
         }
         await this.cancelInvoices(cancelInvoices);
     }

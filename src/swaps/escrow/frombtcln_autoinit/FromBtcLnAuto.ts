@@ -229,13 +229,17 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         ]);
 
         for(let {obj: swap} of queriedData) {
-            switch(await this.processPastSwap(swap)) {
-                case "SETTLE":
-                    settleInvoices.push(swap);
-                    break;
-                case "REFUND":
-                    refundSwaps.push(swap);
-                    break;
+            try {
+                switch(await this.processPastSwap(swap)) {
+                    case "SETTLE":
+                        settleInvoices.push(swap);
+                        break;
+                    case "REFUND":
+                        refundSwaps.push(swap);
+                        break;
+                }
+            } catch (e) {
+                this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e);
             }
         }
 
