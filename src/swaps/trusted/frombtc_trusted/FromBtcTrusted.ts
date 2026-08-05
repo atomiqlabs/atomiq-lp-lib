@@ -13,6 +13,29 @@ import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {FromBtcAmountAssertions} from "../../assertions/FromBtcAmountAssertions";
 import {isQuoteThrow} from "../../../plugins/IPlugin";
 
+/*
+TODO: IN CASE THIS EVER GETS USED, FIX THE FOLLOWING:
+
+HIGH 5 — FromBtcTrusted (0-conf): no RBF check, fee gate is min not max, and the burn defense only fires when it shouldn't
+
+Handler is opt-in (ONCHAIN_TRUSTED, not in shipped configs), but if enabled:
+
+• Acceptance (FromBtcTrusted.js:186-194) checks only: direct parents confirmed + fee threshold. Nothing inspects tx.ins[].sequence for BIP-125 (grep: only storage-sequence hits). A double-spendable opt-in-RBF tx is
+ accepted and tokens are sent within seconds.
+• The fee gate is fee >= recommendedFee || fee >= currentRate (line 187) — the weaker of the two wins; the documented intent is max(...). The runner even overrides the library's 1.25 multiplier to 1
+ (IntermediaryRunner.ts FromBtcTrusted section). A stale low fee maximizes the replacement window and minimizes the attacker's BIP-125 cost.
+• The burn defense (checkDoubleSpends → burn() → sendRawPackage([tx1, burnChild])) is rejected by any node whose mempool already holds the replacement — so it structurally loses against a broadcast double-spend, and
+ with mempoolfullrbf (default since Core 28) even non-signaling txs are replaceable.
+• Worse, checkDoubleSpends (lines 636-644) treats getTransaction == null as "double-spent" — but null also means mempool eviction (fee spike, node restart). With no conflict anywhere, the burn package is valid and
+ burns the entire deposit to miners — after tokens were already sent, that's a full LP loss with no attacker at all.
+
+MEDIUM 6 — FromBtcTrusted /setRefundAddress is dead code; refundable user funds strand permanently
+
+FromBtcTrusted.js:606 looks up getData(paymentHash, null); IntermediaryStorageManager.getData (line 64-66) converts null → sequence 0x0, but every swap is stored with a random 64-bit sequence — so the lookup always
+misses and the endpoint always throws 10001. (The status endpoint at line 515 does it correctly.) Any swap that becomes REFUNDABLE (over-max payment, plugin veto, chain revert, balance failure) without a refund
+address set at creation can never be refunded (refundSwap early-returns without one). User funds sit in the LP wallet forever. One-line fix: pass parsedBody.sequence.
+ */
+
 export type FromBtcTrustedConfig = SwapBaseConfig & {
     doubleSpendCheckInterval: number,
     swapAddressExpiry: number,
