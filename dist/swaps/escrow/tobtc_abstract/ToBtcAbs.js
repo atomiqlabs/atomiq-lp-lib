@@ -569,10 +569,10 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
              */
             const parsedBody = await req.paramReader.getParams({
                 address: SchemaVerifier_1.FieldTypeEnum.String,
-                amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                confirmationTarget: SchemaVerifier_1.FieldTypeEnum.Number,
-                confirmations: SchemaVerifier_1.FieldTypeEnum.Number,
-                nonce: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                amount: SchemaVerifier_1.FieldTypeEnum.BigIntPositive,
+                confirmationTarget: SchemaVerifier_1.FieldTypeEnum.NumberPositive,
+                confirmations: SchemaVerifier_1.FieldTypeEnum.NumberPositive,
+                nonce: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,

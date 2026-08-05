@@ -553,7 +553,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     typeof (val) === "string" &&
                     val.length === 64 &&
                     Utils_1.HEX_REGEX.test(val) ? val : null,
-                amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                amount: SchemaVerifier_1.FieldTypeEnum.BigIntPositive,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -562,8 +562,8 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 gasToken: (val) => val != null &&
                     typeof (val) === "string" &&
                     chainInterface.isValidToken(val) ? val : null,
-                gasAmount: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                claimerBounty: SchemaVerifier_1.FieldTypeEnum.BigInt
+                gasAmount: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
+                claimerBounty: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative
             });
             if (parsedBody == null)
                 throw {

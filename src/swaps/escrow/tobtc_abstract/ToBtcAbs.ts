@@ -678,10 +678,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
              */
             const parsedBody: ToBtcRequestType = await req.paramReader.getParams({
                 address: FieldTypeEnum.String,
-                amount: FieldTypeEnum.BigInt,
-                confirmationTarget: FieldTypeEnum.Number,
-                confirmations: FieldTypeEnum.Number,
-                nonce: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
+                confirmationTarget: FieldTypeEnum.NumberPositive,
+                confirmations: FieldTypeEnum.NumberPositive,
+                nonce: FieldTypeEnum.BigIntNotNegative,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,

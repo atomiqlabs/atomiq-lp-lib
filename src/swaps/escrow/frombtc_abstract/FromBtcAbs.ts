@@ -220,11 +220,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
     private async getClaimerBounty(req: Request & {paramReader: IParamReader}, expiry: bigint, signal: AbortSignal): Promise<bigint> {
         const parsedClaimerBounty = await req.paramReader.getParams({
             claimerBounty: {
-                feePerBlock: FieldTypeEnum.BigInt,
-                safetyFactor: FieldTypeEnum.BigInt,
-                startTimestamp: FieldTypeEnum.BigInt,
-                addBlock: FieldTypeEnum.BigInt,
-                addFee: FieldTypeEnum.BigInt,
+                feePerBlock: FieldTypeEnum.BigIntNotNegative,
+                safetyFactor: FieldTypeEnum.BigIntNotNegative,
+                startTimestamp: FieldTypeEnum.BigIntNotNegative,
+                addBlock: FieldTypeEnum.BigIntNotNegative,
+                addFee: FieldTypeEnum.BigIntNotNegative,
             },
         }).catch(e => null);
 
@@ -302,11 +302,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 address: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         chainInterface.isValidAddress(val, true) ? val : null,
-                amount: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
-                sequence: FieldTypeEnum.BigInt,
+                sequence: FieldTypeEnum.BigIntNotNegative,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
             if(parsedBody==null) throw {
