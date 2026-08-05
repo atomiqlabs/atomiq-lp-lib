@@ -29,7 +29,7 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.satsPerVbyte = BigInt(chainIdOrObj.satsPerVbyte);
+            this.satsPerVbyte = Number(chainIdOrObj.satsPerVbyte);
             this.nonce = BigInt(chainIdOrObj.nonce);
             this.requiredConfirmations = chainIdOrObj.requiredConfirmations;
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;

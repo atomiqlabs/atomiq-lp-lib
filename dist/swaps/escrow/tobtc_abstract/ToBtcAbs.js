@@ -286,7 +286,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             if (swap.metadata != null)
                 swap.metadata.times.payCLTVChecked = Date.now();
             const satsPerVbyte = await this.bitcoin.getFeeRate();
-            this.checkCalculatedTxFee(swap.satsPerVbyte, BigInt(satsPerVbyte));
+            this.checkCalculatedTxFee(swap.satsPerVbyte, satsPerVbyte);
             if (swap.metadata != null)
                 swap.metadata.times.payChainFee = Date.now();
             const signResult = await this.bitcoin.getSignedTransaction(swap.address, Number(swap.amount), satsPerVbyte, swap.nonce, Number(swap.satsPerVbyte));
@@ -537,7 +537,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             };
         return {
             networkFee: BigInt(chainFeeResp.networkFee),
-            satsPerVbyte: BigInt(chainFeeResp.satsPerVbyte)
+            satsPerVbyte: chainFeeResp.satsPerVbyte
         };
     }
     startRestServer(restServer) {
