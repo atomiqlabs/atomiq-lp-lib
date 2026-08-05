@@ -649,7 +649,8 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 data: {
                     amount: amountBD.toString(10),
                     address: signer.getAddress(),
-                    satsPervByte: networkFeeData.satsPerVbyte.toString(10),
+                    satsPervByte: Math.floor(networkFeeData.satsPerVbyte).toString(10),
+                    satsPervByteNumber: networkFeeData.satsPerVbyte,
                     networkFee: networkFeeInToken.toString(10),
                     swapFee: swapFeeInToken.toString(10),
                     totalFee: (swapFeeInToken + networkFeeInToken).toString(10),
