@@ -74,7 +74,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
     private getHash(chainIdentifier: string, address: string, amount: bigint): Buffer {
         const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const {swapContract} = this.getChain(chainIdentifier);
-        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations, 0n);
+        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations);
     }
 
     /**
@@ -242,7 +242,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             address,
             useToken,
             dummyAmount,
-            swapContract.getHashForOnchain(randomBytes(32), dummyAmount, 3, null).toString("hex"),
+            swapContract.getHashForOnchain(randomBytes(32), dummyAmount, 3).toString("hex"),
             BigIntBufferUtils.fromBuffer(randomBytes(8)),
             BigInt(Math.floor(Date.now()/1000)) + this.config.swapTsCsvDelta,
             false,
