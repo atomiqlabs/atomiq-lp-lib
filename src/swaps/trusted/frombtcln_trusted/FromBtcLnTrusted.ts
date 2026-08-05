@@ -262,6 +262,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             if(result==null) {
                 this.swapLogger.info(invoiceData, "htlcReceived(): transaction sending failed: ", invoiceData.pr);
                 //Let the swap watchdog handle this case
+                unlock();
                 throw {
                     code: 20002,
                     msg: "Transaction sending failed"
