@@ -170,16 +170,21 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             }
         ]);
         for (let { obj: swap } of queriedData) {
-            switch (await this.processPastSwap(swap)) {
-                case "CANCEL":
-                    cancelInvoices.push(swap);
-                    break;
-                case "SETTLE":
-                    settleInvoices.push(swap);
-                    break;
-                case "REFUND":
-                    refundSwaps.push(swap);
-                    break;
+            try {
+                switch (await this.processPastSwap(swap)) {
+                    case "CANCEL":
+                        cancelInvoices.push(swap);
+                        break;
+                    case "SETTLE":
+                        settleInvoices.push(swap);
+                        break;
+                    case "REFUND":
+                        refundSwaps.push(swap);
+                        break;
+                }
+            }
+            catch (e) {
+                this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e);
             }
         }
         await this.refundSwaps(refundSwaps);

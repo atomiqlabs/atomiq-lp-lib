@@ -341,7 +341,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                 await this.processPastSwap(swap, txs[0]?.tx, txs[0]?.vout);
             }
             catch (e) {
-                this.swapLogger.error(swap, "processPastSwaps(): Error ocurred while processing swap: ", e);
+                this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e);
             }
         }
     }

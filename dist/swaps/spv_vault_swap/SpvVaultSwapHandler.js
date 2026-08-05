@@ -223,7 +223,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             }
         ]);
         for (let { obj: swap } of swaps) {
-            await this.processPastSwap(swap);
+            await this.processPastSwap(swap)
+                .catch(e => this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e));
         }
     }
     getPricePrefetches(chainIdentifier, token, gasToken, abortController) {
