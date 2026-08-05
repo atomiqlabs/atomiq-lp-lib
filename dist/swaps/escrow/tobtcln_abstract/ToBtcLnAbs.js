@@ -311,6 +311,9 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 else
                     throw e;
             }
+            const unlock = swap.lock(120);
+            if (unlock == null)
+                return;
             await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
             await this.saveSwapData(swap);
             try {
@@ -322,12 +325,28 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 if ((0, Utils_1.isDefinedRuntimeError)(e)) {
                     if (swap.metadata != null)
                         swap.metadata.payError = e;
-                    await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE);
-                    await this.saveSwapData(swap);
-                    return;
+                    const payment = await this.lightning.getPayment(swap.lnPaymentHash);
+                    if (!unlock())
+                        return;
+                    if (payment == null || payment.status === "failed") {
+                        if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED)
+                            await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE);
+                        await this.saveSwapData(swap);
+                        return;
+                    }
+                    else if (payment.status === "confirmed") {
+                        await this.processPaymentResult(swap, payment);
+                        return;
+                    }
+                    else {
+                        //Fall-through to subscribe
+                    }
                 }
                 else
                     throw e;
+            }
+            finally {
+                unlock();
             }
             this.subscribeToPayment(swap);
             return;
@@ -832,6 +851,16 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                         msg: "Payment expired"
                     };
                 if (data.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE) {
+                    if (data.payInitiated) {
+                        //Check that the ln payment is indeed non-existent or failed
+                        const lnPayment = await this.lightning.getPayment(data.lnPaymentHash);
+                        if (lnPayment != null && lnPayment.status !== "failed")
+                            throw {
+                                _httpStatus: 200,
+                                code: 20008,
+                                msg: "Payment in-flight"
+                            };
+                    }
                     const refundSigData = await swapContract.getRefundSignature(signer, data.data, this.config.refundAuthorizationTimeout);
                     //Double check the state after promise result
                     if (data.state !== ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE)
