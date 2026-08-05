@@ -182,6 +182,12 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             };
         }
         const tsDelta = expiry - parsedClaimerBounty.claimerBounty.startTimestamp;
+        if (tsDelta < 0n) {
+            throw {
+                code: 20043,
+                msg: "Invalid claimerBounty (ts delta < 0)"
+            };
+        }
         const blocksDelta = tsDelta / this.config.bitcoinBlocktime * parsedClaimerBounty.claimerBounty.safetyFactor;
         const totalBlock = blocksDelta + parsedClaimerBounty.claimerBounty.addBlock;
         return parsedClaimerBounty.claimerBounty.addFee + (totalBlock * parsedClaimerBounty.claimerBounty.feePerBlock);
