@@ -701,6 +701,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     code: 20517,
                     msg: "Bitcoin transaction submission already in progress, please retry later!"
                 };
+            let swapSendingSet = false;
+            let dataSendingSet = false;
             try {
                 const btcRawTx = Buffer.from(signedTx.toBytes(true, true)).toString("hex");
                 //Double-check the state to prevent race condition
@@ -714,10 +716,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 swap.btcTxId = signedTx.id;
                 swap.state = SpvVaultSwap_1.SpvVaultSwapState.SIGNED;
                 swap.sending = true;
+                swapSendingSet = true;
                 await this.saveSwapData(swap);
                 data.btcTx.raw = btcRawTx;
                 data.sending = true;
                 vault.addWithdrawal(data);
+                dataSendingSet = true;
                 await this.Vaults.saveVault(vault);
                 this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: " + swap.btcTxId);
                 try {
@@ -735,10 +739,13 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 }
             }
             catch (e) {
-                data.sending = false;
-                swap.sending = false;
-                vault.removeWithdrawal(data);
-                await this.Vaults.saveVault(vault);
+                if (swapSendingSet)
+                    swap.sending = false;
+                if (dataSendingSet) {
+                    data.sending = false;
+                    vault.removeWithdrawal(data);
+                    await this.Vaults.saveVault(vault);
+                }
                 //Check if the error is only because the state has already changed
                 if (!(0, Utils_1.isDefinedRuntimeError)(e) || e.code !== 20505) {
                     //We only make the swap failed if the error happened in CREATED or SIGNED states

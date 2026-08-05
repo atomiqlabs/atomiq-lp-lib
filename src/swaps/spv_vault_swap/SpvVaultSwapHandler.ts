@@ -892,6 +892,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 msg: "Bitcoin transaction submission already in progress, please retry later!"
             };
 
+            let swapSendingSet = false;
+            let dataSendingSet = false;
             try {
                 const btcRawTx = Buffer.from(signedTx.toBytes(true, true)).toString("hex");
 
@@ -907,11 +909,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 swap.btcTxId = signedTx.id;
                 swap.state = SpvVaultSwapState.SIGNED;
                 swap.sending = true;
+                swapSendingSet = true;
                 await this.saveSwapData(swap);
 
                 data.btcTx.raw = btcRawTx;
                 (data as any).sending = true;
                 vault.addWithdrawal(data);
+                dataSendingSet = true;
                 await this.Vaults.saveVault(vault);
 
                 this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: "+swap.btcTxId);
@@ -929,10 +933,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                     };
                 }
             } catch (e) {
-                (data as any).sending = false;
-                swap.sending = false;
-                vault.removeWithdrawal(data);
-                await this.Vaults.saveVault(vault);
+                if(swapSendingSet) swap.sending = false;
+                if(dataSendingSet) {
+                    (data as any).sending = false;
+                    vault.removeWithdrawal(data);
+                    await this.Vaults.saveVault(vault);
+                }
 
                 //Check if the error is only because the state has already changed
                 if(!isDefinedRuntimeError(e) || e.code!==20505) {
