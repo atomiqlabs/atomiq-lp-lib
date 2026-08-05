@@ -458,6 +458,11 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the confirmationTarget is out of bounds
      */
     checkConfirmationTarget(confirmationTarget) {
+        if (!Number.isFinite(confirmationTarget) || !Number.isSafeInteger(confirmationTarget))
+            throw {
+                code: 20028,
+                msg: "Invalid request body (confirmationTarget - not whole number)"
+            };
         if (confirmationTarget > this.config.maxConfTarget)
             throw {
                 code: 20023,
@@ -476,6 +481,11 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the confirmations are out of bounds
      */
     checkRequiredConfirmations(confirmations) {
+        if (!Number.isFinite(confirmations) || !Number.isSafeInteger(confirmations))
+            throw {
+                code: 20027,
+                msg: "Invalid request body (confirmations - not whole number)"
+            };
         if (confirmations > this.config.maxConfirmations)
             throw {
                 code: 20025,
