@@ -8,6 +8,7 @@ import {
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
+    SwapCommitStateType,
     SwapData
 } from "@atomiqlabs/base";
 import {randomBytes} from "crypto";
@@ -21,7 +22,6 @@ import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamE
 import {FromBtcBaseConfig, FromBtcBaseSwapHandler} from "../FromBtcBaseSwapHandler";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {isQuoteThrow} from "../../../plugins/IPlugin";
-import {FromBtcLnSwapState} from "../frombtcln_abstract/FromBtcLnSwapAbs";
 
 export type FromBtcConfig = FromBtcBaseConfig & {
     confirmations: number,
@@ -91,11 +91,16 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         if(swap.state===FromBtcSwapState.CREATED) {
             if(!await swapContract.isInitAuthorizationExpired(swap.data, swap)) return false;
 
-            const isCommited = await swapContract.isCommited(swap.data);
-            if(isCommited) {
+            const commitState = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            if(commitState.type===SwapCommitStateType.COMMITED || commitState.type===SwapCommitStateType.REFUNDABLE) {
                 this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap was commited, but processed from watchdog, address: "+swap.address);
                 await swap.setState(FromBtcSwapState.COMMITED);
                 await this.saveSwapData(swap);
+                return false;
+            }
+            if(commitState.type===SwapCommitStateType.PAID) {
+                this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap was claimed, but processed from watchdog, address: "+swap.address);
+                await this.removeSwapData(swap, FromBtcSwapState.CLAIMED);
                 return false;
             }
 
@@ -109,10 +114,15 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         if(swap.state===FromBtcSwapState.COMMITED) {
             if(!await swapContract.isExpired(signer.getAddress(), swap.data)) return false;
 
-            const isCommited = await swapContract.isCommited(swap.data);
-            if(isCommited) {
+            const commitState = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            if(commitState.type===SwapCommitStateType.COMMITED || commitState.type===SwapCommitStateType.REFUNDABLE) {
                 this.swapLogger.info(swap, "processPastSwap(state=COMMITED): swap expired, will refund, address: "+swap.address);
                 return true;
+            }
+            if(commitState.type===SwapCommitStateType.PAID) {
+                this.swapLogger.info(swap, "processPastSwap(state=COMMITED): swap was claimed, but processed from watchdog, address: "+swap.address);
+                await this.removeSwapData(swap, FromBtcSwapState.CLAIMED);
+                return false;
             }
 
             this.swapLogger.warn(swap, "processPastSwap(state=COMMITED): commited swap expired and not committed anymore (already refunded?), address: "+swap.address);
