@@ -246,7 +246,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
             if (swap.state !== FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED)
                 return;
             const txns = await chainInterface.txsTransfer(signer.getAddress(), swap.token, swap.adjustedOutput, swap.dstAddress);
-            let unlock = swap.lock(30 * 1000);
+            let unlock = swap.lock(30);
             if (unlock == null)
                 return;
             const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTC_TRUSTED, swap);
