@@ -616,14 +616,12 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 };
             const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTC_SPV, swap);
             if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
-                const error = {
+                if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED)
+                    await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                throw {
                     code: 29999,
                     msg: pluginCheckResult.message
                 };
-                if (swap.metadata != null)
-                    swap.metadata.postQuoteError = error;
-                await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
-                throw error;
             }
             await this.Vaults.checkVaultReplacedTransactions(vault, true);
             if (swap.vaultUtxo !== vault.getLatestUtxo()) {
@@ -632,15 +630,20 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "Vault UTXO already spent, please get another quote and try again!"
                 };
             }
+            const unlock = swap.lock(120);
+            if (!unlock)
+                throw {
+                    code: 20517,
+                    msg: "Bitcoin transaction submission already in progress, please retry later!"
+                };
             try {
                 const btcRawTx = Buffer.from(signedTx.toBytes(true, true)).toString("hex");
                 //Double-check the state to prevent race condition
-                if (swap.state !== SpvVaultSwap_1.SpvVaultSwapState.CREATED) {
+                if (swap.state !== SpvVaultSwap_1.SpvVaultSwapState.CREATED)
                     throw {
                         code: 20505,
                         msg: "Invalid quote ID, not found or expired!"
                     };
-                }
                 //Double check in-flight swap count
                 this.checkTooManyInflightSwaps();
                 swap.btcTxId = signedTx.id;
@@ -671,10 +674,19 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 swap.sending = false;
                 vault.removeWithdrawal(data);
                 await this.Vaults.saveVault(vault);
-                if ((0, Utils_1.isDefinedRuntimeError)(e) && swap.metadata != null)
-                    swap.metadata.postQuoteError = e;
-                await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                //Check if the error is only because the state has already changed
+                if (!(0, Utils_1.isDefinedRuntimeError)(e) || e.code !== 20505) {
+                    //We only make the swap failed if the error happened in CREATED or SIGNED states
+                    if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED || swap.state === SpvVaultSwap_1.SpvVaultSwapState.SIGNED) {
+                        if ((0, Utils_1.isDefinedRuntimeError)(e) && swap.metadata != null)
+                            swap.metadata.postQuoteError = e;
+                        await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                    }
+                }
                 throw e;
+            }
+            finally {
+                unlock();
             }
             await responseStream.writeParamsAndEnd({
                 code: 20000,
