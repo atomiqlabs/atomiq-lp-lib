@@ -124,8 +124,8 @@ class FromBtcAmountAssertions extends AmountAssertions_1.AmountAssertions {
             const tooLow = amountBD < (min * 95n / 100n);
             const tooHigh = amountBD > (max * 105n / 100n);
             if (tooLow || tooHigh) {
-                const adjustedMin = min * (1000000n - fees.feePPM) / (1000000n - fees.baseFee);
-                const adjustedMax = max * (1000000n - fees.feePPM) / (1000000n - fees.baseFee);
+                const adjustedMin = min * (1000000n - fees.feePPM) / 1000000n - fees.baseFee;
+                const adjustedMax = max * (1000000n - fees.feePPM) / 1000000n - fees.baseFee;
                 const minIn = await this.swapPricing.getFromBtcSwapAmount(adjustedMin, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
                 const maxIn = await this.swapPricing.getFromBtcSwapAmount(adjustedMax, requestedAmount.token, chainIdentifier, null, requestedAmount.pricePrefetch);
                 throw {
