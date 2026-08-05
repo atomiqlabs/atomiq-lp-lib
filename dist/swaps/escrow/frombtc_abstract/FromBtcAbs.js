@@ -167,11 +167,11 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     async getClaimerBounty(req, expiry, signal) {
         const parsedClaimerBounty = await req.paramReader.getParams({
             claimerBounty: {
-                feePerBlock: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                safetyFactor: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                startTimestamp: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                addBlock: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                addFee: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                feePerBlock: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
+                safetyFactor: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
+                startTimestamp: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
+                addBlock: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
+                addFee: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
             },
         }).catch(e => null);
         signal.throwIfAborted();
@@ -225,11 +225,11 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 address: (val) => val != null &&
                     typeof (val) === "string" &&
                     chainInterface.isValidAddress(val, true) ? val : null,
-                amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                amount: SchemaVerifier_1.FieldTypeEnum.BigIntPositive,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
-                sequence: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                sequence: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
                 exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional
             });
             if (parsedBody == null)

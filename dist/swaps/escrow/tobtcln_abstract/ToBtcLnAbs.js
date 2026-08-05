@@ -682,8 +682,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
              */
             const parsedBody = await req.paramReader.getParams({
                 pr: SchemaVerifier_1.FieldTypeEnum.String,
-                maxFee: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                expiryTimestamp: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                maxFee: SchemaVerifier_1.FieldTypeEnum.BigIntPositive,
+                expiryTimestamp: SchemaVerifier_1.FieldTypeEnum.BigIntPositive,
                 token: (val) => val != null &&
                     typeof (val) === "string" &&
                     this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -691,7 +691,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     typeof (val) === "string" &&
                     chainInterface.isValidAddress(val, true) ? val : null,
                 exactIn: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
-                amount: SchemaVerifier_1.FieldTypeEnum.BigIntOptional
+                amount: SchemaVerifier_1.FieldTypeEnum.BigIntPositiveOptional
             });
             if (parsedBody == null) {
                 throw {

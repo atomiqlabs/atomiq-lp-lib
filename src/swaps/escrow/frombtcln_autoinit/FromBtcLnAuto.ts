@@ -657,7 +657,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                             typeof(val)==="string" &&
                             val.length===64 &&
                             HEX_REGEX.test(val) ? val: null,
-                amount: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -666,8 +666,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                 gasToken: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         chainInterface.isValidToken(val) ? val : null,
-                gasAmount: FieldTypeEnum.BigInt,
-                claimerBounty: FieldTypeEnum.BigInt
+                gasAmount: FieldTypeEnum.BigIntNotNegative,
+                claimerBounty: FieldTypeEnum.BigIntNotNegative
             });
             if(parsedBody==null) throw {
                 code: 20100,

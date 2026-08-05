@@ -646,7 +646,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                             typeof(val)==="string" &&
                             val.length===64 &&
                             HEX_REGEX.test(val) ? val: null,
-                amount: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,

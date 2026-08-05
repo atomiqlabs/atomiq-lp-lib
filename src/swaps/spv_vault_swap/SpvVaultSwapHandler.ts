@@ -441,11 +441,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
              * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
              */
             const actualParsedBody = await req.paramReader.getParams({
-                amount: FieldTypeEnum.BigInt,
-                gasAmount: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
+                gasAmount: FieldTypeEnum.BigIntNotNegative,
                 exactOut: FieldTypeEnum.BooleanOptional,
-                callerFeeRate: FieldTypeEnum.BigInt,
-                frontingFeeRate: FieldTypeEnum.BigInt,
+                callerFeeRate: FieldTypeEnum.BigIntNotNegative,
+                frontingFeeRate: FieldTypeEnum.BigIntNotNegative,
             });
             abortController.signal.throwIfAborted();
             if(actualParsedBody==null) throw {
@@ -471,10 +471,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
             const inputAmountAdjustments = req.paramReader.getExistingParamsOrNull({
                 amountUtxos: FieldTypeEnum.AnyOptional,
-                amountFeeRate: FieldTypeEnum.NumberOptional,
+                amountFeeRate: FieldTypeEnum.NumberPositiveOptional,
                 amountSkipDetrimental: FieldTypeEnum.BooleanOptional, //Default to true
-                amountChangeValue: FieldTypeEnum.BigIntOptional,
-                amountChangeVSize: FieldTypeEnum.NumberOptional
+                amountChangeValue: FieldTypeEnum.BigIntNotNegativeOptional,
+                amountChangeVSize: FieldTypeEnum.NumberNotNegativeOptional
             });
             if(inputAmountAdjustments==null) throw {
                 code: 20100,

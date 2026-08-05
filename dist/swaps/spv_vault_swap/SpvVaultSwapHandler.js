@@ -330,11 +330,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
              * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
              */
             const actualParsedBody = await req.paramReader.getParams({
-                amount: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                gasAmount: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                amount: SchemaVerifier_1.FieldTypeEnum.BigIntPositive,
+                gasAmount: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
                 exactOut: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
-                callerFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
-                frontingFeeRate: SchemaVerifier_1.FieldTypeEnum.BigInt,
+                callerFeeRate: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
+                frontingFeeRate: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegative,
             });
             abortController.signal.throwIfAborted();
             if (actualParsedBody == null)
@@ -360,10 +360,10 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 };
             const inputAmountAdjustments = req.paramReader.getExistingParamsOrNull({
                 amountUtxos: SchemaVerifier_1.FieldTypeEnum.AnyOptional,
-                amountFeeRate: SchemaVerifier_1.FieldTypeEnum.NumberOptional,
+                amountFeeRate: SchemaVerifier_1.FieldTypeEnum.NumberPositiveOptional,
                 amountSkipDetrimental: SchemaVerifier_1.FieldTypeEnum.BooleanOptional,
-                amountChangeValue: SchemaVerifier_1.FieldTypeEnum.BigIntOptional,
-                amountChangeVSize: SchemaVerifier_1.FieldTypeEnum.NumberOptional
+                amountChangeValue: SchemaVerifier_1.FieldTypeEnum.BigIntNotNegativeOptional,
+                amountChangeVSize: SchemaVerifier_1.FieldTypeEnum.NumberNotNegativeOptional
             });
             if (inputAmountAdjustments == null)
                 throw {
