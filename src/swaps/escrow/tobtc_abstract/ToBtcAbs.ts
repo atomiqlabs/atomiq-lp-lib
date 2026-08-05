@@ -339,7 +339,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @private
      * @throws DefinedRuntimeError will throw an error in case the actual fee is higher than quoted fee
      */
-    protected checkCalculatedTxFee(quotedSatsPerVbyte: bigint, actualSatsPerVbyte: bigint): void {
+    protected checkCalculatedTxFee(quotedSatsPerVbyte: number, actualSatsPerVbyte: number): void {
         const swapPaysEnoughNetworkFee = quotedSatsPerVbyte >= actualSatsPerVbyte;
         if(!swapPaysEnoughNetworkFee) throw {
             code: 90003,
@@ -368,7 +368,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             if(swap.metadata!=null) swap.metadata.times.payCLTVChecked = Date.now();
 
             const satsPerVbyte = await this.bitcoin.getFeeRate();
-            this.checkCalculatedTxFee(swap.satsPerVbyte, BigInt(satsPerVbyte));
+            this.checkCalculatedTxFee(swap.satsPerVbyte, satsPerVbyte);
             if(swap.metadata!=null) swap.metadata.times.payChainFee = Date.now();
 
             const signResult = await this.bitcoin.getSignedTransaction(
@@ -630,7 +630,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param amount
      * @throws {DefinedRuntimeError} will throw an error if there are not enough BTC funds
      */
-    private async checkAndGetNetworkFee(address: string, amount: bigint): Promise<{ networkFee: bigint, satsPerVbyte: bigint }> {
+    private async checkAndGetNetworkFee(address: string, amount: bigint): Promise<{ networkFee: bigint, satsPerVbyte: number }> {
         let chainFeeResp = await this.bitcoin.estimateFee(address, Number(amount), null, this.config.networkFeeMultiplier);
 
         const hasEnoughFunds = chainFeeResp!=null;
@@ -641,7 +641,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
         return {
             networkFee: BigInt(chainFeeResp.networkFee),
-            satsPerVbyte: BigInt(chainFeeResp.satsPerVbyte)
+            satsPerVbyte: chainFeeResp.satsPerVbyte
         };
     }
 

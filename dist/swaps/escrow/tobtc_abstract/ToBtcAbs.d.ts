@@ -91,7 +91,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @private
      * @throws DefinedRuntimeError will throw an error in case the actual fee is higher than quoted fee
      */
-    protected checkCalculatedTxFee(quotedSatsPerVbyte: bigint, actualSatsPerVbyte: bigint): void;
+    protected checkCalculatedTxFee(quotedSatsPerVbyte: number, actualSatsPerVbyte: number): void;
     /**
      * Sends a bitcoin transaction to payout BTC for a swap
      *

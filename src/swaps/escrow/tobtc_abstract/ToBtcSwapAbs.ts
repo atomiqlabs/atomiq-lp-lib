@@ -20,7 +20,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
     sending: boolean;
 
     readonly address: string;
-    readonly satsPerVbyte: bigint;
+    readonly satsPerVbyte: number;
     readonly nonce: bigint;
     readonly requiredConfirmations: number;
     readonly preferedConfirmationTarget: number;
@@ -36,7 +36,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         swapFeeInToken: bigint,
         networkFee: bigint,
         networkFeeInToken: bigint,
-        satsPerVbyte: bigint,
+        satsPerVbyte: number,
         nonce: bigint,
         requiredConfirmations: number,
         preferedConfirmationTarget: number
@@ -51,7 +51,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         swapFeeInToken?: bigint,
         networkFee?: bigint,
         networkFeeInToken?: bigint,
-        satsPerVbyte?: bigint,
+        satsPerVbyte?: number,
         nonce?: bigint,
         requiredConfirmations?: number,
         preferedConfirmationTarget?: number
@@ -67,7 +67,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         } else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.satsPerVbyte = BigInt(chainIdOrObj.satsPerVbyte);
+            this.satsPerVbyte = Number(chainIdOrObj.satsPerVbyte);
             this.nonce = BigInt(chainIdOrObj.nonce);
             this.requiredConfirmations = chainIdOrObj.requiredConfirmations;
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
