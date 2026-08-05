@@ -25,6 +25,10 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         this.config.invoiceTimeoutSeconds = this.config.invoiceTimeoutSeconds || 90;
         this.lightning = lightning;
         this.LightningAssertions = new LightningAssertions_1.LightningAssertions(this.logger, lightning);
+        const numerator = (this.config.destinationHtlcTimeoutSeconds + this.config.gracePeriod) * this.config.safetyFactor;
+        this.minCltv = (0, Utils_1.bigIntMax)((numerator + this.config.bitcoinBlocktime - 1n)
+            / this.config.bitcoinBlocktime, //Ceil division
+        (0, Utils_1.getMinSafeBlockWindowFast)(this.config.safetyFactor));
     }
     async processPastSwap(swap) {
         const { swapContract, signer } = this.getChain(swap.chainIdentifier);
@@ -266,14 +270,13 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         const balancePrefetch = this.getBalancePrefetch(invoiceData.chainIdentifier, useToken, abortController);
         const blockheightPrefetch = this.getBlockheightPrefetch(abortController);
         const signDataPrefetchPromise = this.getSignDataPrefetch(invoiceData.chainIdentifier, abortController);
-        let expiryTimeout;
         try {
             //Check if we have enough liquidity to proceed
             await this.checkBalance(escrowAmount, balancePrefetch, abortController.signal);
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcBalanceChecked = Date.now();
             //Check if HTLC expiry is long enough
-            expiryTimeout = await this.checkHtlcExpiry(invoice, blockheightPrefetch, abortController.signal);
+            await this.checkHtlcExpiry(invoice, blockheightPrefetch, abortController.signal);
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcTimeoutCalculated = Date.now();
         }
@@ -288,7 +291,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         }
         const { swapContract, signer } = this.getChain(invoiceData.chainIdentifier);
         //Create real swap data
-        const payInvoiceObject = await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.claimer, useToken, escrowAmount, invoiceData.claimHash, 0n, BigInt(Math.floor(Date.now() / 1000)) + expiryTimeout, false, true, invoiceData.securityDeposit, 0n, invoiceData.depositToken);
+        const payInvoiceObject = await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.claimer, useToken, escrowAmount, invoiceData.claimHash, 0n, BigInt(Math.floor(Date.now() / 1000)) + this.config.destinationHtlcTimeoutSeconds, false, true, invoiceData.securityDeposit, 0n, invoiceData.depositToken);
         abortController.signal.throwIfAborted();
         if (invoiceData.metadata != null)
             invoiceData.metadata.times.htlcSwapCreated = Date.now();
@@ -407,25 +410,23 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
      * @param blockheightPrefetch
      * @param signal
      * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     * @returns expiry timeout in seconds
      */
     async checkHtlcExpiry(invoice, blockheightPrefetch, signal) {
         const timeout = this.getInvoicePaymentsTimeout(invoice);
         const current_block_height = await blockheightPrefetch;
         signal.throwIfAborted();
         const blockDelta = BigInt(timeout - current_block_height);
-        const htlcExpiresTooSoon = blockDelta < this.config.minCltv;
+        const htlcExpiresTooSoon = blockDelta < this.minCltv;
         if (htlcExpiresTooSoon) {
             throw {
                 code: 20002,
                 msg: "Not enough time to reliably process the swap",
                 data: {
-                    requiredDelta: this.config.minCltv.toString(10),
+                    requiredDelta: this.minCltv.toString(10),
                     actualDelta: blockDelta.toString(10)
                 }
             };
         }
-        return (this.config.minCltv * this.config.bitcoinBlocktime / this.config.safetyFactor) - this.config.gracePeriod;
     }
     /**
      * Cancels the swap (CANCELED state) & also cancels the LN invoice (including all pending HTLCs)
@@ -573,7 +574,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Create swap
             const hodlInvoiceObj = {
                 description: description ?? (chainIdentifier + "-" + parsedBody.address),
-                cltvDelta: Number(this.config.minCltv) + 5,
+                cltvDelta: Number(this.minCltv) + 5,
                 expiresAt: Date.now() + (this.config.invoiceTimeoutSeconds * 1000),
                 id: parsedBody.paymentHash,
                 mtokens: amountBD * 1000n,
@@ -585,8 +586,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             metadata.times.invoiceCreated = Date.now();
             metadata.invoiceResponse = { ...hodlInvoice };
             //Pre-compute the security deposit
-            const expiryTimeout = (this.config.minCltv * this.config.bitcoinBlocktime / this.config.safetyFactor) - this.config.gracePeriod;
-            const totalSecurityDeposit = await this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, expiryTimeout, baseSDPromise, depositToken, depositTokenPricePrefetchPromise, fees, abortController.signal, metadata);
+            const totalSecurityDeposit = await this.getSecurityDeposit(chainIdentifier, amountBD, swapFee, this.config.destinationHtlcTimeoutSeconds, baseSDPromise, depositToken, depositTokenPricePrefetchPromise, fees, abortController.signal, metadata);
             metadata.times.securityDepositCalculated = Date.now();
             const createdSwap = new FromBtcLnSwapAbs_1.FromBtcLnSwapAbs(chainIdentifier, hodlInvoice.request, parsedBody.paymentHash, hodlInvoice.mtokens, swapFee, swapFeeInToken, parsedBody.address, useToken, totalInToken, swapContract.getHashForHtlc(Buffer.from(parsedBody.paymentHash, "hex")).toString("hex"), totalSecurityDeposit, depositToken);
             metadata.times.swapCreated = Date.now();
@@ -717,7 +717,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     }
     getInfoData() {
         return {
-            minCltv: Number(this.config.minCltv)
+            minCltv: Number(this.minCltv)
         };
     }
 }

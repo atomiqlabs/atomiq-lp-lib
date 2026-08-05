@@ -9,7 +9,7 @@ import { ILightningWallet } from "../../../wallets/ILightningWallet";
 import { LightningAssertions } from "../../assertions/LightningAssertions";
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number;
-    minCltv: bigint;
+    destinationHtlcTimeoutSeconds: bigint;
     gracePeriod: bigint;
     gasTokenMax: {
         [chainId: string]: bigint;
@@ -37,6 +37,7 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
     readonly config: FromBtcLnAutoConfig;
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
+    readonly minCltv: bigint;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcLnAutoSwap>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: FromBtcLnAutoConfig);
     protected processPastSwap(swap: FromBtcLnAutoSwap): Promise<"REFUND" | "SETTLE" | null>;
     protected refundSwaps(refundSwaps: FromBtcLnAutoSwap[]): Promise<void>;
@@ -95,7 +96,6 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
      *
      * @param invoice
      * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     * @returns expiry timeout in seconds
      */
     private checkHtlcExpiry;
     /**
