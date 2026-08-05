@@ -260,13 +260,8 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             }).catch(e => this.swapLogger.error(invoiceData, "htlcReceived(): Error sending transfer txns", e));
 
             if(result==null) {
-                //Cancel invoice
-                await invoiceData.setState(FromBtcLnTrustedSwapState.REFUNDED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
-                await this.lightning.cancelHodlInvoice(invoice.id);
-                this.unsubscribeInvoice(invoice.id);
-                await this.removeSwapData(invoiceData);
-                this.swapLogger.info(invoiceData, "htlcReceived(): transaction sending failed, refunding lightning: ", invoiceData.pr);
+                this.swapLogger.info(invoiceData, "htlcReceived(): transaction sending failed: ", invoiceData.pr);
+                //Let the swap watchdog handle this case
                 throw {
                     code: 20002,
                     msg: "Transaction sending failed"
@@ -285,14 +280,8 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             if(invoiceData.isLocked()) return;
 
             const txStatus = await chainInterface.getTxStatus(invoiceData.scRawTx);
-            if(txStatus==="not_found") {
-                //Retry
-                invoiceData.txIds = {init: null};
-                invoiceData.scRawTx = null;
-                await invoiceData.setState(FromBtcLnTrustedSwapState.RECEIVED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
-            }
-            if(txStatus==="reverted") {
+
+            if(txStatus==="reverted" || txStatus==="not_found") {
                 //Cancel invoice
                 await invoiceData.setState(FromBtcLnTrustedSwapState.REFUNDED);
                 await this.storageManager.saveData(invoice.id, null, invoiceData);
