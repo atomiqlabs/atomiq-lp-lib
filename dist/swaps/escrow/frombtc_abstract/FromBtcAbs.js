@@ -36,7 +36,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     getHash(chainIdentifier, address, amount) {
         const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const { swapContract } = this.getChain(chainIdentifier);
-        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations, 0n);
+        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations);
     }
     /**
      * Processes past swap
@@ -179,7 +179,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     getDummySwapData(chainIdentifier, useToken, address) {
         const { swapContract, signer } = this.getChain(chainIdentifier);
         const dummyAmount = BigInt(Math.floor(Math.random() * 0x1000000));
-        return swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), address, useToken, dummyAmount, swapContract.getHashForOnchain((0, crypto_1.randomBytes)(32), dummyAmount, 3, null).toString("hex"), base_1.BigIntBufferUtils.fromBuffer((0, crypto_1.randomBytes)(8)), BigInt(Math.floor(Date.now() / 1000)) + this.config.swapTsCsvDelta, false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
+        return swapContract.createSwapData(base_1.ChainSwapType.CHAIN, signer.getAddress(), address, useToken, dummyAmount, swapContract.getHashForOnchain((0, crypto_1.randomBytes)(32), dummyAmount, 3).toString("hex"), base_1.BigIntBufferUtils.fromBuffer((0, crypto_1.randomBytes)(8)), BigInt(Math.floor(Date.now() / 1000)) + this.config.swapTsCsvDelta, false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
     }
     /**
      * Sets up required listeners for the REST server

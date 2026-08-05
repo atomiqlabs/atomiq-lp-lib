@@ -438,7 +438,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the nonce is invalid
      */
     checkNonceValid(nonce) {
-        if (nonce < 0 || nonce >= (2n ** 64n))
+        if (nonce < 1 || nonce >= (2n ** 64n))
             throw {
                 code: 20021,
                 msg: "Invalid request body (nonce - cannot be parsed)"
