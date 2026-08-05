@@ -561,6 +561,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @throws {DefinedRuntimeError} will throw an error if the confirmationTarget is out of bounds
      */
     protected checkConfirmationTarget(confirmationTarget: number): void {
+        if(!Number.isFinite(confirmationTarget) || !Number.isSafeInteger(confirmationTarget)) throw {
+            code: 20028,
+            msg: "Invalid request body (confirmationTarget - not whole number)"
+        };
         if(confirmationTarget>this.config.maxConfTarget) throw {
             code: 20023,
             msg: "Invalid request body (confirmationTarget - too high)"
@@ -578,6 +582,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @throws {DefinedRuntimeError} will throw an error if the confirmations are out of bounds
      */
     protected checkRequiredConfirmations(confirmations: number): void {
+        if(!Number.isFinite(confirmations) || !Number.isSafeInteger(confirmations)) throw {
+            code: 20027,
+            msg: "Invalid request body (confirmations - not whole number)"
+        };
         if(confirmations>this.config.maxConfirmations) throw {
             code: 20025,
             msg: "Invalid request body (confirmations - too high)"
