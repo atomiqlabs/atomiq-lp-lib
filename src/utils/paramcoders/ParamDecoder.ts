@@ -1,4 +1,11 @@
-import {FieldTypeEnum, parseBigInt, RequestSchema, RequestSchemaResult, verifySchema} from "./SchemaVerifier";
+import {
+    FieldTypeEnum,
+    parseBigInt,
+    RequestSchema,
+    RequestSchemaResult,
+    verifySchema,
+    verifySchemaField
+} from "./SchemaVerifier";
 import {IParamReader} from "./IParamReader";
 
 
@@ -133,41 +140,7 @@ export class ParamDecoder implements IParamReader {
         const resultSchema: any = {};
         for(let fieldName in schema) {
             const val: any = await this.getParam(fieldName);
-            const type: FieldTypeEnum | RequestSchema | ((val: any) => boolean) = schema[fieldName];
-            if(typeof(type)==="function") {
-                const result = type(val);
-                if(result==null) return null;
-                resultSchema[fieldName] = result;
-                continue;
-            }
-
-            if(val==null && (type as number)>=100) {
-                resultSchema[fieldName] = null;
-                continue;
-            }
-
-            if(type===FieldTypeEnum.Any || type===FieldTypeEnum.AnyOptional) {
-                resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.Boolean || type===FieldTypeEnum.BooleanOptional) {
-                if(typeof(val)!=="boolean") return null;
-                resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.Number || type===FieldTypeEnum.NumberOptional) {
-                if(typeof(val)!=="number") return null;
-                if(isNaN(val as number)) return null;
-                resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.BigInt || type===FieldTypeEnum.BigIntOptional) {
-                const result = parseBigInt(val);
-                if(result==null) return null;
-                resultSchema[fieldName] = result;
-            } else if(type===FieldTypeEnum.String || type===FieldTypeEnum.StringOptional) {
-                if(typeof(val)!=="string") return null;
-                resultSchema[fieldName] = val;
-            } else {
-                //Probably another request schema
-                const result = verifySchema(val, type as RequestSchema);
-                if(result==null) return null;
-                resultSchema[fieldName] = result;
-            }
+            if(!verifySchemaField(val, schema[fieldName], fieldName, resultSchema)) return null;
         }
         return resultSchema;
     }
@@ -182,36 +155,7 @@ export class ParamDecoder implements IParamReader {
                 continue;
             }
 
-            const type: FieldTypeEnum | RequestSchema | ((val: any) => boolean) = schema[fieldName];
-            if(typeof(type)==="function") {
-                const result = type(val);
-                if(result==null) return null;
-                resultSchema[fieldName] = result;
-                continue;
-            }
-
-            if(type===FieldTypeEnum.Any || type===FieldTypeEnum.AnyOptional) {
-                resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.Boolean || type===FieldTypeEnum.BooleanOptional) {
-                if(typeof(val)!=="boolean") return null;
-                resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.Number || type===FieldTypeEnum.NumberOptional) {
-                if(typeof(val)!=="number") return null;
-                if(isNaN(val as number)) return null;
-                resultSchema[fieldName] = val;
-            } else if(type===FieldTypeEnum.BigInt || type===FieldTypeEnum.BigIntOptional) {
-                const result = parseBigInt(val);
-                if(result==null) return null;
-                resultSchema[fieldName] = result;
-            } else if(type===FieldTypeEnum.String || type===FieldTypeEnum.StringOptional) {
-                if(typeof(val)!=="string") return null;
-                resultSchema[fieldName] = val;
-            } else {
-                //Probably another request schema
-                const result = verifySchema(val, type as RequestSchema);
-                if(result==null) return null;
-                resultSchema[fieldName] = result;
-            }
+            if(!verifySchemaField(val, schema[fieldName], fieldName, resultSchema)) return null;
         }
         return resultSchema;
     }
