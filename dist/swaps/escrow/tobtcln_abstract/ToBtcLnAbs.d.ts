@@ -68,6 +68,7 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
     };
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
+    readonly cltvDeltaLowerBound: bigint;
     constructor(storageDirectory: IIntermediaryStorage<ToBtcLnSwapAbs>, path: string, chainData: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: ToBtcLnConfig);
     /**
      * Cleans up exactIn authorization that are already past their expiry

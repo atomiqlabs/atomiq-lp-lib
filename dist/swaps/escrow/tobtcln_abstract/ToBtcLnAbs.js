@@ -33,9 +33,10 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10 * 1000;
         this.config.lnSendBitcoinBlockTimeSafetyFactorPPM = this.config.lnSendBitcoinBlockTimeSafetyFactorPPM ?? (this.config.safetyFactor * 1000000n);
-        if (this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1100000n) {
-            throw new Error("Lightning network send block safety factor set below 1.1, this is insecure!");
+        if (this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1250000n) {
+            throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
+        this.cltvDeltaLowerBound = (0, Utils_1.getMinSafeBlockWindowSlow)(Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1000000);
     }
     /**
      * Cleans up exactIn authorization that are already past their expiry
@@ -229,6 +230,11 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         const maxFee = swap.quotedNetworkFee;
         const maxUsableCLTVdelta = (expiryTimestamp - currentTimestamp - this.config.gracePeriod)
             / (this.config.bitcoinBlocktime * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
+        if (maxUsableCLTVdelta < this.cltvDeltaLowerBound)
+            throw {
+                code: 90008,
+                msg: "Calculated CLTV delta is too low for current safety factor!"
+            };
         //Initiate payment
         this.swapLogger.info(swap, "sendLightningPayment(): paying lightning network invoice," +
             " cltvDelta: " + maxUsableCLTVdelta.toString(10) +
@@ -476,6 +482,11 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     async checkAndGetNetworkFee(amountBD, maxFee, expiryTimestamp, currentTimestamp, pr, metadata, abortSignal) {
         const maxUsableCLTV = (expiryTimestamp - currentTimestamp - this.config.gracePeriod)
             / (this.config.bitcoinBlocktime * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
+        if (maxUsableCLTV < this.cltvDeltaLowerBound)
+            throw {
+                code: 20002,
+                msg: "Cannot route the payment (calculated CLTV delta too short - increase timeout)!"
+            };
         const blockHeight = await this.lightning.getBlockheight();
         abortSignal.throwIfAborted();
         metadata.times.blockheightFetched = Date.now();

@@ -11,7 +11,13 @@ import {
     SwapCommitStateType,
     SwapData
 } from "@atomiqlabs/base";
-import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
+import {
+    expressHandlerWrapper,
+    getAbortController,
+    getMinSafeBlockWindowSlow,
+    HEX_REGEX,
+    isDefinedRuntimeError
+} from "../../../utils/Utils";
 import {PluginManager} from "../../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
 import {randomBytes} from "crypto";
@@ -105,6 +111,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
 
+    readonly cltvDeltaLowerBound: bigint;
+
     constructor(
         storageDirectory: IIntermediaryStorage<ToBtcLnSwapAbs>,
         path: string,
@@ -123,9 +131,13 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10*1000;
         this.config.lnSendBitcoinBlockTimeSafetyFactorPPM = this.config.lnSendBitcoinBlockTimeSafetyFactorPPM ?? (this.config.safetyFactor * 1_000_000n);
-        if(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1_100_000n) {
-            throw new Error("Lightning network send block safety factor set below 1.1, this is insecure!");
+        if(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1_250_000n) {
+            throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
+
+        this.cltvDeltaLowerBound = getMinSafeBlockWindowSlow(
+            Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1_000_000
+        );
     }
 
     /**
@@ -334,6 +346,10 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         const maxFee = swap.quotedNetworkFee;
         const maxUsableCLTVdelta = (expiryTimestamp - currentTimestamp - this.config.gracePeriod)
             / (this.config.bitcoinBlocktime * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1_000_000n);
+        if(maxUsableCLTVdelta < this.cltvDeltaLowerBound) throw {
+            code: 90008,
+            msg: "Calculated CLTV delta is too low for current safety factor!"
+        }
 
         //Initiate payment
         this.swapLogger.info(swap, "sendLightningPayment(): paying lightning network invoice,"+
@@ -591,6 +607,10 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
     }> {
         const maxUsableCLTV: bigint = (expiryTimestamp - currentTimestamp - this.config.gracePeriod)
             / (this.config.bitcoinBlocktime * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1_000_000n);
+        if(maxUsableCLTV < this.cltvDeltaLowerBound) throw {
+            code: 20002,
+            msg: "Cannot route the payment (calculated CLTV delta too short - increase timeout)!"
+        };
 
         const blockHeight = await this.lightning.getBlockheight();
         abortSignal.throwIfAborted();
