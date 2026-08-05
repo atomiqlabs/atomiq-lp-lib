@@ -870,13 +870,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 swap
             );
             if(isQuoteThrow(pluginCheckResult)) {
-                const error = {
+                if(swap.state===SpvVaultSwapState.CREATED)
+                    await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                throw {
                     code: 29999,
                     msg: pluginCheckResult.message
-                }
-                if(swap.metadata!=null) swap.metadata.postQuoteError = error;
-                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
-                throw error;
+                };
             }
 
             await this.Vaults.checkVaultReplacedTransactions(vault, true);
@@ -887,16 +886,20 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 };
             }
 
+            const unlock = swap.lock(120);
+            if(!unlock) throw {
+                code: 20517,
+                msg: "Bitcoin transaction submission already in progress, please retry later!"
+            };
+
             try {
                 const btcRawTx = Buffer.from(signedTx.toBytes(true, true)).toString("hex");
 
                 //Double-check the state to prevent race condition
-                if(swap.state!==SpvVaultSwapState.CREATED) {
-                    throw {
-                        code: 20505,
-                        msg: "Invalid quote ID, not found or expired!"
-                    };
-                }
+                if(swap.state!==SpvVaultSwapState.CREATED) throw {
+                    code: 20505,
+                    msg: "Invalid quote ID, not found or expired!"
+                };
 
                 //Double check in-flight swap count
                 this.checkTooManyInflightSwaps();
@@ -931,10 +934,18 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 vault.removeWithdrawal(data);
                 await this.Vaults.saveVault(vault);
 
-                if(isDefinedRuntimeError(e) && swap.metadata!=null) swap.metadata.postQuoteError = e;
-                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                //Check if the error is only because the state has already changed
+                if(!isDefinedRuntimeError(e) || e.code!==20505) {
+                    //We only make the swap failed if the error happened in CREATED or SIGNED states
+                    if(swap.state===SpvVaultSwapState.CREATED || swap.state===SpvVaultSwapState.SIGNED) {
+                        if(isDefinedRuntimeError(e) && swap.metadata!=null) swap.metadata.postQuoteError = e;
+                        await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                    }
+                }
 
                 throw e;
+            } finally {
+                unlock();
             }
 
             await responseStream.writeParamsAndEnd({
