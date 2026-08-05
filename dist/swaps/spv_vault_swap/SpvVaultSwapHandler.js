@@ -174,13 +174,21 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
             let tx = foundWithdrawal?.btcTx;
-            if (tx == null)
+            if (tx == null) {
                 tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
+            }
+            else {
+                tx = await (0, BitcoinUtils_1.checkTransactionReplaced)(tx.txid, tx.raw, this.bitcoinRpc);
+            }
             if (tx == null) {
                 await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                if (foundWithdrawal != null) {
+                    vault.removeWithdrawal(foundWithdrawal);
+                    await this.Vaults.saveVault(vault);
+                }
                 return;
             }
-            else if (tx.confirmations === 0) {
+            else if (tx.confirmations == null || tx.confirmations === 0) {
                 await swap.setState(SpvVaultSwap_1.SpvVaultSwapState.SENT);
                 await this.saveSwapData(swap);
                 return;
@@ -630,25 +638,26 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "Vault UTXO already spent, please get another quote and try again!"
                 };
             }
+            //Double-check the state to prevent race condition
+            if (swap.state !== SpvVaultSwap_1.SpvVaultSwapState.CREATED)
+                throw {
+                    code: 20505,
+                    msg: "Invalid quote ID, not found or expired!"
+                }; //Continues here is only synchronous code until the state change to SIGNED
             const unlock = swap.lock(120);
             if (!unlock)
                 throw {
                     code: 20517,
                     msg: "Bitcoin transaction submission already in progress, please retry later!"
                 };
+            const txId = signedTx.id;
             let swapSendingSet = false;
             let dataSendingSet = false;
             try {
                 const btcRawTx = Buffer.from(signedTx.toBytes(true, true)).toString("hex");
-                //Double-check the state to prevent race condition
-                if (swap.state !== SpvVaultSwap_1.SpvVaultSwapState.CREATED)
-                    throw {
-                        code: 20505,
-                        msg: "Invalid quote ID, not found or expired!"
-                    };
                 //Double check in-flight swap count
                 this.checkTooManyInflightSwaps();
-                swap.btcTxId = signedTx.id;
+                swap.btcTxId = txId;
                 swap.state = SpvVaultSwap_1.SpvVaultSwapState.SIGNED;
                 swap.sending = true;
                 swapSendingSet = true;
@@ -658,7 +667,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 vault.addWithdrawal(data);
                 dataSendingSet = true;
                 await this.Vaults.saveVault(vault);
-                this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: " + swap.btcTxId);
+                this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: " + txId);
                 try {
                     await this.bitcoin.sendRawTransaction(btcRawTx);
                     await swap.setState(SpvVaultSwap_1.SpvVaultSwapState.SENT);
@@ -676,21 +685,45 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             catch (e) {
                 if (swapSendingSet)
                     swap.sending = false;
-                if (dataSendingSet) {
+                if (dataSendingSet)
                     data.sending = false;
-                    vault.removeWithdrawal(data);
-                    await this.Vaults.saveVault(vault);
-                }
-                //Check if the error is only because the state has already changed
-                if (!(0, Utils_1.isDefinedRuntimeError)(e) || e.code !== 20505) {
-                    //We only make the swap failed if the error happened in CREATED or SIGNED states
-                    if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED || swap.state === SpvVaultSwap_1.SpvVaultSwapState.SIGNED) {
-                        if ((0, Utils_1.isDefinedRuntimeError)(e) && swap.metadata != null)
-                            swap.metadata.postQuoteError = e;
-                        await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                //We only make the swap failed if the error happened in CREATED or SIGNED states
+                if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED || swap.state === SpvVaultSwap_1.SpvVaultSwapState.SIGNED) {
+                    try {
+                        const fetchedBtcTx = await this.bitcoin.getWalletTransaction(txId);
+                        if (fetchedBtcTx == null) {
+                            if (dataSendingSet) {
+                                vault.removeWithdrawal(data);
+                                await this.Vaults.saveVault(vault);
+                            }
+                            if ((0, Utils_1.isDefinedRuntimeError)(e) && swap.metadata != null)
+                                swap.metadata.postQuoteError = e;
+                            await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                            throw e; //This will get caught locally and throw the post quote error
+                        }
+                        else {
+                            //Transaction not-null set state to sent and fall through without throwing
+                            await swap.setState(SpvVaultSwap_1.SpvVaultSwapState.SENT);
+                        }
+                    }
+                    catch (getTxErr) {
+                        if (getTxErr === e)
+                            throw e;
+                        //Cannot determine whether the bitcoin transaction was broadcasted or not
+                        // do nothing here and let the watchdog handle this!
+                        throw {
+                            _httpStatus: 200,
+                            code: 20001,
+                            msg: "Transaction status unknown",
+                            data: {
+                                txId: swap.btcTxId
+                            }
+                        };
                     }
                 }
-                throw e;
+                else {
+                    throw e;
+                }
             }
             finally {
                 unlock();
