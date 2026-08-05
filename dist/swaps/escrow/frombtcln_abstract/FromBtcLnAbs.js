@@ -120,9 +120,14 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             if (unlock == null)
                 continue;
             this.swapLogger.debug(refundSwap, "refundSwaps(): initiate refund of swap");
-            await swapContract.refund(signer, refundSwap.data, true, false, { waitForConfirmation: true });
-            this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: " + refundSwap.pr);
-            await refundSwap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED);
+            try {
+                await swapContract.refund(signer, refundSwap.data, true, false, { waitForConfirmation: true });
+                this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: " + refundSwap.pr);
+                await refundSwap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED);
+            }
+            catch (e) {
+                this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
+            }
             unlock();
         }
     }

@@ -160,11 +160,16 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const {swapContract, signer} = this.getChain(refundSwap.chainIdentifier);
             const unlock = refundSwap.lock(swapContract.refundTimeout);
             if(unlock==null) continue;
+
             this.swapLogger.debug(refundSwap, "refundSwaps(): initiate refund of swap");
-            await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
-            this.swapLogger.info(refundSwap, "refundSwaps(): swap refunded, address: "+refundSwap.address);
-            //The swap should be removed by the event handler
-            await refundSwap.setState(FromBtcSwapState.REFUNDED);
+            try {
+                await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
+                this.swapLogger.info(refundSwap, "refundSwaps(): swap refunded, address: "+refundSwap.address);
+                //The swap should be removed by the event handler
+                await refundSwap.setState(FromBtcSwapState.REFUNDED);
+            } catch (e) {
+                this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
+            }
             unlock();
         }
     }
