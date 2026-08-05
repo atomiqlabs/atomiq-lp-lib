@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.parsePsbt = exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = exports.getLogger = void 0;
+exports.bigIntMax = exports.getMinSafeBlockWindowSlow = exports.getMinSafeBlockWindowFast = exports.parsePsbt = exports.getAbortController = exports.bigIntSorter = exports.deserializeBN = exports.serializeBN = exports.HEX_REGEX = exports.expressHandlerWrapper = exports.isDefinedRuntimeError = exports.getLogger = void 0;
 const crypto_1 = require("crypto");
 const btc_signer_1 = require("@scure/btc-signer");
 function getLogger(prefix) {
@@ -128,3 +128,53 @@ function parsePsbt(btcTx) {
     };
 }
 exports.parsePsbt = parsePsbt;
+/**
+ * Returns the minimum Bitcoin block window (in blocks) for which a "fast blocks" safety
+ * factor is genuinely usable: the probability that N consecutive blocks are produced
+ * with an average interval below (blocktime / safetyFactor) is less than `probability`.
+ *
+ * Model: block arrivals are a Poisson process (i.i.d. exponential intervals), so the
+ * production time of N blocks is Erlang/Gamma(shape=N). A Chernoff (Cramer) bound on
+ * the lower tail gives the per-block large-deviation rate I(S) = ln(S) + 1/S - 1, i.e.
+ *     P(N blocks faster than blocktime/S on average) <= exp(-N * I(S))
+ * which this function inverts for N. Conservative: the exact Erlang CDF already
+ * satisfies the bound ~25% earlier. Use for the fast-block tail (e.g. incoming LN
+ * HTLC expiry racing an escrow claim window).
+ *
+ * @param {number|bigint} safetyFactor Assumed max block-speed multiplier (must be > 1)
+ * @param {number} [probability=0.0001] Tolerated failure probability (default 0.01%)
+ * @returns {number} Minimum safe block window in blocks
+ */
+function getMinSafeBlockWindowFast(safetyFactor, probability = 0.0001) {
+    const S = Number(safetyFactor);
+    const rate = Math.log(S) + 1 / S - 1;
+    if (!(rate > 0))
+        throw new RangeError("safetyFactor must be > 1");
+    return BigInt(Math.ceil(Math.log(1 / probability) / rate));
+}
+exports.getMinSafeBlockWindowFast = getMinSafeBlockWindowFast;
+/**
+ * Slow-tail mirror of getMinSafeBlockWindowFast(): returns the minimum block window
+ * (in blocks) for which a "slow blocks" safety factor is genuinely usable: the
+ * probability that N consecutive blocks take LONGER than N * blocktime * safetyFactor
+ * is less than `probability`. Chernoff bound on the upper Erlang tail gives the rate
+ * I(S) = S - 1 - ln(S). Use when converting a wall-clock deadline into a block count
+ * (e.g. payout/claim timeouts that must expire before some real-world time even if
+ * blocks come slowly).
+ *
+ * @param {number|bigint} safetyFactor Assumed max block-slowness multiplier (must be > 1)
+ * @param {number} [probability=0.0001] Tolerated failure probability (default 0.01%)
+ * @returns {number} Minimum safe block window in blocks
+ */
+function getMinSafeBlockWindowSlow(safetyFactor, probability = 0.0001) {
+    const S = Number(safetyFactor);
+    const rate = S - 1 - Math.log(S);
+    if (!(rate > 0))
+        throw new RangeError("safetyFactor must be > 1");
+    return BigInt(Math.ceil(Math.log(1 / probability) / rate));
+}
+exports.getMinSafeBlockWindowSlow = getMinSafeBlockWindowSlow;
+function bigIntMax(a, b) {
+    return a > b ? a : b;
+}
+exports.bigIntMax = bigIntMax;

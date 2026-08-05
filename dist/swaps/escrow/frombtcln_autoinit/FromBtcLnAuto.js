@@ -32,6 +32,10 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             if (!swapContract.supportsInitWithoutClaimer)
                 this.allowedTokens[chain].clear();
         }
+        const numerator = (this.config.destinationHtlcTimeoutSeconds + this.config.gracePeriod) * this.config.safetyFactor;
+        this.minCltv = (0, Utils_1.bigIntMax)((numerator + this.config.bitcoinBlocktime - 1n)
+            / this.config.bitcoinBlocktime, //Ceil division
+        (0, Utils_1.getMinSafeBlockWindowFast)(this.config.safetyFactor));
     }
     async processPastSwap(swap) {
         const { swapContract, signer } = this.getChain(swap.chainIdentifier);
@@ -262,10 +266,9 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         if (invoiceData.metadata != null)
             invoiceData.metadata.times.htlcReceived = Date.now();
         const useToken = invoiceData.token;
-        let expiryTimeout;
         try {
             //Check if HTLC expiry is long enough
-            expiryTimeout = await this.checkHtlcExpiry(invoice);
+            await this.checkHtlcExpiry(invoice);
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcTimeoutCalculated = Date.now();
         }
@@ -278,7 +281,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         }
         const { swapContract, signer } = this.getChain(invoiceData.chainIdentifier);
         //Create real swap data
-        const swapData = await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.claimer, useToken, invoiceData.amountToken, invoiceData.claimHash, 0n, BigInt(Math.floor(Date.now() / 1000)) + expiryTimeout, false, true, invoiceData.amountGasToken + invoiceData.claimerBounty, invoiceData.claimerBounty, invoiceData.gasToken);
+        const swapData = await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer.getAddress(), invoiceData.claimer, useToken, invoiceData.amountToken, invoiceData.claimHash, 0n, BigInt(Math.floor(Date.now() / 1000)) + this.config.destinationHtlcTimeoutSeconds, false, true, invoiceData.amountGasToken + invoiceData.claimerBounty, invoiceData.claimerBounty, invoiceData.gasToken);
         if (invoiceData.metadata != null)
             invoiceData.metadata.times.htlcSwapCreated = Date.now();
         //Important to prevent race condition and issuing 2 signed init messages at the same time
@@ -445,24 +448,22 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
      *
      * @param invoice
      * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     * @returns expiry timeout in seconds
      */
     async checkHtlcExpiry(invoice) {
         const timeout = this.getInvoicePaymentsTimeout(invoice);
         const current_block_height = await this.lightning.getBlockheight();
         const blockDelta = BigInt(timeout - current_block_height);
-        const htlcExpiresTooSoon = blockDelta < this.config.minCltv;
+        const htlcExpiresTooSoon = blockDelta < this.minCltv;
         if (htlcExpiresTooSoon) {
             throw {
                 code: 20002,
                 msg: "Not enough time to reliably process the swap",
                 data: {
-                    requiredDelta: this.config.minCltv.toString(10),
+                    requiredDelta: this.minCltv.toString(10),
                     actualDelta: blockDelta.toString(10)
                 }
             };
         }
-        return (this.config.minCltv * this.config.bitcoinBlocktime / this.config.safetyFactor) - this.config.gracePeriod;
     }
     /**
      * Cancels the swap (CANCELED state) & also cancels the LN invoice (including all pending HTLCs)
@@ -635,7 +636,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Create swap
             const hodlInvoiceObj = {
                 description: description ?? (chainIdentifier + "-" + parsedBody.address),
-                cltvDelta: Number(this.config.minCltv) + 5,
+                cltvDelta: Number(this.minCltv) + 5,
                 expiresAt: Date.now() + (this.config.invoiceTimeoutSeconds * 1000),
                 id: parsedBody.paymentHash,
                 mtokens: totalBtcInput * 1000n,
@@ -726,7 +727,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             };
         }
         return {
-            minCltv: Number(this.config.minCltv),
+            minCltv: Number(this.minCltv),
             invoiceTimeoutSeconds: this.config.invoiceTimeoutSeconds,
             gasTokens: mappedDict
         };

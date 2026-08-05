@@ -4,7 +4,13 @@ import {FromBtcLnAutoSwap, FromBtcLnAutoSwapState} from "./FromBtcLnAutoSwap";
 import {MultichainData, SwapHandlerType} from "../../SwapHandler";
 import {ISwapPrice} from "../../../prices/ISwapPrice";
 import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
-import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
+import {
+    bigIntMax,
+    expressHandlerWrapper,
+    getAbortController, getMinSafeBlockWindowFast,
+    HEX_REGEX,
+    isDefinedRuntimeError
+} from "../../../utils/Utils";
 import {PluginManager} from "../../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
 import {FieldTypeEnum, verifySchema} from "../../../utils/paramcoders/SchemaVerifier";
@@ -23,7 +29,7 @@ import {isQuoteThrow} from "../../../plugins/IPlugin";
 
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
-    minCltv: bigint,
+    destinationHtlcTimeoutSeconds: bigint,
     gracePeriod: bigint,
     gasTokenMax: {[chainId: string]: bigint}
 }
@@ -54,6 +60,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
 
+    readonly minCltv: bigint;
+
     constructor(
         storageDirectory: IIntermediaryStorage<FromBtcLnAutoSwap>,
         path: string,
@@ -73,6 +81,13 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             const {swapContract} = this.getChain(chain);
             if(!swapContract.supportsInitWithoutClaimer) this.allowedTokens[chain].clear();
         }
+
+        const numerator = (this.config.destinationHtlcTimeoutSeconds + this.config.gracePeriod) * this.config.safetyFactor;
+        this.minCltv = bigIntMax(
+            (numerator + this.config.bitcoinBlocktime - 1n)
+                / this.config.bitcoinBlocktime, //Ceil division
+            getMinSafeBlockWindowFast(this.config.safetyFactor)
+        );
     }
 
     protected async processPastSwap(swap: FromBtcLnAutoSwap): Promise<"REFUND" | "SETTLE" | null> {
@@ -326,10 +341,9 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
         const useToken = invoiceData.token;
 
-        let expiryTimeout: bigint;
         try {
             //Check if HTLC expiry is long enough
-            expiryTimeout = await this.checkHtlcExpiry(invoice);
+            await this.checkHtlcExpiry(invoice);
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcTimeoutCalculated = Date.now();
         } catch (e) {
             if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = e;
@@ -348,7 +362,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             invoiceData.amountToken,
             invoiceData.claimHash,
             0n,
-            BigInt(Math.floor(Date.now() / 1000)) + expiryTimeout,
+            BigInt(Math.floor(Date.now() / 1000)) + this.config.destinationHtlcTimeoutSeconds,
             false,
             true,
             invoiceData.amountGasToken + invoiceData.claimerBounty,
@@ -528,27 +542,24 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
      *
      * @param invoice
      * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     * @returns expiry timeout in seconds
      */
-    private async checkHtlcExpiry(invoice: LightningNetworkInvoice): Promise<bigint> {
+    private async checkHtlcExpiry(invoice: LightningNetworkInvoice): Promise<void> {
         const timeout: number = this.getInvoicePaymentsTimeout(invoice);
         const current_block_height = await this.lightning.getBlockheight();
 
         const blockDelta = BigInt(timeout - current_block_height);
 
-        const htlcExpiresTooSoon = blockDelta < this.config.minCltv;
+        const htlcExpiresTooSoon = blockDelta < this.minCltv;
         if(htlcExpiresTooSoon) {
             throw {
                 code: 20002,
                 msg: "Not enough time to reliably process the swap",
                 data: {
-                    requiredDelta: this.config.minCltv.toString(10),
+                    requiredDelta: this.minCltv.toString(10),
                     actualDelta: blockDelta.toString(10)
                 }
             };
         }
-
-        return (this.config.minCltv * this.config.bitcoinBlocktime / this.config.safetyFactor) - this.config.gracePeriod;
     }
 
     /**
@@ -756,7 +767,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             //Create swap
             const hodlInvoiceObj: HodlInvoiceInit = {
                 description: description ?? (chainIdentifier+"-"+parsedBody.address),
-                cltvDelta:  Number(this.config.minCltv) + 5,
+                cltvDelta:  Number(this.minCltv) + 5,
                 expiresAt: Date.now()+(this.config.invoiceTimeoutSeconds*1000),
                 id: parsedBody.paymentHash,
                 mtokens: totalBtcInput * 1000n,
@@ -886,7 +897,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             };
         }
         return {
-            minCltv: Number(this.config.minCltv),
+            minCltv: Number(this.minCltv),
             invoiceTimeoutSeconds: this.config.invoiceTimeoutSeconds,
             gasTokens: mappedDict
         };
