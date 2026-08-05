@@ -333,8 +333,14 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             const isTxSent = tx != null;
             if (!isTxSent) {
                 //Reset the state to COMMITED
-                this.swapLogger.info(swap, "processInitialized(state=BTC_SENDING): btc transaction not found, resetting to COMMITED state, txId: " + swap.txId + " address: " + swap.address);
-                await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.COMMITED);
+                const walletTx = await this.bitcoin.getWalletTransaction(swap.txId);
+                if (walletTx == null) {
+                    this.swapLogger.info(swap, "processInitialized(state=BTC_SENDING): btc transaction not found, resetting to COMMITED state, txId: " + swap.txId + " address: " + swap.address);
+                    await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.COMMITED);
+                }
+                else {
+                    this.swapLogger.error(swap, "processInitialized(state=BTC_SENDING): btc transaction not found in mempool, but known to the wallet! txId: " + swap.txId + " address: " + swap.address);
+                }
             }
             else {
                 this.swapLogger.info(swap, "processInitialized(state=BTC_SENDING): btc transaction found, advancing to BTC_SENT state, txId: " + swap.txId + " address: " + swap.address);
