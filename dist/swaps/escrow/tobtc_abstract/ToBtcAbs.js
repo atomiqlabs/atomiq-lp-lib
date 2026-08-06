@@ -404,8 +404,18 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         this.subscribeToPayment(swap);
     }
     async processInitializeEvent(chainIdentifier, swap, event) {
-        this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, address: " + swap.address);
-        await this.processInitialized(swap);
+        const eventSwapData = await event.swapData();
+        if (eventSwapData == null) {
+            this.swapLogger.warn(swap, "SC: InitializeEvent: cannot fetch and verify event swap data, address: " + swap.address);
+            return;
+        }
+        if (swap.data.equals(eventSwapData)) {
+            this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, address: " + swap.address);
+            await this.processInitialized(swap);
+        }
+        else {
+            this.swapLogger.warn(swap, "SC: InitializeEvent: warning, potentially fake swap initialized by the client (swap data doesn't match!), address: " + swap.address);
+        }
     }
     async processClaimEvent(chainIdentifier, swap, event) {
         this.swapLogger.info(swap, "SC: ClaimEvent: swap successfully claimed to us, address: " + swap.address);
