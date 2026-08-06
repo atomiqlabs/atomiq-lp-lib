@@ -496,9 +496,17 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     }
 
     protected async processInitializeEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: InitializeEvent<SwapData>): Promise<void> {
-        this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, address: "+swap.address);
-
-        await this.processInitialized(swap);
+        const eventSwapData = await event.swapData();
+        if(eventSwapData==null) {
+            this.swapLogger.warn(swap, "SC: InitializeEvent: cannot fetch and verify event swap data, address: "+swap.address);
+            return;
+        }
+        if(swap.data.equals(eventSwapData)) {
+            this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, address: "+swap.address);
+            await this.processInitialized(swap);
+        } else {
+            this.swapLogger.warn(swap, "SC: InitializeEvent: warning, potentially fake swap initialized by the client (swap data doesn't match!), address: "+swap.address);
+        }
     }
 
     protected async processClaimEvent(chainIdentifier: string, swap: ToBtcSwapAbs, event: ClaimEvent<SwapData>): Promise<void> {

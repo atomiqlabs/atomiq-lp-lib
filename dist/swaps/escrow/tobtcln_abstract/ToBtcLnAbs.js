@@ -364,11 +364,20 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         }
     }
     async processInitializeEvent(chainIdentifier, swap, event) {
-        this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, invoice: " + swap.pr);
-        //Only process swaps in SAVED state
-        if (swap.state !== ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED)
+        const eventSwapData = await event.swapData();
+        if (eventSwapData == null) {
+            this.swapLogger.warn(swap, "SC: InitializeEvent: cannot fetch and verify event swap data, invoice: " + swap.pr);
             return;
-        await this.processInitialized(swap);
+        }
+        if (swap.data.equals(eventSwapData)) {
+            this.swapLogger.info(swap, "SC: InitializeEvent: swap initialized by the client, invoice: " + swap.pr);
+            if (swap.state !== ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED)
+                return;
+            await this.processInitialized(swap);
+        }
+        else {
+            this.swapLogger.warn(swap, "SC: InitializeEvent: warning, potentially fake swap initialized by the client (swap data doesn't match!), invoice: " + swap.pr);
+        }
     }
     async processClaimEvent(chainIdentifier, swap, event) {
         this.swapLogger.info(swap, "SC: ClaimEvent: swap claimed to us, secret: " + event.result + " invoice: " + swap.pr);
