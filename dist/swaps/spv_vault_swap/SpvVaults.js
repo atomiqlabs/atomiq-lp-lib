@@ -302,110 +302,117 @@ class SpvVaults {
             const { signer, spvVaultContract, chainInterface } = chainData;
             if (vault.data.getOwner() !== signer.getAddress())
                 continue;
-            if (vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
-                //Check if btc tx confirmed
-                const txId = vault.initialUtxo.split(":")[0];
-                const btcTx = await this.bitcoinRpc.getTransaction(txId);
-                if (btcTx.confirmations >= VAULT_INIT_CONFIRMATIONS) {
-                    //Double-check the state here to prevent race condition
-                    if (vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
-                        vault.state = SpvVault_1.SpvVaultState.BTC_CONFIRMED;
-                        await this.saveVault(vault);
-                    }
-                    this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " confirmed on bitcoin, opening vault on " + vault.chainId);
-                }
-            }
-            if (vault.state === SpvVault_1.SpvVaultState.BTC_CONFIRMED) {
-                //Check if open txs were sent already
-                if (vault.scOpenTxs != null) {
-                    //Check if confirmed
-                    let _continue = false;
-                    for (let txId in vault.scOpenTxs) {
-                        const tx = vault.scOpenTxs[txId];
-                        const status = await chainInterface.getTxStatus(tx);
-                        if (status === "pending") {
-                            _continue = true;
-                            break;
-                        }
-                        if (status === "success") {
-                            vault.state = SpvVault_1.SpvVaultState.OPENED;
+            try {
+                if (vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
+                    //Check if btc tx confirmed
+                    const txId = vault.initialUtxo.split(":")[0];
+                    const btcTx = await this.bitcoinRpc.getTransaction(txId);
+                    if (btcTx != null && btcTx.confirmations >= VAULT_INIT_CONFIRMATIONS) {
+                        //Double-check the state here to prevent race condition
+                        if (vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
+                            vault.state = SpvVault_1.SpvVaultState.BTC_CONFIRMED;
                             await this.saveVault(vault);
-                            _continue = true;
-                            break;
                         }
+                        this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " confirmed on bitcoin, opening vault on " + vault.chainId);
                     }
-                    if (_continue)
-                        continue;
                 }
-                const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
-                let numTx = 0;
-                promises.push(chainInterface.sendAndConfirm(signer, txs, true, undefined, true, async (txId, rawTx) => {
-                    numTx++;
-                    if (numTx === txs.length) {
-                        //Final tx
-                        vault.scOpenTxs = { [txId]: rawTx };
-                        await this.saveVault(vault);
+                if (vault.state === SpvVault_1.SpvVaultState.BTC_CONFIRMED) {
+                    //Check if open txs were sent already
+                    if (vault.scOpenTxs != null) {
+                        //Check if confirmed
+                        let _continue = false;
+                        for (let txId in vault.scOpenTxs) {
+                            const tx = vault.scOpenTxs[txId];
+                            const status = await chainInterface.getTxStatus(tx);
+                            if (status === "pending") {
+                                _continue = true;
+                                break;
+                            }
+                            if (status === "success") {
+                                vault.state = SpvVault_1.SpvVaultState.OPENED;
+                                await this.saveVault(vault);
+                                _continue = true;
+                                break;
+                            }
+                        }
+                        if (_continue)
+                            continue;
                     }
-                }).then(txIds => {
-                    this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " opened on " + vault.chainId + " txId: " + txIds.join(", "));
-                    vault.state = SpvVault_1.SpvVaultState.OPENED;
-                    return this.saveVault(vault);
-                }));
-                if (promises.length >= MAX_PARALLEL_VAULTS_OPENING) {
-                    await Promise.all(promises);
-                    promises = [];
+                    const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
+                    let numTx = 0;
+                    promises.push(chainInterface.sendAndConfirm(signer, txs, true, undefined, true, async (txId, rawTx) => {
+                        numTx++;
+                        if (numTx === txs.length) {
+                            //Final tx
+                            vault.scOpenTxs = { [txId]: rawTx };
+                            await this.saveVault(vault);
+                        }
+                    }).then(txIds => {
+                        this.logger.info("checkVaults(): Vault ID " + vault.data.getVaultId().toString(10) + " opened on " + vault.chainId + " txId: " + txIds.join(", "));
+                        vault.state = SpvVault_1.SpvVaultState.OPENED;
+                        return this.saveVault(vault);
+                    }).catch(e => {
+                        this.logger.error(`checkVaults(): error sending vault open transaction for vault ${vault.data.getVaultId().toString(10)} on ${vault.chainId}: `, e);
+                    }));
+                    if (promises.length >= MAX_PARALLEL_VAULTS_OPENING) {
+                        await Promise.all(promises);
+                        promises = [];
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if (vault.state === SpvVault_1.SpvVaultState.OPENED) {
-                let changed = await this.checkVaultReplacedTransactions(vault);
-                //Check if some of the pendingWithdrawals got confirmed
-                let latestOwnWithdrawalIndex = -1;
-                let latestConfirmedWithdrawalIndex = -1;
-                for (let i = vault.pendingWithdrawals.length - 1; i >= 0; i--) {
-                    const pendingWithdrawal = vault.pendingWithdrawals[i];
-                    if (pendingWithdrawal.sending)
-                        continue;
-                    //Check all the pending withdrawals that were not finalized yet
-                    const btcTx = await (0, BitcoinUtils_1.checkTransactionReplaced)(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
-                    if (btcTx == null) {
-                        //Probable double-spend, remove from pending withdrawals
-                        if (!vault.doubleSpendPendingWithdrawal(pendingWithdrawal)) {
-                            this.logger.warn("checkVaults(): Tried to remove pending withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", but doesn't exist anymore!");
-                        }
-                        else {
-                            this.logger.info("checkVaults(): Successfully removed withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", due to being replaced in the mempool!");
-                        }
-                        changed = true;
-                    }
-                    else {
-                        //Update confirmations count
-                        if (pendingWithdrawal.btcTx.confirmations !== btcTx.confirmations ||
-                            pendingWithdrawal.btcTx.blockhash !== btcTx.blockhash) {
-                            pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
-                            pendingWithdrawal.btcTx.blockhash = btcTx.blockhash;
+                if (vault.state === SpvVault_1.SpvVaultState.OPENED) {
+                    let changed = await this.checkVaultReplacedTransactions(vault);
+                    //Check if some of the pendingWithdrawals got confirmed
+                    let latestOwnWithdrawalIndex = -1;
+                    let latestConfirmedWithdrawalIndex = -1;
+                    for (let i = vault.pendingWithdrawals.length - 1; i >= 0; i--) {
+                        const pendingWithdrawal = vault.pendingWithdrawals[i];
+                        if (pendingWithdrawal.sending)
+                            continue;
+                        //Check all the pending withdrawals that were not finalized yet
+                        const btcTx = await (0, BitcoinUtils_1.checkTransactionReplaced)(pendingWithdrawal.btcTx.txid, pendingWithdrawal.btcTx.raw, this.bitcoinRpc);
+                        if (btcTx == null) {
+                            //Probable double-spend, remove from pending withdrawals
+                            if (!vault.doubleSpendPendingWithdrawal(pendingWithdrawal)) {
+                                this.logger.warn("checkVaults(): Tried to remove pending withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", but doesn't exist anymore!");
+                            }
+                            else {
+                                this.logger.info("checkVaults(): Successfully removed withdrawal txId: " + pendingWithdrawal.btcTx.txid + ", due to being replaced in the mempool!");
+                            }
                             changed = true;
                         }
-                    }
-                    //Check it has enough confirmations
-                    if (pendingWithdrawal.btcTx.confirmations >= vault.data.getConfirmations()) {
-                        latestConfirmedWithdrawalIndex = i;
-                        //Check if the pending withdrawals contain a withdrawal to our own address
-                        if (pendingWithdrawal.isRecipient(signer.getAddress())) {
-                            latestOwnWithdrawalIndex = i;
+                        else {
+                            //Update confirmations count
+                            if (pendingWithdrawal.btcTx.confirmations !== btcTx.confirmations ||
+                                pendingWithdrawal.btcTx.blockhash !== btcTx.blockhash) {
+                                pendingWithdrawal.btcTx.confirmations = btcTx.confirmations;
+                                pendingWithdrawal.btcTx.blockhash = btcTx.blockhash;
+                                changed = true;
+                            }
+                        }
+                        //Check it has enough confirmations
+                        if (pendingWithdrawal.btcTx.confirmations >= vault.data.getConfirmations()) {
+                            latestConfirmedWithdrawalIndex = i;
+                            //Check if the pending withdrawals contain a withdrawal to our own address
+                            if (pendingWithdrawal.isRecipient(signer.getAddress())) {
+                                latestOwnWithdrawalIndex = i;
+                            }
                         }
                     }
+                    if (changed) {
+                        await this.saveVault(vault);
+                    }
+                    if (this.config.maxUnclaimedWithdrawals != null && latestConfirmedWithdrawalIndex + 1 >= this.config.maxUnclaimedWithdrawals) {
+                        this.logger.info("checkVaults(): Processing withdrawals by self, because a lot of them are unclaimed!");
+                        claimWithdrawals.push({ vault, withdrawals: vault.pendingWithdrawals.slice(0, latestConfirmedWithdrawalIndex + 1) });
+                    }
+                    else if (latestOwnWithdrawalIndex !== -1) {
+                        claimWithdrawals.push({ vault, withdrawals: vault.pendingWithdrawals.slice(0, latestOwnWithdrawalIndex + 1) });
+                    }
                 }
-                if (changed) {
-                    await this.saveVault(vault);
-                }
-                if (this.config.maxUnclaimedWithdrawals != null && latestConfirmedWithdrawalIndex + 1 >= this.config.maxUnclaimedWithdrawals) {
-                    this.logger.info("checkVaults(): Processing withdrawals by self, because a lot of them are unclaimed!");
-                    claimWithdrawals.push({ vault, withdrawals: vault.pendingWithdrawals.slice(0, latestConfirmedWithdrawalIndex + 1) });
-                }
-                else if (latestOwnWithdrawalIndex !== -1) {
-                    claimWithdrawals.push({ vault, withdrawals: vault.pendingWithdrawals.slice(0, latestOwnWithdrawalIndex + 1) });
-                }
+            }
+            catch (e) {
+                this.logger.error(`checkVaults(): error while processing vault ${vault.data.getVaultId().toString(10)} on ${vault.chainId}: `, e);
             }
         }
         for (let { vault, withdrawals } of claimWithdrawals) {
