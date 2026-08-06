@@ -726,11 +726,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 swap.state = SpvVaultSwap_1.SpvVaultSwapState.SIGNED;
                 swap.sending = true;
                 swapSendingSet = true;
-                await this.saveSwapData(swap);
                 data.btcTx.raw = btcRawTx;
                 data.sending = true;
                 vault.addWithdrawal(data);
                 dataSendingSet = true;
+                await this.saveSwapData(swap);
                 await this.Vaults.saveVault(vault);
                 this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: " + txId);
                 try {
