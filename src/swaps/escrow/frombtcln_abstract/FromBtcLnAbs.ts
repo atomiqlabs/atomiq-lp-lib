@@ -235,7 +235,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcLnSwapState.CREATED,
                     FromBtcLnSwapState.RECEIVED,
                     FromBtcLnSwapState.COMMITED,

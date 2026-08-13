@@ -235,7 +235,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcLnAutoSwapState.CREATED,
                     FromBtcLnAutoSwapState.RECEIVED,
                     FromBtcLnAutoSwapState.TXS_SENT,

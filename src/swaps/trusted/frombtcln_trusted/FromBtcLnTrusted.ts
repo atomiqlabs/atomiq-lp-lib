@@ -183,7 +183,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcLnTrustedSwapState.CREATED,
                     FromBtcLnTrustedSwapState.RECEIVED,
                     FromBtcLnTrustedSwapState.SENT,

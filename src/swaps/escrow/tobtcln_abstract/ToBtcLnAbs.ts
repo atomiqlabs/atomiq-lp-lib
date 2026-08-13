@@ -199,7 +199,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     ToBtcLnSwapState.SAVED,
                     ToBtcLnSwapState.COMMITED,
                     ToBtcLnSwapState.PAID,

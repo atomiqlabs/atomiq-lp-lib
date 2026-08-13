@@ -316,7 +316,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         const swaps = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     SpvVaultSwapState.CREATED, //Check if expired
                     SpvVaultSwapState.SIGNED, //Check if sent
                     SpvVaultSwapState.SENT //Check if confirmed or double-spent
