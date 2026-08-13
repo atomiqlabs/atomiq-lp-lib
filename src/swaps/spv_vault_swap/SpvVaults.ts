@@ -459,17 +459,21 @@ export class SpvVaults {
 
                         //Check it has enough confirmations
                         if(pendingWithdrawal.btcTx.confirmations >= vault.data.getConfirmations()) {
-                            latestConfirmedWithdrawalIndex = i;
+                            //Only set once, since the loop is going through the withdrawals backwards, the first
+                            // match is the latest confirmed withdrawal index
+                            if(latestConfirmedWithdrawalIndex===-1) latestConfirmedWithdrawalIndex = i;
                             //Check if the pending withdrawals contain a withdrawal to our own address
                             if (pendingWithdrawal.isRecipient(signer.getAddress())) {
-                                latestOwnWithdrawalIndex = i;
+                                //Only set once, since the loop is going through the withdrawals backwards, the first
+                                // match is the latest own withdrawal index
+                                if(latestOwnWithdrawalIndex===-1) latestOwnWithdrawalIndex = i;
                             }
                         }
                     }
                     if(changed) {
                         await this.saveVault(vault);
                     }
-                    if(this.config.maxUnclaimedWithdrawals!=null && latestConfirmedWithdrawalIndex+1 >= this.config.maxUnclaimedWithdrawals) {
+                    if(this.config.maxUnclaimedWithdrawals!=null && latestConfirmedWithdrawalIndex!==-1 && latestConfirmedWithdrawalIndex+1 >= this.config.maxUnclaimedWithdrawals) {
                         this.logger.info("checkVaults(): Processing withdrawals by self, because a lot of them are unclaimed!");
                         claimWithdrawals.push({vault, withdrawals: vault.pendingWithdrawals.slice(0, latestConfirmedWithdrawalIndex+1)});
                     } else if(latestOwnWithdrawalIndex!==-1) {
