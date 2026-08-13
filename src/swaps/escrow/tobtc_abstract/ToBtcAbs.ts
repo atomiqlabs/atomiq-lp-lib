@@ -356,12 +356,14 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      *
      * @param swap
      * @private
+     * @retuns boolean whether a broadcast was successful, or an error happened during broadcasting
      * @throws DefinedRuntimeError will throw an error in case the payment cannot be initiated
      */
-    private sendBitcoinPayment(swap: ToBtcSwapAbs) {
+    private async sendBitcoinPayment(swap: ToBtcSwapAbs): Promise<boolean> {
         //Make sure that bitcoin payouts are processed sequentially to avoid race conditions between multiple payouts,
         // e.g. that 2 payouts share the same input and would effectively double-spend each other
-        return this.bitcoin.execute(async () => {
+        let result: boolean;
+        await this.bitcoin.execute(async () => {
             //Run checks
             this.checkTooManyInflightSwaps();
             this.checkExpiresTooSoon(swap);
@@ -397,7 +399,9 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 swap.sending = false;
             } catch (e) {
                 swap.sending = false;
-                throw e;
+                this.swapLogger.error(swap, "sendBitcoinPayment(): send bitcoin payment error", e);
+                result = false;
+                return;
             }
 
             if(swap.metadata!=null) swap.metadata.times.payTxSent = Date.now();
@@ -405,7 +409,9 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
             await swap.setState(ToBtcSwapState.BTC_SENT);
             await this.saveSwapData(swap);
+            result = true;
         });
+        return result;
     }
 
     /**
@@ -473,8 +479,12 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             this.swapLogger.debug(swap, "processInitialized(state=COMMITED): sending bitcoin transaction, address: "+swap.address);
 
             try {
-                await this.sendBitcoinPayment(swap);
-                this.swapLogger.info(swap, "processInitialized(state=COMMITED): btc transaction sent, address: "+swap.address);
+                if(await this.sendBitcoinPayment(swap)) {
+                    this.swapLogger.info(swap, "processInitialized(state=COMMITED): btc transaction sent, address: "+swap.address);
+                } else {
+                    //Broadcast failure
+                    this.swapLogger.error(swap, "processInitialized(state=COMMITED): Failed to broadcast bitcoin transaction!");
+                }
             } catch (e) {
                 if(isDefinedRuntimeError(e)) {
                     this.swapLogger.error(swap, "processInitialized(state=COMMITED): setting state to NON_PAYABLE due to send bitcoin payment error", e);
@@ -482,7 +492,6 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     await swap.setState(ToBtcSwapState.NON_PAYABLE);
                     await this.saveSwapData(swap);
                 } else {
-                    this.swapLogger.error(swap, "processInitialized(state=COMMITED): send bitcoin payment error", e);
                     throw e;
                 }
             } finally {
