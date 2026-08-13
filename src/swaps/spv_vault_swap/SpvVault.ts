@@ -29,7 +29,7 @@ export class SpvVault<
     readonly btcAddress: string;
 
     readonly pendingWithdrawals: D[];
-    readonly replacedWithdrawals: Map<number, D[]>;
+    readonly replacedWithdrawals: Map<number, Map<string, D>>;
     data: T;
 
     state: SpvVaultState;
@@ -61,11 +61,20 @@ export class SpvVault<
             this.replacedWithdrawals = new Map();
             if(chainIdOrObj.replacedWithdrawals!=null) {
                 chainIdOrObj.replacedWithdrawals.forEach((val: [number, any[]]) => {
-                    this.replacedWithdrawals.set(val[0], val[1].map(SpvWithdrawalTransactionData.deserialize<D>));
+                    this.replacedWithdrawals.set(val[0], new Map(val[1].map((raw) => {
+                        const withdrawTxData = SpvWithdrawalTransactionData.deserialize<D>(raw);
+                        return [withdrawTxData.getTxId(), withdrawTxData];
+                    })));
                 });
             }
         }
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
+    }
+
+    private addToReplacedWithdrawals(withdrawalIndex: number, withdrawalData: D) {
+        let map = this.replacedWithdrawals.get(withdrawalIndex);
+        if(map==null) this.replacedWithdrawals.set(withdrawalIndex, map = new Map());
+        map.set(withdrawalData.getTxId(), withdrawalData);
     }
 
     update(event: SpvVaultOpenEvent | SpvVaultDepositEvent | SpvVaultCloseEvent | SpvVaultClaimEvent): void {
@@ -108,11 +117,34 @@ export class SpvVault<
         this.pendingWithdrawals.splice(index, 1);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
 
-        const withdrawalIndex = this.data.getWithdrawalCount()+index+1;
-        let arr = this.replacedWithdrawals.get(withdrawalIndex);
-        if(arr==null) this.replacedWithdrawals.set(withdrawalIndex, arr = []);
-        arr.push(withdrawalData);
+        this.addToReplacedWithdrawals(this.data.getWithdrawalCount()+index+1, withdrawalData);
         return true;
+    }
+
+    replacePendingWithdrawals(newPendingWithdrawalData: D[]) {
+        const backup = this.pendingWithdrawals.splice(0);
+        try {
+            newPendingWithdrawalData.forEach(newWithdrawal => this.addWithdrawal(newWithdrawal));
+        } catch (e) {
+            //Roll-back the original backup
+            this.pendingWithdrawals.splice(0);
+            this.pendingWithdrawals.push(...backup);
+            this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
+            throw e;
+        }
+
+        for(let i=0;i<newPendingWithdrawalData.length;i++) {
+            const newWithdrawal = newPendingWithdrawalData[i];
+            if(backup[i]==null) continue; //Nothing needs to be done
+            if(backup[i].getTxId()==newWithdrawal.getTxId()) continue; //Same transaction
+            //Different transaction, add the original to the replaced txs
+            this.addToReplacedWithdrawals(this.data.getWithdrawalCount()+i+1, backup[i]);
+        }
+        //The replacement is actually shorter than the original
+        for(let i= newPendingWithdrawalData.length; i<backup.length; i++) {
+            //Add the original to the replaced txs
+            this.addToReplacedWithdrawals(this.data.getWithdrawalCount()+i+1, backup[i]);
+        }
     }
 
     toRawAmounts(amounts: bigint[]): bigint[] {
@@ -141,7 +173,7 @@ export class SpvVault<
     serialize(): any {
         const replacedWithdrawals: [number, any[]][] = [];
         this.replacedWithdrawals.forEach((value, key) => {
-            replacedWithdrawals.push([key, value.map(val => val.serialize())])
+            replacedWithdrawals.push([key, [...value.values()].map(val => val.serialize())])
         });
 
         return {
