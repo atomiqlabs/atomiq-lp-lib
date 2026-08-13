@@ -757,6 +757,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             this.checkTooManyInflightSwaps();
             const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
 
+            const metadata = parsedAuth.metadata;
+
             const responseStream = res.responseStream;
             const abortSignal = responseStream.getAbortSignal();
 
@@ -766,6 +768,11 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 code: 20102,
                 msg: "Provided PR doesn't match requested (amount)!"
             };
+
+            //Check if prior payment has been made
+            await this.LightningAssertions.checkPriorPayment(parsedPR.id, abortSignal);
+            metadata.times.priorPaymentChecked = Date.now();
+
             if(!this.isPaymentRequestMatchingInitial(parsedPR, parsedAuth)) {
                 //The provided payment request doesn't match the parameters from the initial one, try to probe/route again
                 // with the same max fee parameters
@@ -783,8 +790,6 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                     " invoice: "+parsedBody.pr);
                 parsedAuth.confidence = confidence;
             }
-
-            const metadata = parsedAuth.metadata;
 
             const sequence = BigIntBufferUtils.fromBuffer(randomBytes(8));
 
