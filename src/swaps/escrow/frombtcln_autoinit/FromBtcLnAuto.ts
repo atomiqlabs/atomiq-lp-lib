@@ -286,17 +286,19 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
         this.swapLogger.info(savedSwap, "SC: ClaimEvent: swap HTLC successfully claimed by the client, invoice: "+savedSwap.pr);
 
-        try {
+        if(savedSwap.state <= FromBtcLnAutoSwapState.COMMITED) {
+            savedSwap.secret = secretHex;
+            await savedSwap.setState(FromBtcLnAutoSwapState.CLAIMED);
+            await this.saveSwapData(savedSwap);
+        }
+
+        if(savedSwap.state === FromBtcLnAutoSwapState.CLAIMED) try {
             await this.lightning.settleHodlInvoice(secretHex);
             this.swapLogger.info(savedSwap, "SC: ClaimEvent: invoice settled, secret: "+secretHex);
-            savedSwap.secret = secretHex;
             if(savedSwap.metadata!=null) savedSwap.metadata.times.htlcSettled = Date.now();
             await this.removeSwapData(savedSwap, FromBtcLnAutoSwapState.SETTLED);
         } catch (e) {
             this.swapLogger.error(savedSwap, "SC: ClaimEvent: cannot settle invoice", e);
-            savedSwap.secret = secretHex;
-            await savedSwap.setState(FromBtcLnAutoSwapState.CLAIMED);
-            await this.saveSwapData(savedSwap);
         }
 
     }
