@@ -293,7 +293,6 @@ export class SpvVaults {
                     while(withdrawalIndex>latestWithdrawalIndex) {
                         const tx = await this.bitcoinRpc.getTransaction(txChain[0].getSpentVaultUtxo().split(":")[0]);
                         if(tx==null) break;
-                        reintroducedTxIds.add(tx.txid);
                         txChain.unshift(await spvVaultContract.getWithdrawalData(tx));
                         withdrawalIndex--;
                     }
@@ -301,6 +300,7 @@ export class SpvVaults {
                         this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Tried to re-introduce previously replaced TX, but one of txns in the chain not found!`);
                         continue;
                     }
+                    txChain.forEach(tx => reintroducedTxIds.add(tx.getTxId()));
                     newPendingTxns.push(...txChain);
                     latestWithdrawalIndex += txChain.length;
                     break; //Don't check other txns at the same withdrawal index
