@@ -378,9 +378,18 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             await this.checkBalance(totalInToken, balancePrefetch, abortController.signal);
             metadata.times.balanceChecked = Date.now();
 
+            //Listener that re-adds the returned bitcoin address to the unused address list if request fails or closes
+            let abortAddUnusedAddressListener: () => void;
+
             //Create swap receive bitcoin address
             const receiveAddress = await this.bitcoin.getAddress();
-            abortController.signal.throwIfAborted();
+            if(abortController.signal.aborted) {
+                await this.bitcoin.addUnusedAddress(receiveAddress);
+                abortController.signal.throwIfAborted();
+            }
+            abortController.signal.addEventListener("abort", abortAddUnusedAddressListener = () => {
+                this.bitcoin.addUnusedAddress(receiveAddress);
+            });
             metadata.times.addressCreated = Date.now();
 
             const paymentHash = this.getHash(chainIdentifier, receiveAddress, amountBD);
@@ -445,6 +454,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 msg: pluginCheckResult.message
             };
 
+            //We can remove the listener to add unused address now, as we are about to save the swap
+            abortController.signal.removeEventListener("abort", abortAddUnusedAddressListener);
             await PluginManager.swapCreate(createdSwap);
             await this.saveSwapData(createdSwap);
 
