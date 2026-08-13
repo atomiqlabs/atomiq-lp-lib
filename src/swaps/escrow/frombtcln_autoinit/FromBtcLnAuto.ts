@@ -323,6 +323,10 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             if(result.status==="held")
                 this.htlcReceived(swap, result).catch(e => this.swapLogger.error(swap, "subscribeToInvoice(): HTLC received result", e));
             this.activeSubscriptions.delete(paymentHash);
+        }).catch(e => {
+            this.swapLogger.error(swap, "subscribeToInvoice(): error while waiting for invoice payment, invoice: "+swap.pr, e);
+            //Delete from active subscription, the watchdog will re-subscribe later
+            this.activeSubscriptions.delete(paymentHash);
         });
         this.swapLogger.info(swap, "subscribeToInvoice(): subscribe to invoice: "+swap.pr);
 
