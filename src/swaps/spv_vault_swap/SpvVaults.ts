@@ -255,8 +255,8 @@ export class SpvVaults {
                 (withdrawalData as any).sending = false;
             } catch (e) {
                 (withdrawalData as any).sending = false;
-                vault.removeWithdrawal(withdrawalData);
-                await this.saveVault(vault);
+                if(vault.removeWithdrawal(withdrawalData))
+                    await this.saveVault(vault);
                 throw e;
             }
         });

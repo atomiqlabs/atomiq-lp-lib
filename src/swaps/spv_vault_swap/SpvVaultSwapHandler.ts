@@ -278,8 +278,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             if(tx==null) {
                 await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
                 if(foundWithdrawal!=null) {
-                    vault.removeWithdrawal(foundWithdrawal);
-                    await this.Vaults.saveVault(vault);
+                    if(vault.removeWithdrawal(foundWithdrawal))
+                        await this.Vaults.saveVault(vault);
                 }
                 return;
             } else if(tx.confirmations==null || tx.confirmations===0) {
@@ -956,8 +956,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                         const fetchedBtcTx = await this.bitcoin.getWalletTransaction(txId);
                         if(fetchedBtcTx==null) {
                             if(dataSendingSet) {
-                                vault.removeWithdrawal(data);
-                                await this.Vaults.saveVault(vault);
+                                if(vault.removeWithdrawal(data))
+                                    await this.Vaults.saveVault(vault);
                             }
                             if(isDefinedRuntimeError(e) && swap.metadata!=null) swap.metadata.postQuoteError = e;
                             await this.removeSwapData(swap, SpvVaultSwapState.FAILED);

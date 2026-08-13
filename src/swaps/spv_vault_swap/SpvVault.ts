@@ -94,14 +94,17 @@ export class SpvVault<
     removeWithdrawal(withdrawalData: D): boolean {
         const index = this.pendingWithdrawals.indexOf(withdrawalData);
         if(index===-1) return false;
-        this.pendingWithdrawals.splice(index, 1);
+        //We also have to remove all the subsequent withdrawals, otherwise the state calculation throws on discontinous chain
+        this.pendingWithdrawals.splice(index);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
         return true;
     }
 
+    //Must only be called on the latest pending withdrawal!
     doubleSpendPendingWithdrawal(withdrawalData: D): boolean {
         const index = this.pendingWithdrawals.indexOf(withdrawalData);
         if(index===-1) return false;
+        if(index!==this.pendingWithdrawals.length-1) throw new Error("Cannot remove not-last pending withdrawal!");
         this.pendingWithdrawals.splice(index, 1);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
 
