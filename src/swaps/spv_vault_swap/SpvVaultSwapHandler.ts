@@ -68,7 +68,7 @@ export type SpvVaultPostQuote = {
     psbtHex: string
 }
 
-const TX_MAX_VSIZE = 16*1024;
+const TX_MAX_VSIZE = 8*1024;
 
 type AmountAdjustUtxo = {
     value: number,
