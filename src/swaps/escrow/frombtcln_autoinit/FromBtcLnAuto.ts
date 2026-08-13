@@ -350,7 +350,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
         try {
             //Check if HTLC expiry is long enough
-            await this.checkHtlcExpiry(invoice);
+            await this.LightningAssertions.checkHtlcExpiry(invoice, this.minCltv);
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcTimeoutCalculated = Date.now();
         } catch (e) {
             if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = e;
@@ -528,45 +528,6 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         })).catch(e => {
             this.logger.error("sendPublicKeyAsync(): error", e);
         });
-    }
-
-    /**
-     * Returns the CLTV timeout (blockheight) of the received HTLC corresponding to the invoice. If multiple HTLCs are
-     *  received (MPP) it returns the lowest of the timeouts
-     *
-     * @param invoice
-     */
-    private getInvoicePaymentsTimeout(invoice: LightningNetworkInvoice): number | null {
-        let timeout: number = null;
-        invoice.payments.forEach((curr) => {
-            if (timeout == null || timeout > curr.timeout) timeout = curr.timeout;
-        });
-        return timeout;
-    }
-
-    /**
-     * Checks if the received HTLC's CLTV timeout is large enough to still process the swap
-     *
-     * @param invoice
-     * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     */
-    private async checkHtlcExpiry(invoice: LightningNetworkInvoice): Promise<void> {
-        const timeout: number = this.getInvoicePaymentsTimeout(invoice);
-        const current_block_height = await this.lightning.getBlockheight();
-
-        const blockDelta = BigInt(timeout - current_block_height);
-
-        const htlcExpiresTooSoon = blockDelta < this.minCltv;
-        if(htlcExpiresTooSoon) {
-            throw {
-                code: 20002,
-                msg: "Not enough time to reliably process the swap",
-                data: {
-                    requiredDelta: this.minCltv.toString(10),
-                    actualDelta: blockDelta.toString(10)
-                }
-            };
-        }
     }
 
     /**
