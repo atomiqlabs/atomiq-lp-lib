@@ -27,6 +27,7 @@ import {isQuoteThrow} from "../../../plugins/IPlugin";
 import {FromBtcLnAutoSwapState} from "../frombtcln_autoinit/FromBtcLnAutoSwap";
 
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
+const MAX_TX_VSIZE = 8*1024;
 
 export type ToBtcConfig = ToBtcBaseConfig & {
     sendSafetyFactor: bigint,
@@ -383,6 +384,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             if(signResult==null) throw {
                 code: 90002,
                 msg: "Failed to create signed transaction (not enough funds?)"
+            }
+            if(signResult.tx.vsize > MAX_TX_VSIZE) throw {
+                code: 90004,
+                msg: "Transaction created is too large, please consolidate UTXOs!"
             }
             if(swap.metadata!=null) swap.metadata.times.paySignPSBT = Date.now();
 
