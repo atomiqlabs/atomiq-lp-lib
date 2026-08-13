@@ -201,7 +201,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
      * @param invoiceData
      * @param invoice
      */
-    private async htlcReceived(invoiceData: FromBtcLnTrustedSwap, invoice: { id: string }) {
+    private async htlcReceived(invoiceData: FromBtcLnTrustedSwap, invoice: LightningNetworkInvoice) {
 
         const { signer, chainInterface} = this.getChain(invoiceData.chainIdentifier);
 
@@ -224,6 +224,14 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             try {
                 await this.checkBalance(invoiceData.output, balance, null);
                 if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcBalanceChecked = Date.now();
+            } catch (e) {
+                await this.cancelSwapAndInvoice(invoiceData);
+                throw e;
+            }
+
+            try {
+                await this.LightningAssertions.checkHtlcExpiry(invoice, this.config.minCltv);
+                if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcExpiryChecked = Date.now();
             } catch (e) {
                 await this.cancelSwapAndInvoice(invoiceData);
                 throw e;
