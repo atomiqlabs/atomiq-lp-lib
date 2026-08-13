@@ -784,6 +784,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 };
             }
 
+            //Enforce sighash default on the spv vault input
+            transaction.updateInput(0, {sighashType: 0});
+
             for(let i=1;i<transaction.inputsLength;i++) { //Skip first vault input
                 const txIn = transaction.getInput(i);
                 if (isLegacyInput(txIn)) throw {
