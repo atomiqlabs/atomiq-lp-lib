@@ -220,7 +220,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     swap.txIds ??= {};
                     swap.txIds.claim = await status.getClaimTxId();
                     await this.removeSwapData(swap, ToBtcSwapState.CLAIMED);
-                } else if(status.type===SwapCommitStateType.EXPIRED || status.type===SwapCommitStateType.NOT_COMMITED) {
+                } else if(status.type===SwapCommitStateType.EXPIRED) {
                     this.swapLogger.warn(swap, "processPastSwap(state=BTC_SENT): swap expired and refunded, but bitcoin was probably already sent, txId: "+swap.txId+" address: "+swap.address);
                     this.unsubscribePayment(swap);
                     swap.txIds ??= {};
