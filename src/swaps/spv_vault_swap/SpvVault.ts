@@ -78,18 +78,38 @@ export class SpvVault<
     }
 
     update(event: SpvVaultOpenEvent | SpvVaultDepositEvent | SpvVaultCloseEvent | SpvVaultClaimEvent): void {
+        //Check if the transition is valid
+        //Trip the data through deserializer, so we get new instance
+        const clonedData = SpvVaultData.deserialize<T>(this.data.serialize());
+        clonedData.updateState(event);
+
+        let removedWithdrawals: D[];
         if(isSpvVaultClaimEvent(event) || isSpvVaultCloseEvent(event)) {
             const processedWithdrawalIndex = this.pendingWithdrawals.findIndex(val => val.btcTx.txid === event.btcTxId);
-            if(processedWithdrawalIndex!==-1) this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
-            if(isSpvVaultClaimEvent(event)) {
-                for(let key of this.replacedWithdrawals.keys()) {
-                    if(key<=event.withdrawCount) this.replacedWithdrawals.delete(key);
-                }
-            }
-            if(isSpvVaultCloseEvent(event)) {
-                this.replacedWithdrawals.clear();
+            if (processedWithdrawalIndex !== -1) removedWithdrawals = this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
+        }
+
+        //This throws if there is invalid withdrawal tx chain
+        try {
+            clonedData.calculateStateAfter(this.pendingWithdrawals);
+        } catch (e) {
+            //Roll-back pending withdrawals
+            if(removedWithdrawals!=null) this.pendingWithdrawals.unshift(...removedWithdrawals);
+            throw e;
+        }
+        //Everything verified now
+
+        //Handle replaced withdrawals and vault close events
+        if(isSpvVaultClaimEvent(event)) {
+            for(let key of this.replacedWithdrawals.keys()) {
+                if(key<=event.withdrawCount) this.replacedWithdrawals.delete(key);
             }
         }
+        if(isSpvVaultCloseEvent(event)) {
+            this.replacedWithdrawals.clear();
+        }
+
+        //Apply state update for real and recalculate the balance
         this.data.updateState(event);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
