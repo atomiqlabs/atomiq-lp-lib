@@ -1113,6 +1113,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
             this.checkSequence(parsedBody.sequence);
 
             let data = await this.storageManager.getData(parsedBody.paymentHash, parsedBody.sequence);
+            //Keep a fallback for cases when the user cannot provide the payment hash of the invoice (i.e. when
+            // recovering swaps from the on-chain data)
             if(data==null) {
                 for(let chainId in this.chains.chains) {
                     const _data = this.getSwapByEscrowHash(chainId, parsedBody.paymentHash);
