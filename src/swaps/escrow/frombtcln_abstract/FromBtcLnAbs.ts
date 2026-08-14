@@ -179,6 +179,24 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             }
         }
 
+        if(swap.state===FromBtcLnSwapState.REFUNDED) {
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state: FromBtcLnSwapState = swap.state as FromBtcLnSwapState;
+            if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
+                if(state===FromBtcLnSwapState.REFUNDED) {
+                    try {
+                        await this.cancelInvoiceIdempotent(swap.lnPaymentHash)
+                        this.swapLogger.info(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, lightning invoice cancelled!");
+                        await this.removeSwapData(swap, FromBtcLnSwapState.REFUNDED);
+                    } catch (e) {
+                        this.swapLogger.error(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, but lightning invoice cannot be cancelled!", e);
+                        await swap.setState(FromBtcLnSwapState.CANCELED);
+                        await this.saveSwapData(swap);
+                    }
+                }
+            }
+        }
+
         if(swap.state===FromBtcLnSwapState.CLAIMED) return "SETTLE";
         if(swap.state===FromBtcLnSwapState.CANCELED) return "CANCEL";
     }
@@ -260,6 +278,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                     FromBtcLnSwapState.COMMITED,
                     FromBtcLnSwapState.CLAIMED,
                     FromBtcLnSwapState.CANCELED,
+                    FromBtcLnSwapState.REFUNDED
                 ]
             }
         ]);
@@ -337,7 +356,6 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         } catch (e) {
             this.swapLogger.error(savedSwap, "SC: RefundEvent: cannot cancel invoice", e);
             await savedSwap.setState(FromBtcLnSwapState.CANCELED);
-            // await PluginManager.swapStateChange(savedSwap);
             await this.saveSwapData(savedSwap);
         }
     }
