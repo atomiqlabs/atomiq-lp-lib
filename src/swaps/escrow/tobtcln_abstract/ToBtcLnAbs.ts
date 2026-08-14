@@ -102,7 +102,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
     activeSubscriptions: Set<string> = new Set<string>();
 
-    readonly config: ToBtcLnConfig & {minTsSendCltv: bigint};
+    readonly config: ToBtcLnConfig;
+    readonly minTsSendCltv: bigint;
 
     readonly exactInAuths: {
         [reqId: string]: ExactInAuthorization
@@ -124,9 +125,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         super(storageDirectory, path, chainData, swapPricing, config);
         this.lightning = lightning;
         this.LightningAssertions = new LightningAssertions(this.logger, lightning);
-        const anyConfig = config as any;
-        anyConfig.minTsSendCltv = config.gracePeriod + (config.bitcoinBlocktime * config.minSendCltv * config.safetyFactor);
-        this.config = anyConfig;
+        this.config = config;
         this.config.minLnRoutingFeePPM = this.config.minLnRoutingFeePPM || 1000n;
         this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10*1000;
@@ -134,6 +133,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         if(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1_250_000n) {
             throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
+        this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.config.minSendCltv * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1_000_000n);
 
         this.cltvDeltaLowerBound = getMinSafeBlockWindowSlow(
             Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1_000_000
@@ -334,7 +334,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         const currentTimestamp: bigint = BigInt(Math.floor(Date.now()/1000));
 
         //Run checks
-        const hasEnoughTimeToPay = (expiryTimestamp - currentTimestamp) >= this.config.minTsSendCltv;
+        const hasEnoughTimeToPay = (expiryTimestamp - currentTimestamp) >= this.minTsSendCltv;
         if(!hasEnoughTimeToPay) throw {
             code: 90005,
             msg: "Not enough time to reliably pay the invoice"
@@ -590,7 +590,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
      * @throws {DefinedRuntimeError} will throw an error if the expiry time is too short
      */
     private checkExpiry(expiryTimestamp: bigint, currentTimestamp: bigint): void {
-        const expiresTooSoon = (expiryTimestamp - currentTimestamp) < this.config.minTsSendCltv;
+        const expiresTooSoon = (expiryTimestamp - currentTimestamp) < this.minTsSendCltv;
         if(expiresTooSoon) {
             throw {
                 code: 20001,
@@ -1228,7 +1228,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
     getInfoData(): any {
         return {
             minCltv: Number(this.config.minSendCltv),
-            minTimestampCltv: Number(this.config.minTsSendCltv)
+            minTimestampCltv: Number(this.minTsSendCltv)
         };
     }
 
