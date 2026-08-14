@@ -307,6 +307,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 this.swapLogger.info(payment, "unsubscribePayment(): unsubscribing swap, txId: "+payment.txId+" address: "+payment.address);
                 delete this.activeSubscriptions[payment.txId];
             }
+            for(let txId in payment.pastTxIds) if(this.activeSubscriptions[txId]!=null) {
+                this.swapLogger.info(payment, "unsubscribePayment(): unsubscribing swap, txId: "+txId+" address: "+payment.address);
+                delete this.activeSubscriptions[txId];
+            }
         }
     }
 
@@ -393,6 +397,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
             try {
                 this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: "+signResult.raw);
+                //Save previous bitcoin tx
+                if(swap.txId!=null && swap.btcRawTx!=null) {
+                    swap.pastTxIds[swap.txId] = swap.btcRawTx;
+                }
                 swap.txId = signResult.tx.id;
                 swap.btcRawTx = signResult.raw;
                 swap.setRealNetworkFee(BigInt(signResult.networkFee));

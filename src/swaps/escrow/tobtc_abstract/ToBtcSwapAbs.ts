@@ -27,6 +27,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
 
     btcRawTx: string;
     txId: string;
+    readonly pastTxIds: {[btcTxId: string]: string};
 
     constructor(
         chainIdentifier: string,
@@ -64,6 +65,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
             this.nonce = nonce;
             this.requiredConfirmations = requiredConfirmations;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
+            this.pastTxIds = {};
         } else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
@@ -74,6 +76,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
 
             this.txId = chainIdOrObj.txId;
             this.btcRawTx = chainIdOrObj.btcRawTx;
+            this.pastTxIds = chainIdOrObj.pastTxIds ?? {};
 
             //Compatibility
             this.quotedNetworkFee ??= deserializeBN(chainIdOrObj.networkFee);
@@ -90,6 +93,7 @@ export class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBaseSwap<T
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
         partialSerialized.txId = this.txId;
         partialSerialized.btcRawTx = this.btcRawTx;
+        partialSerialized.pastTxIds = this.pastTxIds;
         return partialSerialized;
     }
 
