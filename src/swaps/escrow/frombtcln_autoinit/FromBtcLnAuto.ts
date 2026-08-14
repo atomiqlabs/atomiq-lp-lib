@@ -146,7 +146,10 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
                     if (swap.lnPaymentHash!==paymentHashHex) {
                         //TODO: Possibly fatal failure
-                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=TXS_SENT|COMMITED): onchainStatus=PAID, Invalid swap secret specified: "+secretHex+" for paymentHash: "+paymentHashHex);
+                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=TXS_SENT|COMMITED): onchainStatus=PAID, Invalid swap secret specified: "+secretHex
+                            +" with hash: "+paymentHashHex
+                            +" expected paymentHash: "+swap.lnPaymentHash
+                            +" swap invoice: "+swap.pr);
                         return null;
                     }
 
@@ -306,7 +309,10 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
         if (savedSwap.lnPaymentHash!==paymentHashHex) {
             //TODO: Possibly fatal failure
-            this.swapLogger.error(savedSwap, "FATAL: SC: ClaimEvent: invalid swap secret specified: "+secretHex+" for paymentHash: "+paymentHashHex);
+            this.swapLogger.error(savedSwap, "FATAL: SC: ClaimEvent: invalid swap secret specified: "+secretHex
+                +" with hash: "+paymentHashHex
+                +" expected paymentHash: "+savedSwap.lnPaymentHash
+                +" swap invoice: "+savedSwap.pr);
             return;
         }
 
