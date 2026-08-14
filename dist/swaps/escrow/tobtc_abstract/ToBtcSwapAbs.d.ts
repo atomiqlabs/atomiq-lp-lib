@@ -19,6 +19,9 @@ export declare class ToBtcSwapAbs<T extends SwapData = SwapData> extends ToBtcBa
     readonly preferedConfirmationTarget: number;
     btcRawTx: string;
     txId: string;
+    readonly pastTxIds: {
+        [btcTxId: string]: string;
+    };
     constructor(chainIdentifier: string, address: string, amount: bigint, swapFee: bigint, swapFeeInToken: bigint, networkFee: bigint, networkFeeInToken: bigint, satsPerVbyte: number, nonce: bigint, requiredConfirmations: number, preferedConfirmationTarget: number);
     constructor(obj: any);
     serialize(): any;

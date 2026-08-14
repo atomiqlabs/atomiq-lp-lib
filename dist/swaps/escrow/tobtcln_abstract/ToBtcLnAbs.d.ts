@@ -60,9 +60,8 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
     readonly swapType = ChainSwapType.HTLC;
     readonly inflightSwapStates: Set<ToBtcLnSwapState>;
     activeSubscriptions: Set<string>;
-    readonly config: ToBtcLnConfig & {
-        minTsSendCltv: bigint;
-    };
+    readonly config: ToBtcLnConfig;
+    readonly minTsSendCltv: bigint;
     readonly exactInAuths: {
         [reqId: string]: ExactInAuthorization;
     };

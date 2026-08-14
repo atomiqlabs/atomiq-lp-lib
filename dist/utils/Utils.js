@@ -59,7 +59,7 @@ function expressHandlerWrapper(func) {
     };
 }
 exports.expressHandlerWrapper = expressHandlerWrapper;
-exports.HEX_REGEX = /[0-9a-fA-F]+/;
+exports.HEX_REGEX = /^[0-9a-fA-F]+$/;
 function serializeBN(bn) {
     return bn == null ? null : bn.toString(10);
 }

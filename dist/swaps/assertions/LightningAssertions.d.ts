@@ -1,4 +1,4 @@
-import { ILightningWallet, LightningNetworkChannel } from "../../wallets/ILightningWallet";
+import { ILightningWallet, LightningNetworkChannel, LightningNetworkInvoice } from "../../wallets/ILightningWallet";
 import { LoggerType } from "../../utils/Utils";
 export declare class LightningAssertions {
     protected readonly LIGHTNING_LIQUIDITY_CACHE_TIMEOUT: number;
@@ -41,4 +41,19 @@ export declare class LightningAssertions {
      * @param abortController
      */
     getChannelsPrefetch(abortController: AbortController): Promise<LightningNetworkChannel[]>;
+    /**
+     * Returns the CLTV timeout (blockheight) of the received HTLC corresponding to the invoice. If multiple HTLCs are
+     *  received (MPP) it returns the lowest of the timeouts
+     *
+     * @param invoice
+     */
+    private getInvoicePaymentsTimeout;
+    /**
+     * Checks if the received HTLC's CLTV timeout is large enough to still process the swap
+     *
+     * @param invoice
+     * @param minCltvDelta Minimal required delta between HTLC's expiry and current blockheight
+     * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
+     */
+    checkHtlcExpiry(invoice: LightningNetworkInvoice, minCltvDelta: bigint): Promise<void>;
 }

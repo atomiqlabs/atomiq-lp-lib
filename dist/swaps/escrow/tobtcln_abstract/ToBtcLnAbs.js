@@ -26,9 +26,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         this.exactInAuths = {};
         this.lightning = lightning;
         this.LightningAssertions = new LightningAssertions_1.LightningAssertions(this.logger, lightning);
-        const anyConfig = config;
-        anyConfig.minTsSendCltv = config.gracePeriod + (config.bitcoinBlocktime * config.minSendCltv * config.safetyFactor);
-        this.config = anyConfig;
+        this.config = config;
         this.config.minLnRoutingFeePPM = this.config.minLnRoutingFeePPM || 1000n;
         this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10 * 1000;
@@ -36,6 +34,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         if (this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1250000n) {
             throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
+        this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.config.minSendCltv * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
         this.cltvDeltaLowerBound = (0, Utils_1.getMinSafeBlockWindowSlow)(Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1000000);
     }
     /**
@@ -92,7 +91,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     ToBtcLnSwapAbs_1.ToBtcLnSwapState.SAVED,
                     ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED,
                     ToBtcLnSwapAbs_1.ToBtcLnSwapState.PAID,
@@ -174,8 +173,13 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 await this.saveSwapData(swap);
                 return;
             case "confirmed":
+                if (lnPaymentStatus.secret == null) {
+                    this.swapLogger.error(swap, "FATAL: processPaymentResult(): invoice paid but no secret can be extracted! invoice: " + swap.pr);
+                    return;
+                }
                 swap.secret = lnPaymentStatus.secret;
-                swap.setRealNetworkFee(lnPaymentStatus.feeMtokens / 1000n);
+                if (lnPaymentStatus.feeMtokens != null)
+                    swap.setRealNetworkFee(lnPaymentStatus.feeMtokens / 1000n);
                 this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: " + swap.secret + " realRoutingFee: " + swap.realNetworkFee.toString(10) + " invoice: " + swap.pr);
                 await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.PAID);
                 await this.saveSwapData(swap);
@@ -214,7 +218,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         const expiryTimestamp = swap.data.getExpiry();
         const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
         //Run checks
-        const hasEnoughTimeToPay = (expiryTimestamp - currentTimestamp) >= this.config.minTsSendCltv;
+        const hasEnoughTimeToPay = (expiryTimestamp - currentTimestamp) >= this.minTsSendCltv;
         if (!hasEnoughTimeToPay)
             throw {
                 code: 90005,
@@ -288,6 +292,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED) {
             if (swap.metadata != null)
                 swap.metadata.times.payPaymentChecked = Date.now();
+            if (swap.isLocked())
+                return;
             let lnPaymentStatus = await this.lightning.getPayment(swap.lnPaymentHash);
             if (lnPaymentStatus != null) {
                 if (lnPaymentStatus.status === "pending") {
@@ -467,7 +473,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @throws {DefinedRuntimeError} will throw an error if the expiry time is too short
      */
     checkExpiry(expiryTimestamp, currentTimestamp) {
-        const expiresTooSoon = (expiryTimestamp - currentTimestamp) < this.config.minTsSendCltv;
+        const expiresTooSoon = (expiryTimestamp - currentTimestamp) < this.minTsSendCltv;
         if (expiresTooSoon) {
             throw {
                 code: 20001,
@@ -616,6 +622,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             }
             this.checkTooManyInflightSwaps();
             const parsedAuth = this.checkExactInAuthorization(parsedBody.reqId);
+            const metadata = parsedAuth.metadata;
             const responseStream = res.responseStream;
             const abortSignal = responseStream.getAbortSignal();
             //Check request params
@@ -625,6 +632,9 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     code: 20102,
                     msg: "Provided PR doesn't match requested (amount)!"
                 };
+            //Check if prior payment has been made
+            await this.LightningAssertions.checkPriorPayment(parsedPR.id, abortSignal);
+            metadata.times.priorPaymentChecked = Date.now();
             if (!this.isPaymentRequestMatchingInitial(parsedPR, parsedAuth)) {
                 //The provided payment request doesn't match the parameters from the initial one, try to probe/route again
                 // with the same max fee parameters
@@ -639,7 +649,6 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     " invoice: " + parsedBody.pr);
                 parsedAuth.confidence = confidence;
             }
-            const metadata = parsedAuth.metadata;
             const sequence = base_1.BigIntBufferUtils.fromBuffer((0, crypto_1.randomBytes)(8));
             const { swapContract, signer } = this.getChain(parsedAuth.chainIdentifier);
             const claimHash = swapContract.getHashForHtlc(Buffer.from(parsedPR.id, "hex"));
@@ -857,6 +866,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 };
             this.checkSequence(parsedBody.sequence);
             let data = await this.storageManager.getData(parsedBody.paymentHash, parsedBody.sequence);
+            //Keep a fallback for cases when the user cannot provide the payment hash of the invoice (i.e. when
+            // recovering swaps from the on-chain data)
             if (data == null) {
                 for (let chainId in this.chains.chains) {
                     const _data = this.getSwapByEscrowHash(chainId, parsedBody.paymentHash);
@@ -961,7 +972,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     getInfoData() {
         return {
             minCltv: Number(this.config.minSendCltv),
-            minTimestampCltv: Number(this.config.minTsSendCltv)
+            minTimestampCltv: Number(this.minTsSendCltv)
         };
     }
 }

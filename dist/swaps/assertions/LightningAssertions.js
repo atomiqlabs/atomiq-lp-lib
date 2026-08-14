@@ -82,5 +82,42 @@ class LightningAssertions {
             return null;
         });
     }
+    /**
+     * Returns the CLTV timeout (blockheight) of the received HTLC corresponding to the invoice. If multiple HTLCs are
+     *  received (MPP) it returns the lowest of the timeouts
+     *
+     * @param invoice
+     */
+    getInvoicePaymentsTimeout(invoice) {
+        let timeout = null;
+        invoice.payments.forEach((curr) => {
+            if (timeout == null || timeout > curr.timeout)
+                timeout = curr.timeout;
+        });
+        return timeout;
+    }
+    /**
+     * Checks if the received HTLC's CLTV timeout is large enough to still process the swap
+     *
+     * @param invoice
+     * @param minCltvDelta Minimal required delta between HTLC's expiry and current blockheight
+     * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
+     */
+    async checkHtlcExpiry(invoice, minCltvDelta) {
+        const timeout = this.getInvoicePaymentsTimeout(invoice);
+        const current_block_height = await this.lightning.getBlockheight();
+        const blockDelta = BigInt(timeout - current_block_height);
+        const htlcExpiresTooSoon = blockDelta < minCltvDelta;
+        if (htlcExpiresTooSoon) {
+            throw {
+                code: 20002,
+                msg: "Not enough time to reliably process the swap",
+                data: {
+                    requiredDelta: minCltvDelta.toString(10),
+                    actualDelta: blockDelta.toString(10)
+                }
+            };
+        }
+    }
 }
 exports.LightningAssertions = LightningAssertions;

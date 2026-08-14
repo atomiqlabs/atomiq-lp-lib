@@ -2,7 +2,7 @@ import { Express } from "express";
 import { ToBtcSwapAbs, ToBtcSwapState } from "./ToBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../../SwapHandler";
 import { ISwapPrice } from "../../../prices/ISwapPrice";
-import { BtcTx, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
+import { BitcoinRpc, BtcBlock, BtcTx, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../../storage/IIntermediaryStorage";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { IBitcoinWallet } from "../../../wallets/IBitcoinWallet";
@@ -97,6 +97,7 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      *
      * @param swap
      * @private
+     * @retuns boolean whether a broadcast was successful, or an error happened during broadcasting
      * @throws DefinedRuntimeError will throw an error in case the payment cannot be initiated
      */
     private sendBitcoinPayment;

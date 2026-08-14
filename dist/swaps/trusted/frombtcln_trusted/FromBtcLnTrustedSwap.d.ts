@@ -15,7 +15,9 @@ export declare class FromBtcLnTrustedSwap extends SwapHandlerSwap<FromBtcLnTrust
     readonly dstAddress: string;
     readonly secret: string;
     readonly token: string;
-    scRawTx: string;
+    scSendTxs: {
+        [txId: string]: string;
+    };
     constructor(chainIdentifier: string, pr: string, inputMtokens: bigint, swapFee: bigint, swapFeeInToken: bigint, output: bigint, secret: string, dstAddress: string, token: string);
     constructor(obj: any);
     getToken(): string;

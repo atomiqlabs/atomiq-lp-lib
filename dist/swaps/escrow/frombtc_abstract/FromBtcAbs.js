@@ -94,7 +94,7 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcSwapAbs_1.FromBtcSwapState.CREATED,
                     FromBtcSwapAbs_1.FromBtcSwapState.COMMITED
                 ]
@@ -279,9 +279,17 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Check if we have enough funds to honor the request
             await this.checkBalance(totalInToken, balancePrefetch, abortController.signal);
             metadata.times.balanceChecked = Date.now();
+            //Listener that re-adds the returned bitcoin address to the unused address list if request fails or closes
+            let abortAddUnusedAddressListener;
             //Create swap receive bitcoin address
             const receiveAddress = await this.bitcoin.getAddress();
-            abortController.signal.throwIfAborted();
+            if (abortController.signal.aborted) {
+                await this.bitcoin.addUnusedAddress(receiveAddress);
+                abortController.signal.throwIfAborted();
+            }
+            abortController.signal.addEventListener("abort", abortAddUnusedAddressListener = () => {
+                this.bitcoin.addUnusedAddress(receiveAddress);
+            });
             metadata.times.addressCreated = Date.now();
             const paymentHash = this.getHash(chainIdentifier, receiveAddress, amountBD);
             const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
@@ -314,6 +322,8 @@ class FromBtcAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     code: 29999,
                     msg: pluginCheckResult.message
                 };
+            //We can remove the listener to add unused address now, as we are about to save the swap
+            abortController.signal.removeEventListener("abort", abortAddUnusedAddressListener);
             await PluginManager_1.PluginManager.swapCreate(createdSwap);
             await this.saveSwapData(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: " + receiveAddress + " amount: " + amountBD.toString(10));

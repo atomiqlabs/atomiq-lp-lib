@@ -16,7 +16,7 @@ var SpvVaultSwapState;
     SpvVaultSwapState[SpvVaultSwapState["CLAIMED"] = 4] = "CLAIMED";
 })(SpvVaultSwapState = exports.SpvVaultSwapState || (exports.SpvVaultSwapState = {}));
 class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
-    constructor(chainIdentifierOrObj, quoteId, expiry, vault, vaultUtxo, btcAddress, btcFeeRate, recipient, amountBtc, amountToken, amountGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, token, gasToken) {
+    constructor(chainIdentifierOrObj, quoteId, expiry, vault, vaultUtxo, withdrawalIndex, btcAddress, btcFeeRate, recipient, amountBtc, amountToken, amountGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeShare, frontingFeeShare, executionFeeShare, token, gasToken) {
         if (typeof (chainIdentifierOrObj) === "string") {
             super(chainIdentifierOrObj, swapFee + gasSwapFee, swapFeeInToken);
             this.state = SpvVaultSwapState.CREATED;
@@ -46,6 +46,7 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.tokenMultiplier = vault.data.getTokenData()[0].multiplier;
             this.gasToken = gasToken;
             this.gasTokenMultiplier = vault.data.getTokenData()[1].multiplier;
+            this.withdrawalIndex = withdrawalIndex;
         }
         else {
             super(chainIdentifierOrObj);
@@ -77,6 +78,7 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             this.btcTxId = chainIdentifierOrObj.btcTxId;
             this.hasStickyAddress = chainIdentifierOrObj.hasStickyAddress;
             this.saveStickyAddress = chainIdentifierOrObj.saveStickyAddress;
+            this.withdrawalIndex = chainIdentifierOrObj.withdrawalIndex;
         }
         this.type = SwapHandler_1.SwapHandlerType.FROM_BTC_SPV;
     }
@@ -110,7 +112,8 @@ class SpvVaultSwap extends SwapHandlerSwap_1.SwapHandlerSwap {
             gasTokenMultiplier: (0, Utils_1.serializeBN)(this.gasTokenMultiplier),
             btcTxId: this.btcTxId,
             hasStickyAddress: this.hasStickyAddress,
-            saveStickyAddress: this.saveStickyAddress
+            saveStickyAddress: this.saveStickyAddress,
+            withdrawalIndex: this.withdrawalIndex
         };
     }
     getIdentifierHash() {

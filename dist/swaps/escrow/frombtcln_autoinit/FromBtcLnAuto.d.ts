@@ -85,20 +85,6 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
      */
     private sendPublicKeyAsync;
     /**
-     * Returns the CLTV timeout (blockheight) of the received HTLC corresponding to the invoice. If multiple HTLCs are
-     *  received (MPP) it returns the lowest of the timeouts
-     *
-     * @param invoice
-     */
-    private getInvoicePaymentsTimeout;
-    /**
-     * Checks if the received HTLC's CLTV timeout is large enough to still process the swap
-     *
-     * @param invoice
-     * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     */
-    private checkHtlcExpiry;
-    /**
      * Cancels the swap (CANCELED state) & also cancels the LN invoice (including all pending HTLCs)
      *
      * @param invoiceData

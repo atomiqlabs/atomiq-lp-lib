@@ -16,7 +16,7 @@ const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 const AmountAssertions_1 = require("../assertions/AmountAssertions");
 const IPlugin_1 = require("../../plugins/IPlugin");
 const StickyAddress_1 = require("./StickyAddress");
-const TX_MAX_VSIZE = 16 * 1024;
+const TX_MAX_VSIZE = 8 * 1024;
 function parseAmountAdjustUtxos(amountAdjustUtxos) {
     if (!Array.isArray(amountAdjustUtxos))
         return null;
@@ -181,11 +181,13 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 tx = await (0, BitcoinUtils_1.checkTransactionReplaced)(tx.txid, tx.raw, this.bitcoinRpc);
             }
             if (tx == null) {
-                await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
-                if (foundWithdrawal != null) {
-                    vault.removeWithdrawal(foundWithdrawal);
-                    await this.Vaults.saveVault(vault);
+                if (swap.withdrawalIndex != null && vault.data.isOpened() && vault.data.getWithdrawalCount() < swap.withdrawalIndex) {
+                    //The tx should not be considered completely dead yet
+                    return;
                 }
+                await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                //The spv vault watchdog will handle the removal of the withdrawal tx from pending withdrawals
+                // of the vault, if necessary
                 return;
             }
             else if (tx.confirmations == null || tx.confirmations === 0) {
@@ -208,6 +210,10 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             if (tx == null)
                 tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
             if (tx == null) {
+                if (swap.withdrawalIndex != null && vault.data.isOpened() && vault.data.getWithdrawalCount() < swap.withdrawalIndex) {
+                    //The tx should not be considered completely dead yet
+                    return;
+                }
                 await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.DOUBLE_SPENT);
                 return;
             }
@@ -223,10 +229,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         const swaps = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     SpvVaultSwap_1.SpvVaultSwapState.CREATED,
                     SpvVaultSwap_1.SpvVaultSwapState.SIGNED,
-                    SpvVaultSwap_1.SpvVaultSwapState.SENT //Check if confirmed or double-spent
+                    SpvVaultSwap_1.SpvVaultSwapState.SENT,
+                    SpvVaultSwap_1.SpvVaultSwapState.BTC_CONFIRMED
                 ]
             }
         ]);
@@ -531,8 +538,9 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
             //Get PSBT data
             const executionFeeShare = 0n;
             const utxo = vault.getLatestUtxo();
+            const withdrawalIndex = vault.getNextWithdrawalIndex();
             const quoteId = (0, crypto_1.randomBytes)(32).toString("hex");
-            const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, quoteId, expiry, vault, utxo, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeRate, frontingFeeRate, executionFeeShare, useToken, gasToken);
+            const swap = new SpvVaultSwap_1.SpvVaultSwap(chainIdentifier, quoteId, expiry, vault, utxo, withdrawalIndex, receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken, swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken, callerFeeRate, frontingFeeRate, executionFeeShare, useToken, gasToken);
             swap.metadata = metadata;
             swap.saveStickyAddress = useStickyAddress && !hasStickyAddress;
             swap.hasStickyAddress = hasStickyAddress;
@@ -609,6 +617,8 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     msg: "Error parsing PSBT, hex format required!"
                 };
             }
+            //Enforce sighash default on the spv vault input
+            transaction.updateInput(0, { sighashType: 0 });
             for (let i = 1; i < transaction.inputsLength; i++) { //Skip first vault input
                 const txIn = transaction.getInput(i);
                 if ((0, BitcoinUtils_1.isLegacyInput)(txIn))
@@ -649,6 +659,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 data.rawAmounts[1] !== swap.rawAmountGasToken ||
                 data.getExecutionData() != null ||
                 data.getSpentVaultUtxo() !== swap.vaultUtxo ||
+                data.btcTx.outs.length < 3 ||
                 data.btcTx.outs[0].value !== SpvVaults_1.VAULT_DUST_AMOUNT ||
                 !Buffer.from(data.btcTx.outs[0].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.vaultAddress)) ||
                 BigInt(data.btcTx.outs[2].value) !== swap.amountBtc ||
@@ -757,13 +768,14 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                     try {
                         const fetchedBtcTx = await this.bitcoin.getWalletTransaction(txId);
                         if (fetchedBtcTx == null) {
+                            //The transaction wasn't sent
                             if (dataSendingSet) {
-                                vault.removeWithdrawal(data);
-                                await this.Vaults.saveVault(vault);
+                                if (vault.doubleSpendPendingWithdrawal(data))
+                                    await this.Vaults.saveVault(vault);
                             }
                             if ((0, Utils_1.isDefinedRuntimeError)(e) && swap.metadata != null)
                                 swap.metadata.postQuoteError = e;
-                            await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                            //Do not remove or transition the state of the swap here. Let the watchdog handle this
                             throw e; //This will get caught locally and throw the post quote error
                         }
                         else {

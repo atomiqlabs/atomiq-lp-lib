@@ -308,7 +308,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE,
                     FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CREATED,
                     FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED,
