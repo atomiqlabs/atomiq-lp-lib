@@ -194,10 +194,23 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
                 this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: "+refundSwap.pr);
                 await refundSwap.setState(FromBtcLnSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
             } catch (e) {
                 this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
             }
             unlock();
+        }
+    }
+
+    protected async cancelInvoiceIdempotent(paymentHash: string) {
+        try {
+            await this.lightning.cancelHodlInvoice(paymentHash);
+        } catch (e) {
+            const invoice = await this.lightning.getInvoice(paymentHash);
+            if(invoice.status==="canceled") {
+                return;
+            }
+            throw e;
         }
     }
 
@@ -206,16 +219,10 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             //Refund
             const paymentHash = swap.lnPaymentHash;
             try {
-                await this.lightning.cancelHodlInvoice(paymentHash);
+                await this.cancelInvoiceIdempotent(paymentHash);
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
                 await this.removeSwapData(swap);
             } catch (e) {
-                const invoice = await this.lightning.getInvoice(paymentHash);
-                if(invoice.status==="canceled") {
-                    this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
-                    await this.removeSwapData(swap);
-                    continue;
-                }
                 this.swapLogger.error(swap, "cancelInvoices(): cannot cancel hodl invoice id", e);
             }
         }
@@ -324,7 +331,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         this.swapLogger.info(savedSwap, "SC: RefundEvent: swap refunded to us, invoice: "+savedSwap.pr);
 
         try {
-            await this.lightning.cancelHodlInvoice(savedSwap.lnPaymentHash);
+            await this.cancelInvoiceIdempotent(savedSwap.lnPaymentHash)
             this.swapLogger.info(savedSwap, "SC: RefundEvent: invoice cancelled");
             await this.removeSwapData(savedSwap, FromBtcLnSwapState.REFUNDED);
         } catch (e) {
