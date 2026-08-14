@@ -125,6 +125,11 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         //Set flag that we are sending the transaction already, so we don't end up with race condition
         if(swap.isLocked()) return false;
 
+        if(!(await swapContract.isCommited(swap.data))) {
+            this.swapLogger.debug(swap, "tryClaimSwap(): Escrow is not committed anymore, cannot claim, utxo: "+tx.txid+":"+vout+" address: "+swap.address);
+            return false;
+        }
+
         let txns: any[];
         try {
             txns = await swapContract.txsClaimWithTxData(
