@@ -413,6 +413,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
         if(swap.state===ToBtcLnSwapState.COMMITED) {
             if(swap.metadata!=null) swap.metadata.times.payPaymentChecked = Date.now();
+            if(swap.isLocked()) return;
             let lnPaymentStatus = await this.lightning.getPayment(swap.lnPaymentHash);
             if(lnPaymentStatus!=null) {
                 if(lnPaymentStatus.status==="pending") {
