@@ -162,8 +162,14 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                     }
                 } else {
                     if(await swapContract.isExpired(signer.getAddress(), swap.data)) {
-                        this.swapLogger.info(swap, "processPastSwap(state=RECEIVED|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
-                        return "REFUND";
+                        if(await swapContract.isCommited(swap.data)) {
+                            this.swapLogger.info(swap, "processPastSwap(state=RECEIVED|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
+                            return "REFUND";
+                        } else {
+                            this.swapLogger.info(swap, "processPastSwap(state=RECEIVED|COMMITED): swap already refunded, cancelling lightning invoice, invoice: "+swap.pr);
+                            await swap.setState(FromBtcLnSwapState.REFUNDED);
+                            return "CANCEL";
+                        }
                     }
                 }
             }
