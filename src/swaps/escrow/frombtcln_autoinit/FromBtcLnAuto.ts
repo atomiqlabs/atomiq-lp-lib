@@ -7,7 +7,8 @@ import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitState
 import {
     bigIntMax,
     expressHandlerWrapper,
-    getAbortController, getMinSafeBlockWindowFast,
+    getAbortController,
+    getMinSafeBlockWindowFast,
     HEX_REGEX,
     isDefinedRuntimeError
 } from "../../../utils/Utils";
@@ -26,6 +27,7 @@ import {
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
 import {isQuoteThrow} from "../../../plugins/IPlugin";
+import {FromBtcLnSwapState} from "../frombtcln_abstract/FromBtcLnSwapAbs";
 
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -177,14 +179,30 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                     }
                 } else {
                     if(await swapContract.isExpired(signer.getAddress(), swap.data)) {
-                        this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
-                        return "REFUND";
+                        if(await swapContract.isCommited(swap.data)) {
+                            this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
+                            return "REFUND";
+                        } else {
+                            //Expired and not committed, we can remove the swap as refunded
+                            await this.removeSwapData(swap, FromBtcLnAutoSwapState.REFUNDED);
+                        }
                     }
                 }
             }
             if(onchainStatus.type===SwapCommitStateType.REFUNDABLE) {
                 this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
                 return "REFUND";
+            }
+        }
+
+        if(swap.state===FromBtcLnAutoSwapState.REFUNDED) {
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state: FromBtcLnAutoSwapState = swap.state as FromBtcLnAutoSwapState;
+            if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
+                if(state===FromBtcLnAutoSwapState.REFUNDED) {
+                    //Explicitly don't cancel the invoice
+                    await this.removeSwapData(swap, FromBtcLnAutoSwapState.REFUNDED);
+                }
             }
         }
 
@@ -242,6 +260,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                     FromBtcLnAutoSwapState.COMMITED,
                     FromBtcLnAutoSwapState.CLAIMED,
                     FromBtcLnAutoSwapState.CANCELED,
+                    FromBtcLnAutoSwapState.REFUNDED
                 ]
             }
         ]);
