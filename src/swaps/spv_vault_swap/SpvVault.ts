@@ -208,6 +208,10 @@ export class SpvVault<
         return null;
     }
 
+    getNextWithdrawalIndex(): number {
+        return this.data.getWithdrawalCount() + this.pendingWithdrawals.length + 1;
+    }
+
     /**
      * Returns whether the vault is ready for the next swap
      */

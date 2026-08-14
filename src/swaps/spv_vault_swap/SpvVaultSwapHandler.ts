@@ -276,11 +276,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             }
 
             if(tx==null) {
-                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
-                if(foundWithdrawal!=null) {
-                    if(vault.removeWithdrawal(foundWithdrawal))
-                        await this.Vaults.saveVault(vault);
+                if(swap.withdrawalIndex!=null && vault.data.isOpened() && vault.data.getWithdrawalCount()<swap.withdrawalIndex){
+                    //The tx should not be considered completely dead yet
+                    return;
                 }
+                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                //The spv vault watchdog will handle the removal of the withdrawal tx from pending withdrawals
+                // of the vault, if necessary
                 return;
             } else if(tx.confirmations==null || tx.confirmations===0) {
                 await swap.setState(SpvVaultSwapState.SENT)
@@ -301,6 +303,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             if(tx==null) tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
 
             if(tx==null) {
+                if(swap.withdrawalIndex!=null && vault.data.isOpened() && vault.data.getWithdrawalCount()<swap.withdrawalIndex){
+                    //The tx should not be considered completely dead yet
+                    return;
+                }
                 await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
                 return;
             } else if(tx.confirmations > 0) {
@@ -319,7 +325,8 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 values: [
                     SpvVaultSwapState.CREATED, //Check if expired
                     SpvVaultSwapState.SIGNED, //Check if sent
-                    SpvVaultSwapState.SENT //Check if confirmed or double-spent
+                    SpvVaultSwapState.SENT, //Check if confirmed or double-spent
+                    SpvVaultSwapState.BTC_CONFIRMED
                 ]
             }
         ]);
@@ -677,11 +684,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             //Get PSBT data
             const executionFeeShare = 0n;
             const utxo = vault.getLatestUtxo();
+            const withdrawalIndex = vault.getNextWithdrawalIndex();
 
             const quoteId = randomBytes(32).toString("hex");
             const swap = new SpvVaultSwap(
                 chainIdentifier, quoteId, expiry,
-                vault, utxo,
+                vault, utxo, withdrawalIndex,
                 receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken,
                 swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken,
                 callerFeeRate, frontingFeeRate, executionFeeShare,
@@ -955,12 +963,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                     try {
                         const fetchedBtcTx = await this.bitcoin.getWalletTransaction(txId);
                         if(fetchedBtcTx==null) {
+                            //The transaction wasn't sent
                             if(dataSendingSet) {
-                                if(vault.removeWithdrawal(data))
+                                if(vault.doubleSpendPendingWithdrawal(data))
                                     await this.Vaults.saveVault(vault);
                             }
                             if(isDefinedRuntimeError(e) && swap.metadata!=null) swap.metadata.postQuoteError = e;
-                            await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                            //Do not remove or transition the state of the swap here. Let the watchdog handle this
                             throw e; //This will get caught locally and throw the post quote error
                         } else {
                             //Transaction not-null set state to sent and fall through without throwing
