@@ -230,7 +230,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwa
             await this.lightning.cancelHodlInvoice(paymentHash);
         } catch (e) {
             const invoice = await this.lightning.getInvoice(paymentHash);
-            if(invoice.status==="canceled") {
+            if(invoice!=null && invoice.status==="canceled") {
                 return;
             }
             throw e;

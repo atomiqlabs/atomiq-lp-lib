@@ -577,7 +577,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             this.swapLogger.info(invoiceData, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", invoiceData.pr);
         } catch (e) {
             const invoice = await this.lightning.getInvoice(invoiceData.lnPaymentHash);
-            if(invoice.status==="canceled") {
+            if(invoice!=null && invoice.status==="canceled") {
                 await this.removeSwapData(invoiceData);
                 this.swapLogger.info(invoiceData, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", invoiceData.pr);
                 return;
