@@ -113,10 +113,10 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             this.swapLogger.debug(invoiceData, "subscribeToInvoice(): invoice_updated: ", invoice);
             if(invoice.status!=="held") return;
             this.htlcReceived(invoiceData, invoice).catch(e => this.swapLogger.error(invoiceData, "subscribeToInvoice(): Error calling htlcReceived(): ", e));
-            this.activeSubscriptions.delete(hash);
         }).catch(e => {
             this.swapLogger.error(invoiceData, "subscribeToInvoice(): error while waiting for invoice payment, invoice: "+invoiceData.pr, e);
-            //Delete from active subscription, the watchdog will re-subscribe later
+        }).finally(() => {
+            //Delete from active subscription, the watchdog will re-subscribe later if needed
             this.activeSubscriptions.delete(hash);
         });
 
