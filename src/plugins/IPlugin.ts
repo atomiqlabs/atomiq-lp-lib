@@ -80,6 +80,12 @@ export function isToBtcPluginQuote(obj: any): obj is ToBtcPluginQuote {
         isPluginQuote(obj);
 }
 
+/**
+ * Important: The only way to veto a swap quote, or similar is to return an explicit {@link QuoteThrow} object,
+ *  errors thrown by the plugins are caught & logged but they are isolated and don't halt the processing of the
+ *  event. If your plugin definitely MUST veto an action, wrap the handler in try-catch and return the {@link QuoteThrow}
+ *  object instead of throwing.
+ */
 export interface IPlugin {
 
     name: string;
