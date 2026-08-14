@@ -108,9 +108,19 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param vout
      */
     private async tryClaimSwap(tx: {blockhash: string, confirmations: number, txid: string, hex: string}, swap: ToBtcSwapAbs, vout: number): Promise<boolean> {
-        const {chainInterface, swapContract, signer} = this.getChain(swap.chainIdentifier);
+        const {chainInterface, swapContract, signer, btcRelay} = this.getChain(swap.chainIdentifier);
 
         const blockHeader = await this.bitcoinRpc.getBlockHeader(tx.blockhash);
+        if(blockHeader==null) {
+            this.swapLogger.debug(swap, "tryClaimSwap(): Cannot fetch expected bitcoin blockheader, blockhash: "+tx.blockhash+" utxo: "+tx.txid+":"+vout+" address: "+swap.address);
+            return false;
+        }
+
+        const btcRelayResponse = await btcRelay.retrieveLogAndBlockheight({blockhash: tx.blockhash, height: blockHeader.getHeight()}, blockHeader.getHeight() + swap.requiredConfirmations - 1);
+        if(btcRelayResponse==null) {
+            this.swapLogger.debug(swap, "tryClaimSwap(): BTC relay not yet synchronized to required blockheight, height: "+blockHeader.getHeight()+" utxo: "+tx.txid+":"+vout+" address: "+swap.address);
+            return false;
+        }
 
         //Set flag that we are sending the transaction already, so we don't end up with race condition
         if(swap.isLocked()) return false;
@@ -123,7 +133,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 {...tx, height: blockHeader.getHeight()},
                 swap.requiredConfirmations,
                 vout,
-                null,
+                btcRelayResponse.header,
                 null,
                 false
             );
