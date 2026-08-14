@@ -3,14 +3,16 @@ import {ToBtcSwapAbs, ToBtcSwapState} from "./ToBtcSwapAbs";
 import {MultichainData, SwapHandlerType} from "../../SwapHandler";
 import {ISwapPrice} from "../../../prices/ISwapPrice";
 import {
+    BigIntBufferUtils,
+    BitcoinRpc,
+    BtcBlock,
     BtcTx,
     ChainSwapType,
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
-    SwapData,
-    BitcoinRpc,
-    BtcBlock, BigIntBufferUtils, SwapCommitStateType
+    SwapCommitStateType,
+    SwapData
 } from "@atomiqlabs/base";
 import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
 import {PluginManager} from "../../../plugins/PluginManager";
@@ -24,7 +26,7 @@ import {ToBtcBaseConfig, ToBtcBaseSwapHandler} from "../ToBtcBaseSwapHandler";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {checkTransactionReplaced} from "../../../utils/BitcoinUtils";
 import {isQuoteThrow} from "../../../plugins/IPlugin";
-import {FromBtcLnAutoSwapState} from "../frombtcln_autoinit/FromBtcLnAutoSwap";
+import {ToBtcLnSwapState} from "../tobtcln_abstract/ToBtcLnSwapAbs";
 
 const OUTPUT_SCRIPT_MAX_LENGTH = 200;
 const MAX_TX_VSIZE = 8*1024;
@@ -125,8 +127,25 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         //Set flag that we are sending the transaction already, so we don't end up with race condition
         if(swap.isLocked()) return false;
 
-        if(!(await swapContract.isCommited(swap.data))) {
-            this.swapLogger.debug(swap, "tryClaimSwap(): Escrow is not committed anymore, cannot claim, utxo: "+tx.txid+":"+vout+" address: "+swap.address);
+        const isCommited = await swapContract.isCommited(swap.data);
+        if(!isCommited) {
+            const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            if(status?.type===SwapCommitStateType.PAID) {
+                //This is alright, we got the money
+                swap.txIds ??= {};
+                swap.txIds.claim = await status.getClaimTxId();
+                await this.removeSwapData(swap, ToBtcSwapState.CLAIMED);
+                return true;
+            } else if(status?.type===SwapCommitStateType.EXPIRED) {
+                //This means the user was able to refund before we were able to claim, no good
+                swap.txIds ??= {};
+                swap.txIds.refund = status.getRefundTxId==null ? null : await status.getRefundTxId();
+                await this.removeSwapData(swap, ToBtcSwapState.REFUNDED);
+            }
+            this.swapLogger.warn(swap, "tryClaimSwap(): tried to claim but escrow doesn't exist anymore,"+
+                " status: "+status+
+                " utxo: "+tx.txid+":"+vout+
+                " address: "+swap.address);
             return false;
         }
 
@@ -201,8 +220,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                     swap.txIds ??= {};
                     swap.txIds.claim = await status.getClaimTxId();
                     await this.removeSwapData(swap, ToBtcSwapState.CLAIMED);
-                } else if(status.type===SwapCommitStateType.EXPIRED) {
-                    this.swapLogger.warn(swap, "processPastSwap(state=BTC_SENT): swap expired, but bitcoin was probably already sent, txId: "+swap.txId+" address: "+swap.address);
+                } else if(status.type===SwapCommitStateType.EXPIRED || status.type===SwapCommitStateType.NOT_COMMITED) {
+                    this.swapLogger.warn(swap, "processPastSwap(state=BTC_SENT): swap expired and refunded, but bitcoin was probably already sent, txId: "+swap.txId+" address: "+swap.address);
                     this.unsubscribePayment(swap);
                     swap.txIds ??= {};
                     swap.txIds.refund = status.getRefundTxId==null ? null : await status.getRefundTxId();
