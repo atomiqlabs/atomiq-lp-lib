@@ -106,6 +106,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
         this.removeSwapFromEscrowHashMap(swap);
         await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
+        swap.state = null;
     }
 
     protected async saveSwapData(swap: V) {
