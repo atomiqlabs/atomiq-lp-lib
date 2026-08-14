@@ -54,7 +54,7 @@ export type FromBtcLnRequestType = {
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
-export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
+class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN;
     readonly swapType = ChainSwapType.HTLC;
     readonly inflightSwapStates = new Set([FromBtcLnSwapState.RECEIVED, FromBtcLnSwapState.COMMITED, FromBtcLnSwapState.CLAIMED]);
@@ -211,8 +211,10 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             try {
                 await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
                 this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: "+refundSwap.pr);
-                await refundSwap.setState(FromBtcLnSwapState.REFUNDED);
-                await this.saveSwapData(refundSwap);
+                if(refundSwap.state!=null) {
+                    await refundSwap.setState(FromBtcLnSwapState.REFUNDED);
+                    if(refundSwap.state!=null) await this.saveSwapData(refundSwap);
+                }
             } catch (e) {
                 this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
             }
@@ -955,4 +957,6 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
     }
 
 }
+
+export default FromBtcLnAbs
 
