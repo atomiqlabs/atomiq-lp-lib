@@ -277,6 +277,15 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 };
             }
 
+            try {
+                await this.LightningAssertions.checkHtlcExpiry(invoice, this.config.minCltv);
+                if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcExpiryChecked = Date.now();
+            } catch (e) {
+                await this.cancelSwapAndInvoice(invoiceData);
+                unlock();
+                throw e;
+            }
+
             if(invoiceData.state!==FromBtcLnTrustedSwapState.RECEIVED) {
                 unlock();
                 return;
