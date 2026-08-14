@@ -602,7 +602,7 @@ export class SpvVaults {
      */
     async recoverVaults(chainId: string): Promise<SpvVault[]> {
         const chain = this.chains.chains[chainId];
-        if(chainId==null) throw new Error(`Chain ${chainId} not found in known chains!`);
+        if(chain==null) throw new Error(`Chain ${chainId} not found in known chains!`);
         const vaults = await chain.spvVaultContract.getAllVaults(chain.signer.getAddress());
 
         const recoveredVaults: SpvVault[] = [];
