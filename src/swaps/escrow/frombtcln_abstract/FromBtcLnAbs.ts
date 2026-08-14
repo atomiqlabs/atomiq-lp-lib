@@ -210,6 +210,12 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
                 await this.removeSwapData(swap);
             } catch (e) {
+                const invoice = await this.lightning.getInvoice(paymentHash);
+                if(invoice.status==="canceled") {
+                    this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
+                    await this.removeSwapData(swap);
+                    return;
+                }
                 this.swapLogger.error(swap, "cancelInvoices(): cannot cancel hodl invoice id", e);
             }
         }
