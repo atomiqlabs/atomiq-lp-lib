@@ -39,8 +39,8 @@ export class IntermediaryStorageManager<T extends StorageObject> implements IInt
                     let hasSome = false;
                     for(let expectedValue of param.values) {
                         if(typeof expectedValue === "object") {
-                            if(expectedValue.eq!=null && !expectedValue.eq(val[param.key])) hasSome = true;
-                            if(expectedValue.equals!=null && !expectedValue.equals(val[param.key])) hasSome = true;
+                            if(expectedValue.eq!=null && expectedValue.eq(val[param.key])) hasSome = true;
+                            if(expectedValue.equals!=null && expectedValue.equals(val[param.key])) hasSome = true;
                         } else {
                             if(expectedValue===val[param.key]) hasSome = true;
                         }
