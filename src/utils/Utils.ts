@@ -79,7 +79,7 @@ export function expressHandlerWrapper(func: (
     }
 }
 
-export const HEX_REGEX = /[0-9a-fA-F]+/;
+export const HEX_REGEX = /^[0-9a-fA-F]+$/;
 
 export function serializeBN(bn: bigint | null): string | null {
     return bn==null ? null : bn.toString(10);
