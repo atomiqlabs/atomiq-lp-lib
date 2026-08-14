@@ -618,6 +618,11 @@ export class SpvVaults {
             const btcTx = await this.bitcoinRpc.getTransaction(txId);
             const btcTxOutput = btcTx.outs[parseInt(voutStr)];
             const vaultAddress = this.bitcoin.fromOutputScript(Buffer.from(btcTxOutput.scriptPubKey.hex, "hex"));
+            const expectedVaultAddress = await this.vaultSigner.getAddress(chainId, vaultData.getVaultId());
+            if(expectedVaultAddress!==vaultAddress) {
+                this.logger.info(`recoverVaults(${chainId}): Skipping vault ${vaultIdentifier}, because the expected bitcoin-side signer address doesn't match!`);
+                continue;
+            }
             const vault = new SpvVault(chainId, vaultData, vaultAddress);
             vault.state = vaultData.isOpened() ? SpvVaultState.OPENED : SpvVaultState.CLOSED;
             recoveredVaults.push(vault);
