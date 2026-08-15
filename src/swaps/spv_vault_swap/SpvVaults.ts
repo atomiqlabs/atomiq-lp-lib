@@ -412,6 +412,8 @@ export class SpvVaults {
                         if(_continue) continue;
                     }
 
+                    if(vault.state!==SpvVaultState.BTC_CONFIRMED) continue;
+
                     const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
                     let numTx = 0;
                     promises.push(
