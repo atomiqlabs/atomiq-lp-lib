@@ -130,7 +130,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10*1000;
         this.config.lnSendBitcoinBlockTimeSafetyFactorPPM = this.config.lnSendBitcoinBlockTimeSafetyFactorPPM ?? (this.config.safetyFactor * 1_000_000n);
-        if(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1_250_000n) {
+        if(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM < 1_250_000n) {
             throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
         this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.config.minSendCltv * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1_000_000n);
