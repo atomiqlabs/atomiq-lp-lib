@@ -197,7 +197,7 @@ export class PluginManager {
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePostFromBtcQuote(): plugin error", e);
             }
         }
 
@@ -229,7 +229,7 @@ export class PluginManager {
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePreFromBtcQuote(): plugin error", e);
             }
         }
 
@@ -293,7 +293,7 @@ export class PluginManager {
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePostToBtcQuote(): plugin error", e);
             }
         }
 
@@ -324,7 +324,7 @@ export class PluginManager {
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePreToBtcQuote(): plugin error", e);
             }
         }
 
