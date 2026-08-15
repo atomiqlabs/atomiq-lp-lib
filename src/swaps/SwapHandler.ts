@@ -218,6 +218,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
                 this.logger.debug("saveSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
         }
         await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+        if(swap.removed) await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
 
     /**
