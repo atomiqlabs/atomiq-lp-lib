@@ -291,7 +291,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 }
                 swap.secret = lnPaymentStatus.secret;
                 if(lnPaymentStatus.feeMtokens!=null) swap.setRealNetworkFee(lnPaymentStatus.feeMtokens / 1000n);
-                this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: "+swap.secret+" realRoutingFee: "+swap.realNetworkFee.toString(10)+" invoice: "+swap.pr);
+                this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: "+swap.secret+" realRoutingFee: "+swap.realNetworkFee?.toString(10)+" invoice: "+swap.pr);
                 await swap.setState(ToBtcLnSwapState.PAID);
                 await this.saveSwapData(swap);
 
