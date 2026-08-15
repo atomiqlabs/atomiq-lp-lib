@@ -93,7 +93,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
     private async refundSwap(swap: FromBtcTrustedSwap) {
         if(swap.state!==FromBtcTrustedSwapState.REFUNDABLE) {
             await swap.setState(FromBtcTrustedSwapState.REFUNDABLE);
-            await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+            await this.saveSwapData(swap);
         }
 
         if(swap.refundAddress==null) return;
@@ -235,20 +235,20 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
             }
 
             await swap.setState(FromBtcTrustedSwapState.RECEIVED);
-            await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+            await this.saveSwapData(swap);
         }
 
         if(swap.state===FromBtcTrustedSwapState.RECEIVED) {
             //Check if transaction still exists
             if(tx==null || foundVout==null || tx.txid!==swap.txId) {
                 await swap.setState(FromBtcTrustedSwapState.CREATED);
-                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                await this.saveSwapData(swap);
                 return;
             }
             //Check if it is confirmed
             if(tx.confirmations>0) {
                 await swap.setState(FromBtcTrustedSwapState.BTC_CONFIRMED);
-                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                await this.saveSwapData(swap);
             } else {
                 //Check if it pays high enough fee AND has confirmed ancestors
                 const ancestors = await this.getAllAncestors(tx);
@@ -265,7 +265,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                     swap.txSize = tx.vsize;
                     swap.txFee = fee;
                     await swap.setState(FromBtcTrustedSwapState.BTC_CONFIRMED);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                 } else {
                     return;
                 }
@@ -345,7 +345,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                 swap.scRawTx = rawTx;
                 if(swap.state===FromBtcTrustedSwapState.BTC_CONFIRMED) {
                     await swap.setState(FromBtcTrustedSwapState.SENT);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                 }
                 if(unlock!=null) unlock();
                 unlock = null;
@@ -360,7 +360,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                     swap.txIds = {init: null};
                     swap.scRawTx = null;
                     await swap.setState(FromBtcTrustedSwapState.RECEIVED);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                     break;
                 case "reverted":
                     //Cancel invoice
@@ -369,7 +369,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
                     break;
                 case "success":
                     await swap.setState(FromBtcTrustedSwapState.CONFIRMED);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                     break;
             }
         }
@@ -559,7 +559,7 @@ export class FromBtcTrusted extends SwapHandler<FromBtcTrustedSwap, FromBtcTrust
             createdSwap.metadata = metadata;
 
             await PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(createdSwap.getIdentifierHash(), createdSwap.getSequence(), createdSwap);
+            await this.saveSwapData(createdSwap);
             this.subscriptions.set(outputScript, createdSwap);
 
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: "+createdSwap.btcAddress+" amount: "+amountBD.toString(10));
