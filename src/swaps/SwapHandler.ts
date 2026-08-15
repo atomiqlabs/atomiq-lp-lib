@@ -179,17 +179,28 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     abstract getInfoData(): any;
 
     /**
+     * Reusable chunk of code that marks the swap for removal, sets ultimate state and calls plugin remove handlers
+     *
+     * @param swap
+     * @param ultimateState
+     * @protected
+     */
+    protected async _markSwapDataForRemoval(swap: V, ultimateState?: S) {
+        if(this.inflightSwaps.delete(swap.getIdentifier()))
+            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+        if(ultimateState!=null) await swap.setState(ultimateState);
+        if(swap!=null) await PluginManager.swapRemove(swap);
+        this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
+    }
+
+    /**
      * Remove swap data
      *
      * @param swap
      * @param ultimateState set the ultimate state of the swap before removing
      */
     protected async removeSwapData(swap: V, ultimateState?: S) {
-        if(this.inflightSwaps.delete(swap.getIdentifier()))
-            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
-        if(ultimateState!=null) await swap.setState(ultimateState);
-        if(swap!=null) await PluginManager.swapRemove(swap);
-        this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
+        await this._markSwapDataForRemoval(swap, ultimateState);
         await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
 
