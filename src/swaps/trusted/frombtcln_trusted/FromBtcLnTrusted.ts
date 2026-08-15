@@ -269,7 +269,9 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 invoiceData
             );
             if(isQuoteThrow(pluginCheckResult)) {
-                await this.cancelSwapAndInvoice(invoiceData);
+                try {
+                    await this.cancelSwapAndInvoice(invoiceData);
+                } catch (e) {}
                 unlock();
                 throw {
                     code: 29999,
@@ -281,7 +283,9 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 await this.LightningAssertions.checkHtlcExpiry(invoice, this.config.minCltv);
                 if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcExpiryChecked = Date.now();
             } catch (e) {
-                await this.cancelSwapAndInvoice(invoiceData);
+                try {
+                    await this.cancelSwapAndInvoice(invoiceData);
+                } catch (e) {}
                 unlock();
                 throw e;
             }
