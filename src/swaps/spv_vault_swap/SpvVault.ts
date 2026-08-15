@@ -177,7 +177,7 @@ export class SpvVault<
             const tokenData = this.data.getTokenData()[index];
             if(tokenData==null) throw new Error("Amount index out of bounds!");
             const result = amt / tokenData.multiplier;
-            if(result >= 2n**64n) throw new Error("Amount too large to be represented as uint64 after multiplier scaling!");
+            if(result<0n || result >= 2n**64n) throw new Error("Amount too large to be represented as uint64 after multiplier scaling!");
             return result;
         });
     }
