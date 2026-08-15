@@ -272,6 +272,7 @@ export class SpvVaults {
         const {spvVaultContract} = this.chains.chains[vault.chainId];
 
         const initialVaultWithdrawalCount = vault.data.getWithdrawalCount();
+        const initialPendingWithdrawals = vault.pendingWithdrawals.map(val => val.getTxId());
 
         let newPendingTxns: SpvWithdrawalTransactionData[];
         const replacedWithdrawalIndexes = [...vault.replacedWithdrawals.keys()].sort((a, b) => b - a); //Sort descending
@@ -345,8 +346,16 @@ export class SpvVaults {
             vault.pendingWithdrawals.every((tx, index) => tx.getTxId()===newPendingTxns[index].getTxId())
         ) return false; //All the txIds still match, sanity check
 
+        //Check if the vault is in the same state still
         if(initialVaultWithdrawalCount!==vault.data.getWithdrawalCount()) {
             this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Not saving vault after checking replaced transactions, due to withdrawal count changed!`);
+            return false;
+        }
+        if(
+            vault.pendingWithdrawals.length!==initialPendingWithdrawals.length ||
+            !vault.pendingWithdrawals.every((tx, index) => tx.getTxId()===initialPendingWithdrawals[index])
+        )  {
+            this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Not saving vault after checking replaced transactions, due to pending withdrawals changed!`);
             return false;
         }
 
