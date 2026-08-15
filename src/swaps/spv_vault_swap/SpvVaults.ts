@@ -329,7 +329,7 @@ export class SpvVaults {
                         //Tx not in mempool, which means the other subsequent one surely also cannot be in the mempool
                         break;
                     }
-                    txChain.push(foundNextTx);
+                    txChain.push(await spvVaultContract.getWithdrawalData(tx));
                 }
 
                 newPendingTxns = txChain;
