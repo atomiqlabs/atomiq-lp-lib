@@ -241,7 +241,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
 
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcReceived = Date.now();
             await invoiceData.setState(FromBtcLnTrustedSwapState.RECEIVED);
-            await this.storageManager.saveData(invoice.id, null, invoiceData);
+            await this.saveSwapData(invoiceData);
         }
 
         if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
@@ -305,7 +305,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 invoiceData.scSendTxs[txId] = rawTx;
                 if(invoiceData.state===FromBtcLnTrustedSwapState.RECEIVED) {
                     await invoiceData.setState(FromBtcLnTrustedSwapState.SENT);
-                    await this.storageManager.saveData(invoice.id, null, invoiceData);
+                    await this.saveSwapData(invoiceData);
                 }
             }).catch(e => this.swapLogger.error(invoiceData, "htlcReceived(): Error sending transfer txns", e));
 
@@ -320,7 +320,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             } else {
                 //Successfully paid
                 await invoiceData.setState(FromBtcLnTrustedSwapState.CONFIRMED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
+                await this.saveSwapData(invoiceData);
             }
 
             unlock();
@@ -348,7 +348,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             if(resultingState==="fail") {
                 //Cancel invoice
                 await invoiceData.setState(FromBtcLnTrustedSwapState.REFUNDED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
+                await this.saveSwapData(invoiceData);
                 await this.LightningAssertions.cancelInvoiceIdempotent(invoice.id);
                 this.unsubscribeInvoice(invoice.id);
                 await this.removeSwapData(invoiceData);
@@ -362,7 +362,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 //Successfully paid
                 invoiceData.txIds = {init: successTxId};
                 await invoiceData.setState(FromBtcLnTrustedSwapState.CONFIRMED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
+                await this.saveSwapData(invoiceData);
             }
         }
 
@@ -564,7 +564,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
             createdSwap.metadata = metadata;
 
             await PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(hash.toString("hex"), null, createdSwap);
+            await this.saveSwapData(createdSwap);
             this.subscribeToInvoice(createdSwap);
 
             this.swapLogger.info(createdSwap, "REST: /createInvoice: Created swap invoice: "+hodlInvoice.request+" amount: "+amountBD.toString(10));
