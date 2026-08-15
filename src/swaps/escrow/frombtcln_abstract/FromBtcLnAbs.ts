@@ -214,10 +214,8 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             try {
                 await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
                 this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: "+refundSwap.pr);
-                if(refundSwap.state!=null) {
-                    await refundSwap.setState(FromBtcLnSwapState.REFUNDED);
-                    if(refundSwap.state!=null) await this.saveSwapData(refundSwap);
-                }
+                await refundSwap.setState(FromBtcLnSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
             } catch (e) {
                 this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
             }

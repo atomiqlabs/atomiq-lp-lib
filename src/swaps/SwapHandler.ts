@@ -188,6 +188,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     protected async _markSwapDataForRemoval(swap: V, ultimateState?: S) {
         if(this.inflightSwaps.delete(swap.getIdentifier()))
             this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: "+this.inflightSwaps.size);
+        swap.removed = true;
         if(ultimateState!=null) await swap.setState(ultimateState);
         if(swap!=null) await PluginManager.swapRemove(swap);
         this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: "+swap.state);
@@ -205,6 +206,7 @@ export abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHandlerSwap
     }
 
     protected async saveSwapData(swap: V) {
+        if(swap.removed) return;
         const identifier = swap.getIdentifier();
         if(this.inflightSwapStates.has(swap.state)) {
             if(!this.inflightSwaps.has(identifier)) {

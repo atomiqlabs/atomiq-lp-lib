@@ -28,6 +28,9 @@ export abstract class SwapHandlerSwap<S = any> extends Lockable implements Stora
     readonly swapFee: bigint;
     readonly swapFeeInToken: bigint;
 
+    //Flag to mark the swap as already removed
+    removed: boolean = false;
+
     protected constructor(chainIdentifier: string, swapFee: bigint, swapFeeInToken: bigint);
     protected constructor(obj: any);
 

@@ -223,10 +223,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             try {
                 await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
                 this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: "+refundSwap.pr);
-                if(refundSwap.state!=null) {
-                    await refundSwap.setState(FromBtcLnAutoSwapState.REFUNDED);
-                    if(refundSwap.state!=null) await this.saveSwapData(refundSwap);
-                }
+                await refundSwap.setState(FromBtcLnAutoSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
             } catch (e) {
                 this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
             }
