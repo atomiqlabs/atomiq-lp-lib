@@ -54,7 +54,7 @@ export type FromBtcLnRequestType = {
 /**
  * Swap handler handling from BTCLN swaps using submarine swaps
  */
-class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
+export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwapState> {
     readonly type = SwapHandlerType.FROM_BTCLN;
     readonly swapType = ChainSwapType.HTLC;
     readonly inflightSwapStates = new Set([FromBtcLnSwapState.RECEIVED, FromBtcLnSwapState.COMMITED, FromBtcLnSwapState.CLAIMED]);
@@ -951,6 +951,3 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwa
     }
 
 }
-
-export default FromBtcLnAbs
-
