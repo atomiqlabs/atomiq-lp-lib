@@ -72,10 +72,10 @@ export class SpvVaults {
     }
 
     async processOpenEvent(vault: SpvVault, event: SpvVaultOpenEvent): Promise<void> {
+        vault.update(event);
         if(vault.state===SpvVaultState.BTC_CONFIRMED || vault.state===SpvVaultState.BTC_INITIATED) {
             vault.state = SpvVaultState.OPENED;
         }
-        vault.update(event);
         await this.saveVault(vault);
     }
 
