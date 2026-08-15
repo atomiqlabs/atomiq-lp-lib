@@ -153,4 +153,16 @@ export class LightningAssertions {
         }
     }
 
+    async cancelInvoiceIdempotent(paymentHash: string) {
+        try {
+            await this.lightning.cancelHodlInvoice(paymentHash);
+        } catch (e) {
+            const invoice = await this.lightning.getInvoice(paymentHash);
+            if(invoice!=null && invoice.status==="canceled") {
+                return;
+            }
+            throw e;
+        }
+    }
+
 }

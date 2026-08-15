@@ -225,24 +225,12 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromBtcLnSwa
         }
     }
 
-    protected async cancelInvoiceIdempotent(paymentHash: string) {
-        try {
-            await this.lightning.cancelHodlInvoice(paymentHash);
-        } catch (e) {
-            const invoice = await this.lightning.getInvoice(paymentHash);
-            if(invoice!=null && invoice.status==="canceled") {
-                return;
-            }
-            throw e;
-        }
-    }
-
     protected async cancelInvoices(swaps: FromBtcLnSwapAbs[]) {
         for(let swap of swaps) {
             //Refund
             const paymentHash = swap.lnPaymentHash;
             try {
-                await this.cancelInvoiceIdempotent(paymentHash);
+                await this.LightningAssertions.cancelInvoiceIdempotent(paymentHash);
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
                 await this.removeSwapData(swap);
             } catch (e) {
