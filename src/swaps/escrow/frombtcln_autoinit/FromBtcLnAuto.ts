@@ -237,7 +237,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
     protected async settleInvoices(swaps: FromBtcLnAutoSwap[]) {
         for(let swap of swaps) {
             try {
-                await this.lightning.settleHodlInvoice(swap.secret);
+                await this.LightningAssertions.settleInvoiceIdempotent(swap.lnPaymentHash, swap.secret);
                 if(swap.metadata!=null) swap.metadata.times.htlcSettled = Date.now();
                 await this.removeSwapData(swap, FromBtcLnAutoSwapState.SETTLED);
 
@@ -325,7 +325,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         }
 
         if(savedSwap.state === FromBtcLnAutoSwapState.CLAIMED) try {
-            await this.lightning.settleHodlInvoice(secretHex);
+            await this.LightningAssertions.settleInvoiceIdempotent(savedSwap.lnPaymentHash, secretHex);
             this.swapLogger.info(savedSwap, "SC: ClaimEvent: invoice settled, secret: "+secretHex);
             if(savedSwap.metadata!=null) savedSwap.metadata.times.htlcSettled = Date.now();
             await this.removeSwapData(savedSwap, FromBtcLnAutoSwapState.SETTLED);

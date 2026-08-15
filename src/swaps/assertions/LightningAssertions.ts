@@ -1,6 +1,7 @@
 import {ILightningWallet, LightningNetworkChannel, LightningNetworkInvoice} from "../../wallets/ILightningWallet";
 import {LoggerType} from "../../utils/Utils";
 import {ISwapPrice} from "../../prices/ISwapPrice";
+import {FromBtcLnAutoSwap, FromBtcLnAutoSwapState} from "../escrow/frombtcln_autoinit/FromBtcLnAutoSwap";
 
 export class LightningAssertions {
 
@@ -137,6 +138,18 @@ export class LightningAssertions {
                     actualDelta: blockDelta.toString(10)
                 }
             };
+        }
+    }
+
+    async settleInvoiceIdempotent(paymentHash: string, secret: string) {
+        try {
+            await this.lightning.settleHodlInvoice(secret);
+        } catch (e) {
+            const invoice = await this.lightning.getInvoice(paymentHash);
+            if(invoice!=null && invoice.status==="confirmed") {
+                return;
+            }
+            throw e;
         }
     }
 
