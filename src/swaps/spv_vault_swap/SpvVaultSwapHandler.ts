@@ -676,8 +676,16 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             totalInGasToken = (totalInGasToken * 100_000n / (100_000n + callerFeeRate + frontingFeeRate));
 
             //Calculate raw amounts
-            const [rawTokenAmount, rawGasTokenAmount] = vault.toRawAmounts([totalInToken, totalInGasToken]);
-            [totalInToken, totalInGasToken] = vault.fromRawAmounts([rawTokenAmount, rawGasTokenAmount]);
+            try {
+                const [rawTokenAmount, rawGasTokenAmount] = vault.toRawAmounts([totalInToken, totalInGasToken]);
+                [totalInToken, totalInGasToken] = vault.fromRawAmounts([rawTokenAmount, rawGasTokenAmount]);
+            } catch (e) {
+                this.logger.error("REST: /getQuote: Error while calculating the scaled raw amounts for vaults: ", e)
+                throw {
+                    code: 20400,
+                    msg: "Swap amount too large for the vault, please try smaller amounts!"
+                }
+            }
 
             const expiry = Math.floor(Date.now() / 1000) + this.getInitAuthorizationTimeout(chainIdentifier);
 
