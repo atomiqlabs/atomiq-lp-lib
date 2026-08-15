@@ -165,6 +165,11 @@ export class SpvVault<
             //Add the original to the replaced txs
             this.addToReplacedWithdrawals(this.data.getWithdrawalCount()+i+1, backup[i]);
         }
+
+        //Also purge the current newPendingWithdrawalData from the replacedWithdrawals
+        for(let value of this.replacedWithdrawals.values()) {
+            newPendingWithdrawalData.forEach(newTx => value.delete(newTx.getTxId()));
+        }
     }
 
     toRawAmounts(amounts: bigint[]): bigint[] {
