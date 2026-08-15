@@ -1,8 +1,7 @@
 import {Express} from "express";
 import {MultichainData, SwapHandler, SwapHandlerInfoType, SwapHandlerType} from "../swaps/SwapHandler";
 import * as express from "express";
-
-export const HEX_REGEX = /^[0-9a-f]+$/;
+import {HEX_REGEX} from "../utils/Utils";
 
 type InfoHandlerResponseEnvelope = {
     nonce: string,
