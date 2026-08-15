@@ -209,10 +209,15 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
         if(swap.state!==FromBtcLnTrustedSwapState.RECEIVED) return;
         await swap.setState(FromBtcLnTrustedSwapState.CANCELED);
         const paymentHash = swap.getIdentifierHash();
-        await this.lightning.cancelHodlInvoice(paymentHash);
-        this.unsubscribeInvoice(paymentHash);
-        await this.removeSwapData(swap);
-        this.swapLogger.info(swap, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", swap.pr);
+        try {
+            await this.lightning.cancelHodlInvoice(paymentHash);
+            this.unsubscribeInvoice(paymentHash);
+            await this.removeSwapData(swap);
+            this.swapLogger.info(swap, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", swap.pr);
+        } catch (e) {
+            await this.saveSwapData(swap);
+            throw e;
+        }
     }
 
     /**
