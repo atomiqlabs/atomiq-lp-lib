@@ -1096,7 +1096,8 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
         const getRefundAuthorization = expressHandlerWrapper(async (req, res) => {
             /**
-             * paymentHash: string          Identifier of the swap
+             * paymentHash: string          Identifier of the swap, can be either a payment hash of the lightning
+             *                               network invoice, or an escrow hash of the created escrow
              * sequence: BN                 Sequence identifier of the swap
              */
             const parsedBody = verifySchema({...req.body, ...req.query}, {
@@ -1171,7 +1172,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 }
             }
 
-            const payment = await this.lightning.getPayment(parsedBody.paymentHash);
+            const payment = await this.lightning.getPayment(data?.lnPaymentHash ?? parsedBody.paymentHash);
 
             if(payment==null) throw {
                 _httpStatus: 200,
