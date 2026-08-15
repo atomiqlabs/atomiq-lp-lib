@@ -287,7 +287,7 @@ export class SpvVaults {
                 if(tx==null) continue;
 
                 //Tx got re-introduced to the mempool, build the full tx chain
-                const txChain: SpvWithdrawalTransactionData[] = [replacedWithdrawal];
+                const txChain: SpvWithdrawalTransactionData[] = [await spvVaultContract.getWithdrawalData(tx)];
 
                 //Add historical transactions
                 let invalidTx: boolean = false;
