@@ -442,18 +442,28 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
             if(swap.metadata!=null) swap.metadata.times.paySignPSBT = Date.now();
 
             try {
-                this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: "+signResult.raw);
+                const txId = signResult.tx.id;
+                this.swapLogger.debug(swap, "sendBitcoinPayment(): signed BTC transaction id: "+txId);
                 //Save previous bitcoin tx
                 if(swap.txId!=null && swap.btcRawTx!=null) {
                     swap.pastTxIds[swap.txId] = swap.btcRawTx;
                 }
-                swap.txId = signResult.tx.id;
+                swap.txId = txId;
                 swap.btcRawTx = signResult.raw;
                 swap.setRealNetworkFee(BigInt(signResult.networkFee));
                 swap.sending = true;
                 await swap.setState(ToBtcSwapState.BTC_SENDING);
                 await this.saveSwapData(swap);
+            } catch (e) {
+                swap.sending = false;
+                this.swapLogger.error(swap, "sendBitcoinPayment(): Failed to persist swap state, while sending bitcoin payout!")
+                throw {
+                    code: 90005,
+                    msg: "Failed to persist swap state!"
+                }
+            }
 
+            try {
                 await this.bitcoin.sendRawTransaction(signResult.raw);
                 swap.sending = false;
             } catch (e) {
