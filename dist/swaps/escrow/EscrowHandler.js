@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EscrowHandler = void 0;
 const SwapHandler_1 = require("../SwapHandler");
 const base_1 = require("@atomiqlabs/base");
-const PluginManager_1 = require("../../plugins/PluginManager");
 const SwapHandlerSwap_1 = require("../SwapHandlerSwap");
 class EscrowHandler extends SwapHandler_1.SwapHandler {
     constructor() {
@@ -74,17 +73,13 @@ class EscrowHandler extends SwapHandler_1.SwapHandler {
         }
     }
     async removeSwapData(swap, ultimateState) {
-        this.inflightSwaps.delete(swap.getIdentifier());
-        this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
-        if (ultimateState != null)
-            await swap.setState(ultimateState);
-        if (swap != null)
-            await PluginManager_1.PluginManager.swapRemove(swap);
-        this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
+        await super._markSwapDataForRemoval(swap, ultimateState);
         this.removeSwapFromEscrowHashMap(swap);
         await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
     async saveSwapData(swap) {
+        if (swap.removed)
+            return;
         this.saveSwapToEscrowHashMap(swap);
         return super.saveSwapData(swap);
     }

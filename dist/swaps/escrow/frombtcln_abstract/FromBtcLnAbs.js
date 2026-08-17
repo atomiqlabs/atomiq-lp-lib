@@ -68,7 +68,10 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     const paymentHashHex = paymentHash.toString("hex");
                     if (swap.lnPaymentHash !== paymentHashHex) {
                         //TODO: Possibly fatal failure
-                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=RECEIVED|COMMITED): onchainStatus=PAID, Invalid swap secret specified: " + secretHex + " for paymentHash: " + paymentHashHex);
+                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=RECEIVED|COMMITED): onchainStatus=PAID, Invalid swap secret specified: " + secretHex
+                            + " with hash: " + paymentHashHex
+                            + " expected paymentHash: " + swap.lnPaymentHash
+                            + " swap invoice: " + swap.pr);
                         return null;
                     }
                     swap.secret = secretHex;
@@ -115,6 +118,24 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 return "REFUND";
             }
         }
+        if (swap.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED) {
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state = swap.state;
+            if (onchainStatus.type === base_1.SwapCommitStateType.NOT_COMMITED || onchainStatus.type === base_1.SwapCommitStateType.EXPIRED) {
+                if (state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED) {
+                    try {
+                        await this.LightningAssertions.cancelInvoiceIdempotent(swap.lnPaymentHash);
+                        this.swapLogger.info(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, lightning invoice cancelled!");
+                        await this.removeSwapData(swap, FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED);
+                    }
+                    catch (e) {
+                        this.swapLogger.error(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, but lightning invoice cannot be cancelled!", e);
+                        await swap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.CANCELED);
+                        await this.saveSwapData(swap);
+                    }
+                }
+            }
+        }
         if (swap.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED)
             return "SETTLE";
         if (swap.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.CANCELED)
@@ -131,6 +152,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 await swapContract.refund(signer, refundSwap.data, true, false, { waitForConfirmation: true });
                 this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: " + refundSwap.pr);
                 await refundSwap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
             }
             catch (e) {
                 this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
@@ -143,17 +165,11 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             //Refund
             const paymentHash = swap.lnPaymentHash;
             try {
-                await this.lightning.cancelHodlInvoice(paymentHash);
+                await this.LightningAssertions.cancelInvoiceIdempotent(paymentHash);
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
                 await this.removeSwapData(swap);
             }
             catch (e) {
-                const invoice = await this.lightning.getInvoice(paymentHash);
-                if (invoice.status === "canceled") {
-                    this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
-                    await this.removeSwapData(swap);
-                    return;
-                }
                 this.swapLogger.error(swap, "cancelInvoices(): cannot cancel hodl invoice id", e);
             }
         }
@@ -161,7 +177,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     async settleInvoices(swaps) {
         for (let swap of swaps) {
             try {
-                await this.lightning.settleHodlInvoice(swap.secret);
+                await this.LightningAssertions.settleInvoiceIdempotent(swap.lnPaymentHash, swap.secret);
                 if (swap.metadata != null)
                     swap.metadata.times.htlcSettled = Date.now();
                 await this.removeSwapData(swap, FromBtcLnSwapAbs_1.FromBtcLnSwapState.SETTLED);
@@ -188,6 +204,7 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     FromBtcLnSwapAbs_1.FromBtcLnSwapState.COMMITED,
                     FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED,
                     FromBtcLnSwapAbs_1.FromBtcLnSwapState.CANCELED,
+                    FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED
                 ]
             }
         ]);
@@ -229,12 +246,15 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         const paymentHashHex = paymentHash.toString("hex");
         if (savedSwap.lnPaymentHash !== paymentHashHex) {
             //TODO: Possibly fatal failure
-            this.swapLogger.error(savedSwap, "FATAL: SC: ClaimEvent: invalid swap secret specified: " + secretHex + " for paymentHash: " + paymentHashHex);
+            this.swapLogger.error(savedSwap, "FATAL: SC: ClaimEvent: invalid swap secret specified: " + secretHex
+                + " with hash: " + paymentHashHex
+                + " expected paymentHash: " + savedSwap.lnPaymentHash
+                + " swap invoice: " + savedSwap.pr);
             return;
         }
         this.swapLogger.info(savedSwap, "SC: ClaimEvent: swap HTLC successfully claimed by the client, invoice: " + savedSwap.pr);
         try {
-            await this.lightning.settleHodlInvoice(secretHex);
+            await this.LightningAssertions.settleInvoiceIdempotent(savedSwap.lnPaymentHash, secretHex);
             this.swapLogger.info(savedSwap, "SC: ClaimEvent: invoice settled, secret: " + secretHex);
             savedSwap.secret = secretHex;
             if (savedSwap.metadata != null)
@@ -251,14 +271,13 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     async processRefundEvent(chainIdentifier, savedSwap, event) {
         this.swapLogger.info(savedSwap, "SC: RefundEvent: swap refunded to us, invoice: " + savedSwap.pr);
         try {
-            await this.lightning.cancelHodlInvoice(savedSwap.lnPaymentHash);
+            await this.LightningAssertions.cancelInvoiceIdempotent(savedSwap.lnPaymentHash);
             this.swapLogger.info(savedSwap, "SC: RefundEvent: invoice cancelled");
             await this.removeSwapData(savedSwap, FromBtcLnSwapAbs_1.FromBtcLnSwapState.REFUNDED);
         }
         catch (e) {
             this.swapLogger.error(savedSwap, "SC: RefundEvent: cannot cancel invoice", e);
             await savedSwap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.CANCELED);
-            // await PluginManager.swapStateChange(savedSwap);
             await this.saveSwapData(savedSwap);
         }
     }

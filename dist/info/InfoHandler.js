@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InfoHandler = void 0;
 const express = require("express");
-const HEX_REGEX = /[0-9a-f]+/i;
+const Utils_1 = require("../utils/Utils");
 /**
  * Handles info requests to POST /info returning information about fees, swap params, etc.
  */
@@ -23,7 +23,7 @@ class InfoHandler {
             if (reqParams.nonce == null ||
                 typeof (reqParams.nonce) !== "string" ||
                 reqParams.nonce.length > 64 ||
-                !HEX_REGEX.test(reqParams.nonce)) {
+                !Utils_1.HEX_REGEX.test(reqParams.nonce)) {
                 res.status(400).json({
                     msg: "Invalid request body (nonce)"
                 });

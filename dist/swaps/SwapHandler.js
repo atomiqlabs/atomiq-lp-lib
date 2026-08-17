@@ -71,22 +71,35 @@ class SwapHandler {
         }
     }
     /**
+     * Reusable chunk of code that marks the swap for removal, sets ultimate state and calls plugin remove handlers
+     *
+     * @param swap
+     * @param ultimateState
+     * @protected
+     */
+    async _markSwapDataForRemoval(swap, ultimateState) {
+        if (this.inflightSwaps.delete(swap.getIdentifier()))
+            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
+        swap.removed = true;
+        if (ultimateState != null)
+            await swap.setState(ultimateState);
+        if (swap != null)
+            await PluginManager_1.PluginManager.swapRemove(swap);
+        this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
+    }
+    /**
      * Remove swap data
      *
      * @param swap
      * @param ultimateState set the ultimate state of the swap before removing
      */
     async removeSwapData(swap, ultimateState) {
-        if (this.inflightSwaps.delete(swap.getIdentifier()))
-            this.logger.debug("removeSwapData(): Removing in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
-        if (ultimateState != null)
-            await swap.setState(ultimateState);
-        if (swap != null)
-            await PluginManager_1.PluginManager.swapRemove(swap);
-        this.swapLogger.debug(swap, "removeSwapData(): removing swap final state: " + swap.state);
+        await this._markSwapDataForRemoval(swap, ultimateState);
         await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
     async saveSwapData(swap) {
+        if (swap.removed)
+            return;
         const identifier = swap.getIdentifier();
         if (this.inflightSwapStates.has(swap.state)) {
             if (!this.inflightSwaps.has(identifier)) {
@@ -99,6 +112,8 @@ class SwapHandler {
                 this.logger.debug("saveSwapData(): Removing in-flight swap, current in-flight swaps: " + this.inflightSwaps.size);
         }
         await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+        if (swap.removed)
+            await this.storageManager.removeData(swap.getIdentifierHash(), swap.getSequence());
     }
     /**
      * Pre-fetches native balance to further check if we have enough reserve in a native token

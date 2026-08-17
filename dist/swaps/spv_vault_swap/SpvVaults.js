@@ -38,10 +38,10 @@ class SpvVaults {
         await this.saveVault(vault);
     }
     async processOpenEvent(vault, event) {
+        vault.update(event);
         if (vault.state === SpvVault_1.SpvVaultState.BTC_CONFIRMED || vault.state === SpvVault_1.SpvVaultState.BTC_INITIATED) {
             vault.state = SpvVault_1.SpvVaultState.OPENED;
         }
-        vault.update(event);
         await this.saveVault(vault);
     }
     async processCloseEvent(vault, event) {
@@ -214,6 +214,7 @@ class SpvVaults {
     async checkVaultReplacedTransactions(vault, save) {
         const { spvVaultContract } = this.chains.chains[vault.chainId];
         const initialVaultWithdrawalCount = vault.data.getWithdrawalCount();
+        const initialPendingWithdrawals = vault.pendingWithdrawals.map(val => val.getTxId());
         let newPendingTxns;
         const replacedWithdrawalIndexes = [...vault.replacedWithdrawals.keys()].sort((a, b) => b - a); //Sort descending
         //Go from the newest vault index to the oldest
@@ -228,7 +229,7 @@ class SpvVaults {
                 if (tx == null)
                     continue;
                 //Tx got re-introduced to the mempool, build the full tx chain
-                const txChain = [replacedWithdrawal];
+                const txChain = [await spvVaultContract.getWithdrawalData(tx)];
                 //Add historical transactions
                 let invalidTx = false;
                 for (let i = withdrawalIndex - 1; i > initialVaultWithdrawalCount; i--) {
@@ -268,7 +269,7 @@ class SpvVaults {
                         //Tx not in mempool, which means the other subsequent one surely also cannot be in the mempool
                         break;
                     }
-                    txChain.push(foundNextTx);
+                    txChain.push(await spvVaultContract.getWithdrawalData(tx));
                 }
                 newPendingTxns = txChain;
                 break;
@@ -281,8 +282,14 @@ class SpvVaults {
         if (vault.pendingWithdrawals.length === newPendingTxns.length &&
             vault.pendingWithdrawals.every((tx, index) => tx.getTxId() === newPendingTxns[index].getTxId()))
             return false; //All the txIds still match, sanity check
+        //Check if the vault is in the same state still
         if (initialVaultWithdrawalCount !== vault.data.getWithdrawalCount()) {
             this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Not saving vault after checking replaced transactions, due to withdrawal count changed!`);
+            return false;
+        }
+        if (vault.pendingWithdrawals.length !== initialPendingWithdrawals.length ||
+            !vault.pendingWithdrawals.every((tx, index) => tx.getTxId() === initialPendingWithdrawals[index])) {
+            this.logger.warn(`checkVaultReplacedTransactions(${vault.getIdentifier()}): Not saving vault after checking replaced transactions, due to pending withdrawals changed!`);
             return false;
         }
         try {
@@ -344,6 +351,8 @@ class SpvVaults {
                         if (_continue)
                             continue;
                     }
+                    if (vault.state !== SpvVault_1.SpvVaultState.BTC_CONFIRMED)
+                        continue;
                     const txs = await spvVaultContract.txsOpen(signer.getAddress(), vault.data);
                     let numTx = 0;
                     promises.push(chainInterface.sendAndConfirm(signer, txs, true, undefined, true, async (txId, rawTx) => {

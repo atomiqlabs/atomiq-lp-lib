@@ -59,6 +59,7 @@ export declare class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVa
     protected subscribeToEvents(): void;
     startWatchdog(): Promise<void>;
     init(): Promise<void>;
+    protected isDefinitelyNotProcessable(vault: SpvVault, swap: SpvVaultSwap): Promise<boolean>;
     protected processPastSwap(swap: SpvVaultSwap): Promise<void>;
     protected processPastSwaps(): Promise<void>;
     protected getPricePrefetches(chainIdentifier: string, token: string, gasToken: string, abortController: AbortController): {

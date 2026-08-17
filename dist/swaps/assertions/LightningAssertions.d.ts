@@ -56,4 +56,6 @@ export declare class LightningAssertions {
      * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
      */
     checkHtlcExpiry(invoice: LightningNetworkInvoice, minCltvDelta: bigint): Promise<void>;
+    settleInvoiceIdempotent(paymentHash: string, secret: string): Promise<void>;
+    cancelInvoiceIdempotent(paymentHash: string): Promise<void>;
 }

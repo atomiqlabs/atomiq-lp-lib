@@ -16,6 +16,7 @@ export declare abstract class SwapHandlerSwap<S = any> extends Lockable implemen
     };
     readonly swapFee: bigint;
     readonly swapFeeInToken: bigint;
+    removed: boolean;
     protected constructor(chainIdentifier: string, swapFee: bigint, swapFeeInToken: bigint);
     protected constructor(obj: any);
     serialize(): any;

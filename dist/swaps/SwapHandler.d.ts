@@ -120,6 +120,14 @@ export declare abstract class SwapHandler<V extends SwapHandlerSwap<S> = SwapHan
      */
     abstract getInfoData(): any;
     /**
+     * Reusable chunk of code that marks the swap for removal, sets ultimate state and calls plugin remove handlers
+     *
+     * @param swap
+     * @param ultimateState
+     * @protected
+     */
+    protected _markSwapDataForRemoval(swap: V, ultimateState?: S): Promise<void>;
+    /**
      * Remove swap data
      *
      * @param swap

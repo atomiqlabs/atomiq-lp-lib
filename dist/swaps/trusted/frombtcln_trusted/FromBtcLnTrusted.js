@@ -74,10 +74,10 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             if (invoice.status !== "held")
                 return;
             this.htlcReceived(invoiceData, invoice).catch(e => this.swapLogger.error(invoiceData, "subscribeToInvoice(): Error calling htlcReceived(): ", e));
-            this.activeSubscriptions.delete(hash);
         }).catch(e => {
             this.swapLogger.error(invoiceData, "subscribeToInvoice(): error while waiting for invoice payment, invoice: " + invoiceData.pr, e);
-            //Delete from active subscription, the watchdog will re-subscribe later
+        }).finally(() => {
+            //Delete from active subscription, the watchdog will re-subscribe later if needed
             this.activeSubscriptions.delete(hash);
         });
         this.swapLogger.debug(invoiceData, "subscribeToInvoice(): Subscribed to invoice payment");
@@ -123,7 +123,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             //Cancel invoices
             try {
                 const paymentHash = swap.getIdentifierHash();
-                await this.lightning.cancelHodlInvoice(paymentHash);
+                await this.LightningAssertions.cancelInvoiceIdempotent(paymentHash);
                 this.unsubscribeInvoice(paymentHash);
                 this.swapLogger.info(swap, "cancelInvoices(): invoice cancelled!");
                 await this.removeSwapData(swap);
@@ -167,10 +167,16 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             return;
         await swap.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CANCELED);
         const paymentHash = swap.getIdentifierHash();
-        await this.lightning.cancelHodlInvoice(paymentHash);
-        this.unsubscribeInvoice(paymentHash);
-        await this.removeSwapData(swap);
-        this.swapLogger.info(swap, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", swap.pr);
+        try {
+            await this.LightningAssertions.cancelInvoiceIdempotent(paymentHash);
+            this.unsubscribeInvoice(paymentHash);
+            await this.removeSwapData(swap);
+            this.swapLogger.info(swap, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", swap.pr);
+        }
+        catch (e) {
+            await this.saveSwapData(swap);
+            throw e;
+        }
     }
     /**
      * Saves the state of received HTLC of the lightning payment
@@ -192,7 +198,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcReceived = Date.now();
             await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED);
-            await this.storageManager.saveData(invoice.id, null, invoiceData);
+            await this.saveSwapData(invoiceData);
         }
         if (invoiceData.state === FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED) {
             const balance = chainInterface.getBalance(signer.getAddress(), invoiceData.token);
@@ -222,12 +228,28 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                 return;
             const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTCLN_TRUSTED, invoiceData);
             if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
-                await this.cancelSwapAndInvoice(invoiceData);
+                try {
+                    await this.cancelSwapAndInvoice(invoiceData);
+                }
+                catch (e) { }
                 unlock();
                 throw {
                     code: 29999,
                     msg: pluginCheckResult.message
                 };
+            }
+            try {
+                await this.LightningAssertions.checkHtlcExpiry(invoice, this.config.minCltv);
+                if (invoiceData.metadata != null)
+                    invoiceData.metadata.times.htlcExpiryChecked = Date.now();
+            }
+            catch (e) {
+                try {
+                    await this.cancelSwapAndInvoice(invoiceData);
+                }
+                catch (e) { }
+                unlock();
+                throw e;
             }
             if (invoiceData.state !== FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED) {
                 unlock();
@@ -238,7 +260,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                 invoiceData.scSendTxs[txId] = rawTx;
                 if (invoiceData.state === FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.RECEIVED) {
                     await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.SENT);
-                    await this.storageManager.saveData(invoice.id, null, invoiceData);
+                    await this.saveSwapData(invoiceData);
                 }
             }).catch(e => this.swapLogger.error(invoiceData, "htlcReceived(): Error sending transfer txns", e));
             if (result == null) {
@@ -253,7 +275,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             else {
                 //Successfully paid
                 await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
+                await this.saveSwapData(invoiceData);
             }
             unlock();
             unlock = null;
@@ -278,8 +300,8 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             if (resultingState === "fail") {
                 //Cancel invoice
                 await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.REFUNDED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
-                await this.lightning.cancelHodlInvoice(invoice.id);
+                await this.saveSwapData(invoiceData);
+                await this.LightningAssertions.cancelInvoiceIdempotent(invoice.id);
                 this.unsubscribeInvoice(invoice.id);
                 await this.removeSwapData(invoiceData);
                 this.swapLogger.info(invoiceData, "htlcReceived(): transaction reverted, refunding lightning: ", invoiceData.pr);
@@ -292,7 +314,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                 //Successfully paid
                 invoiceData.txIds = { init: successTxId };
                 await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED);
-                await this.storageManager.saveData(invoice.id, null, invoiceData);
+                await this.saveSwapData(invoiceData);
             }
         }
         if (invoiceData.state === FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED) {
@@ -452,7 +474,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;
             await PluginManager_1.PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(hash.toString("hex"), null, createdSwap);
+            await this.saveSwapData(createdSwap);
             this.subscribeToInvoice(createdSwap);
             this.swapLogger.info(createdSwap, "REST: /createInvoice: Created swap invoice: " + hodlInvoice.request + " amount: " + amountBD.toString(10));
             res.status(200).json({

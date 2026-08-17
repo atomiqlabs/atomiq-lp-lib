@@ -17,6 +17,8 @@ class SwapHandlerSwap extends base_1.Lockable {
     constructor(obj, swapFee, swapFeeInToken) {
         super();
         this.txIds = {};
+        //Flag to mark the swap as already removed
+        this.removed = false;
         if (typeof (obj) === "string" && typeof (swapFee) === "bigint" && typeof (swapFeeInToken) === "bigint") {
             this.chainIdentifier = obj;
             this.swapFee = swapFee;

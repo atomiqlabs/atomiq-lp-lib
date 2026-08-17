@@ -119,5 +119,29 @@ class LightningAssertions {
             };
         }
     }
+    async settleInvoiceIdempotent(paymentHash, secret) {
+        try {
+            await this.lightning.settleHodlInvoice(secret);
+        }
+        catch (e) {
+            const invoice = await this.lightning.getInvoice(paymentHash);
+            if (invoice != null && invoice.status === "confirmed") {
+                return;
+            }
+            throw e;
+        }
+    }
+    async cancelInvoiceIdempotent(paymentHash) {
+        try {
+            await this.lightning.cancelHodlInvoice(paymentHash);
+        }
+        catch (e) {
+            const invoice = await this.lightning.getInvoice(paymentHash);
+            if (invoice != null && invoice.status === "canceled") {
+                return;
+            }
+            throw e;
+        }
+    }
 }
 exports.LightningAssertions = LightningAssertions;

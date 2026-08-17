@@ -138,7 +138,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             }
         }
         //Sanity check for sent swaps
-        if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENT) {
+        if (swap.state === ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENDING || swap.state === ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENT) {
             const isCommited = await swapContract.isCommited(swap.data);
             if (!isCommited) {
                 const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
@@ -149,7 +149,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     swap.txIds.claim = await status.getClaimTxId();
                     await this.removeSwapData(swap, ToBtcSwapAbs_1.ToBtcSwapState.CLAIMED);
                 }
-                else if (status.type === base_1.SwapCommitStateType.EXPIRED || status.type === base_1.SwapCommitStateType.NOT_COMMITED) {
+                else if (status.type === base_1.SwapCommitStateType.EXPIRED) {
                     this.swapLogger.warn(swap, "processPastSwap(state=BTC_SENT): swap expired and refunded, but bitcoin was probably already sent, txId: " + swap.txId + " address: " + swap.address);
                     this.unsubscribePayment(swap);
                     swap.txIds ?? (swap.txIds = {});
@@ -250,6 +250,10 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     subscribeToPayment(payment) {
         this.swapLogger.info(payment, "subscribeToPayment(): subscribing to swap, txId: " + payment.txId + " address: " + payment.address);
         this.activeSubscriptions[payment.txId] = payment;
+        for (let txId in payment.pastTxIds) {
+            this.swapLogger.info(payment, "subscribeToPayment(): subscribing swap, txId: " + txId + " address: " + payment.address);
+            this.activeSubscriptions[txId] = payment;
+        }
     }
     unsubscribePayment(payment) {
         if (payment.txId != null) {

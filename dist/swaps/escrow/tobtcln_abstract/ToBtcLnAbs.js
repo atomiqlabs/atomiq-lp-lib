@@ -31,7 +31,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         this.config.minLnBaseFee = this.config.minLnBaseFee || 5n;
         this.config.exactInExpiry = this.config.exactInExpiry || 10 * 1000;
         this.config.lnSendBitcoinBlockTimeSafetyFactorPPM = this.config.lnSendBitcoinBlockTimeSafetyFactorPPM ?? (this.config.safetyFactor * 1000000n);
-        if (this.config.lnSendBitcoinBlockTimeSafetyFactorPPM <= 1250000n) {
+        if (this.config.lnSendBitcoinBlockTimeSafetyFactorPPM < 1250000n) {
             throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
         this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.config.minSendCltv * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
@@ -180,7 +180,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 swap.secret = lnPaymentStatus.secret;
                 if (lnPaymentStatus.feeMtokens != null)
                     swap.setRealNetworkFee(lnPaymentStatus.feeMtokens / 1000n);
-                this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: " + swap.secret + " realRoutingFee: " + swap.realNetworkFee.toString(10) + " invoice: " + swap.pr);
+                this.swapLogger.info(swap, "processPaymentResult(): invoice paid, secret: " + swap.secret + " realRoutingFee: " + swap.realNetworkFee?.toString(10) + " invoice: " + swap.pr);
                 await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.PAID);
                 await this.saveSwapData(swap);
                 const success = await this.tryClaimSwap(swap);
@@ -849,7 +849,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         }));
         const getRefundAuthorization = (0, Utils_1.expressHandlerWrapper)(async (req, res) => {
             /**
-             * paymentHash: string          Identifier of the swap
+             * paymentHash: string          Identifier of the swap, can be either a payment hash of the lightning
+             *                               network invoice, or an escrow hash of the created escrow
              * sequence: BN                 Sequence identifier of the swap
              */
             const parsedBody = (0, SchemaVerifier_1.verifySchema)({ ...req.body, ...req.query }, {
@@ -918,7 +919,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                     return;
                 }
             }
-            const payment = await this.lightning.getPayment(parsedBody.paymentHash);
+            const payment = await this.lightning.getPayment(data?.lnPaymentHash ?? parsedBody.paymentHash);
             if (payment == null)
                 throw {
                     _httpStatus: 200,

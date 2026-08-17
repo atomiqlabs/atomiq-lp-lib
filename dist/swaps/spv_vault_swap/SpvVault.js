@@ -135,13 +135,22 @@ class SpvVault extends base_1.Lockable {
             //Add the original to the replaced txs
             this.addToReplacedWithdrawals(this.data.getWithdrawalCount() + i + 1, backup[i]);
         }
+        //Also purge the current newPendingWithdrawalData from the replacedWithdrawals
+        for (let value of this.replacedWithdrawals.values()) {
+            newPendingWithdrawalData.forEach(newTx => value.delete(newTx.getTxId()));
+        }
     }
     toRawAmounts(amounts) {
         return amounts.map((amt, index) => {
+            if (amt < 0n)
+                throw new Error("Amount cannot be negative!");
             const tokenData = this.data.getTokenData()[index];
             if (tokenData == null)
                 throw new Error("Amount index out of bounds!");
-            return amt / tokenData.multiplier;
+            const result = amt / tokenData.multiplier;
+            if (result < 0n || result >= 2n ** 64n)
+                throw new Error("Amount too large to be represented as uint64 after multiplier scaling!");
+            return result;
         });
     }
     fromRawAmounts(rawAmounts) {

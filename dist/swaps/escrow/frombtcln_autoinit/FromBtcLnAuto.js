@@ -86,7 +86,10 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     const paymentHashHex = paymentHash.toString("hex");
                     if (swap.lnPaymentHash !== paymentHashHex) {
                         //TODO: Possibly fatal failure
-                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=TXS_SENT|COMMITED): onchainStatus=PAID, Invalid swap secret specified: " + secretHex + " for paymentHash: " + paymentHashHex);
+                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=TXS_SENT|COMMITED): onchainStatus=PAID, Invalid swap secret specified: " + secretHex
+                            + " with hash: " + paymentHashHex
+                            + " expected paymentHash: " + swap.lnPaymentHash
+                            + " swap invoice: " + swap.pr);
                         return null;
                     }
                     swap.secret = secretHex;
@@ -116,14 +119,30 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 }
                 else {
                     if (await swapContract.isExpired(signer.getAddress(), swap.data)) {
-                        this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: " + swap.pr);
-                        return "REFUND";
+                        if (await swapContract.isCommited(swap.data)) {
+                            this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: " + swap.pr);
+                            return "REFUND";
+                        }
+                        else {
+                            //Expired and not committed, we can remove the swap as refunded
+                            await this.removeSwapData(swap, FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.REFUNDED);
+                        }
                     }
                 }
             }
             if (onchainStatus.type === base_1.SwapCommitStateType.REFUNDABLE) {
                 this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: " + swap.pr);
                 return "REFUND";
+            }
+        }
+        if (swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.REFUNDED) {
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state = swap.state;
+            if (onchainStatus.type === base_1.SwapCommitStateType.NOT_COMMITED || onchainStatus.type === base_1.SwapCommitStateType.EXPIRED) {
+                if (state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.REFUNDED) {
+                    //Explicitly don't cancel the invoice
+                    await this.removeSwapData(swap, FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.REFUNDED);
+                }
             }
         }
         if (swap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CLAIMED)
@@ -142,6 +161,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                 await swapContract.refund(signer, refundSwap.data, true, false, { waitForConfirmation: true });
                 this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: " + refundSwap.pr);
                 await refundSwap.setState(FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
             }
             catch (e) {
                 this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
@@ -152,7 +172,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     async settleInvoices(swaps) {
         for (let swap of swaps) {
             try {
-                await this.lightning.settleHodlInvoice(swap.secret);
+                await this.LightningAssertions.settleInvoiceIdempotent(swap.lnPaymentHash, swap.secret);
                 if (swap.metadata != null)
                     swap.metadata.times.htlcSettled = Date.now();
                 await this.removeSwapData(swap, FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.SETTLED);
@@ -179,6 +199,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                     FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.COMMITED,
                     FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CLAIMED,
                     FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CANCELED,
+                    FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.REFUNDED
                 ]
             }
         ]);
@@ -216,7 +237,10 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         const paymentHashHex = paymentHash.toString("hex");
         if (savedSwap.lnPaymentHash !== paymentHashHex) {
             //TODO: Possibly fatal failure
-            this.swapLogger.error(savedSwap, "FATAL: SC: ClaimEvent: invalid swap secret specified: " + secretHex + " for paymentHash: " + paymentHashHex);
+            this.swapLogger.error(savedSwap, "FATAL: SC: ClaimEvent: invalid swap secret specified: " + secretHex
+                + " with hash: " + paymentHashHex
+                + " expected paymentHash: " + savedSwap.lnPaymentHash
+                + " swap invoice: " + savedSwap.pr);
             return;
         }
         this.swapLogger.info(savedSwap, "SC: ClaimEvent: swap HTLC successfully claimed by the client, invoice: " + savedSwap.pr);
@@ -227,7 +251,7 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
         }
         if (savedSwap.state === FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CLAIMED)
             try {
-                await this.lightning.settleHodlInvoice(secretHex);
+                await this.LightningAssertions.settleInvoiceIdempotent(savedSwap.lnPaymentHash, secretHex);
                 this.swapLogger.info(savedSwap, "SC: ClaimEvent: invoice settled, secret: " + secretHex);
                 if (savedSwap.metadata != null)
                     savedSwap.metadata.times.htlcSettled = Date.now();
@@ -451,17 +475,12 @@ class FromBtcLnAuto extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
     async cancelSwapAndInvoice(invoiceData) {
         await invoiceData.setState(FromBtcLnAutoSwap_1.FromBtcLnAutoSwapState.CANCELED);
         try {
-            await this.lightning.cancelHodlInvoice(invoiceData.lnPaymentHash);
+            await this.LightningAssertions.cancelInvoiceIdempotent(invoiceData.lnPaymentHash);
             await this.removeSwapData(invoiceData);
             this.swapLogger.info(invoiceData, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", invoiceData.pr);
         }
         catch (e) {
-            const invoice = await this.lightning.getInvoice(invoiceData.lnPaymentHash);
-            if (invoice.status === "canceled") {
-                await this.removeSwapData(invoiceData);
-                this.swapLogger.info(invoiceData, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", invoiceData.pr);
-                return;
-            }
+            await this.saveSwapData(invoiceData);
             throw e;
         }
     }
