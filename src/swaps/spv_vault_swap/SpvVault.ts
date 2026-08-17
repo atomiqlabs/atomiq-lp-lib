@@ -1,4 +1,5 @@
 import {
+    isSpvVaultClaimEvent, isSpvVaultCloseEvent,
     Lockable,
     SpvVaultClaimEvent,
     SpvVaultCloseEvent,
@@ -68,15 +69,15 @@ export class SpvVault<
     }
 
     update(event: SpvVaultOpenEvent | SpvVaultDepositEvent | SpvVaultCloseEvent | SpvVaultClaimEvent): void {
-        if(event instanceof SpvVaultClaimEvent || event instanceof SpvVaultCloseEvent) {
+        if(isSpvVaultClaimEvent(event) || isSpvVaultCloseEvent(event)) {
             const processedWithdrawalIndex = this.pendingWithdrawals.findIndex(val => val.btcTx.txid === event.btcTxId);
             if(processedWithdrawalIndex!==-1) this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
-            if(event instanceof SpvVaultClaimEvent) {
+            if(isSpvVaultClaimEvent(event)) {
                 for(let key of this.replacedWithdrawals.keys()) {
                     if(key<=event.withdrawCount) this.replacedWithdrawals.delete(key);
                 }
             }
-            if(event instanceof SpvVaultCloseEvent) {
+            if(isSpvVaultCloseEvent(event)) {
                 this.replacedWithdrawals.clear();
             }
         }

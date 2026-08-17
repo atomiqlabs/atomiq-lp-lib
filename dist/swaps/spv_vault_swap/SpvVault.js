@@ -39,17 +39,17 @@ class SpvVault extends base_1.Lockable {
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
     update(event) {
-        if (event instanceof base_1.SpvVaultClaimEvent || event instanceof base_1.SpvVaultCloseEvent) {
+        if ((0, base_1.isSpvVaultClaimEvent)(event) || (0, base_1.isSpvVaultCloseEvent)(event)) {
             const processedWithdrawalIndex = this.pendingWithdrawals.findIndex(val => val.btcTx.txid === event.btcTxId);
             if (processedWithdrawalIndex !== -1)
                 this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
-            if (event instanceof base_1.SpvVaultClaimEvent) {
+            if ((0, base_1.isSpvVaultClaimEvent)(event)) {
                 for (let key of this.replacedWithdrawals.keys()) {
                     if (key <= event.withdrawCount)
                         this.replacedWithdrawals.delete(key);
                 }
             }
-            if (event instanceof base_1.SpvVaultCloseEvent) {
+            if ((0, base_1.isSpvVaultCloseEvent)(event)) {
                 this.replacedWithdrawals.clear();
             }
         }

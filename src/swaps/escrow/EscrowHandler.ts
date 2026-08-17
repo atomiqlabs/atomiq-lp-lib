@@ -1,6 +1,15 @@
 import {SwapBaseConfig, SwapHandler} from "../SwapHandler";
 import {
-    ChainEvent, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent,
+    ChainEvent,
+    ChainSwapType,
+    ClaimEvent,
+    InitializeEvent,
+    isChainEvent,
+    isClaimEvent,
+    isInitializeEvent,
+    isRefundEvent,
+    isSwapEvent,
+    RefundEvent,
     SwapData,
     SwapEvent
 } from "@atomiqlabs/base";
@@ -41,7 +50,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
         if(this.swapType==null) return true;
 
         for(let event of eventData) {
-            if(event instanceof InitializeEvent) {
+            if(isInitializeEvent(event)) {
                 if(event.swapType!==this.swapType) continue;
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if(swap==null) continue;
@@ -50,7 +59,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
                 if(swap.metadata!=null) swap.metadata.times.initTxReceived = Date.now();
 
                 await this.processInitializeEvent(chainIdentifier, swap, event);
-            } else if(event instanceof ClaimEvent) {
+            } else if(isClaimEvent(event)) {
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if(swap==null) continue;
 
@@ -58,7 +67,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
                 if(swap.metadata!=null) swap.metadata.times.claimTxReceived = Date.now();
 
                 await this.processClaimEvent(chainIdentifier, swap, event);
-            } else if(event instanceof RefundEvent) {
+            } else if(isRefundEvent(event)) {
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if(swap==null) continue;
 
@@ -117,7 +126,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
     }
 
     protected getIdentifierFromEvent(event: SwapEvent<SwapData>): string {
-        if(event instanceof SwapEvent) {
+        if(isSwapEvent(event)) {
             const foundSwap = this.escrowHashMap.get(event.escrowHash);
             if(foundSwap!=null) {
                 return foundSwap.getIdentifier();
@@ -135,7 +144,7 @@ export abstract class EscrowHandler<V extends EscrowHandlerSwap<SwapData, S>, S>
         if(swap instanceof SwapHandlerSwap) {
             return swap.getIdentifier();
         }
-        if(swap instanceof ChainEvent) {
+        if(isChainEvent(swap)) {
             return this.getIdentifierFromEvent(swap);
         }
         return this.getIdentifierFromSwapData(swap);

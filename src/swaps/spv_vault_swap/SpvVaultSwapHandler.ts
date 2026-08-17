@@ -5,6 +5,11 @@ import {
     BitcoinRpc,
     BtcBlock,
     ChainEvent,
+    isSpvVaultClaimEvent,
+    isSpvVaultCloseEvent,
+    isSpvVaultDepositEvent,
+    isSpvVaultEvent,
+    isSpvVaultOpenEvent,
     IStorageManager,
     SpvVaultClaimEvent,
     SpvVaultCloseEvent,
@@ -195,16 +200,16 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
      */
     protected async processEvent(chainIdentifier: string, eventData: ChainEvent<SwapData>[]): Promise<boolean> {
         for(let event of eventData) {
-            if(!(event instanceof SpvVaultEvent)) continue;
+            if(!isSpvVaultEvent(event)) continue;
 
             const vault = await this.Vaults.getVault(chainIdentifier, event.owner, event.vaultId);
             if(vault==null) continue;
 
-            if(event instanceof SpvVaultOpenEvent) {
+            if(isSpvVaultOpenEvent(event)) {
                 await this.Vaults.processOpenEvent(vault, event);
-            } else if(event instanceof SpvVaultCloseEvent) {
+            } else if(isSpvVaultCloseEvent(event)) {
                 await this.Vaults.processCloseEvent(vault, event);
-            } else if(event instanceof SpvVaultClaimEvent) {
+            } else if(isSpvVaultClaimEvent(event)) {
                 const swap = this.btcTxIdIndex.get(event.btcTxId);
 
                 if(swap!=null) {
@@ -214,7 +219,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
                 await this.Vaults.processClaimEvent(vault, swap, event);
                 await this.processClaimEvent(swap, event);
-            } else if(event instanceof SpvVaultDepositEvent) {
+            } else if(isSpvVaultDepositEvent(event)) {
                 await this.Vaults.processDepositEvent(vault, event);
             }
         }

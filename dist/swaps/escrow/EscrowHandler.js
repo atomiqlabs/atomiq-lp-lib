@@ -26,7 +26,7 @@ class EscrowHandler extends SwapHandler_1.SwapHandler {
         if (this.swapType == null)
             return true;
         for (let event of eventData) {
-            if (event instanceof base_1.InitializeEvent) {
+            if ((0, base_1.isInitializeEvent)(event)) {
                 if (event.swapType !== this.swapType)
                     continue;
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
@@ -37,7 +37,7 @@ class EscrowHandler extends SwapHandler_1.SwapHandler {
                     swap.metadata.times.initTxReceived = Date.now();
                 await this.processInitializeEvent(chainIdentifier, swap, event);
             }
-            else if (event instanceof base_1.ClaimEvent) {
+            else if ((0, base_1.isClaimEvent)(event)) {
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if (swap == null)
                     continue;
@@ -46,7 +46,7 @@ class EscrowHandler extends SwapHandler_1.SwapHandler {
                     swap.metadata.times.claimTxReceived = Date.now();
                 await this.processClaimEvent(chainIdentifier, swap, event);
             }
-            else if (event instanceof base_1.RefundEvent) {
+            else if ((0, base_1.isRefundEvent)(event)) {
                 const swap = this.getSwapByEscrowHash(chainIdentifier, event.escrowHash);
                 if (swap == null)
                     continue;
@@ -100,7 +100,7 @@ class EscrowHandler extends SwapHandler_1.SwapHandler {
         return this.escrowHashMap.get(chainIdentifier + "_" + escrowHash);
     }
     getIdentifierFromEvent(event) {
-        if (event instanceof base_1.SwapEvent) {
+        if ((0, base_1.isSwapEvent)(event)) {
             const foundSwap = this.escrowHashMap.get(event.escrowHash);
             if (foundSwap != null) {
                 return foundSwap.getIdentifier();
@@ -117,7 +117,7 @@ class EscrowHandler extends SwapHandler_1.SwapHandler {
         if (swap instanceof SwapHandlerSwap_1.SwapHandlerSwap) {
             return swap.getIdentifier();
         }
-        if (swap instanceof base_1.ChainEvent) {
+        if ((0, base_1.isChainEvent)(swap)) {
             return this.getIdentifierFromEvent(swap);
         }
         return this.getIdentifierFromSwapData(swap);

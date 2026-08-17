@@ -106,18 +106,18 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
      */
     async processEvent(chainIdentifier, eventData) {
         for (let event of eventData) {
-            if (!(event instanceof base_1.SpvVaultEvent))
+            if (!(0, base_1.isSpvVaultEvent)(event))
                 continue;
             const vault = await this.Vaults.getVault(chainIdentifier, event.owner, event.vaultId);
             if (vault == null)
                 continue;
-            if (event instanceof base_1.SpvVaultOpenEvent) {
+            if ((0, base_1.isSpvVaultOpenEvent)(event)) {
                 await this.Vaults.processOpenEvent(vault, event);
             }
-            else if (event instanceof base_1.SpvVaultCloseEvent) {
+            else if ((0, base_1.isSpvVaultCloseEvent)(event)) {
                 await this.Vaults.processCloseEvent(vault, event);
             }
-            else if (event instanceof base_1.SpvVaultClaimEvent) {
+            else if ((0, base_1.isSpvVaultClaimEvent)(event)) {
                 const swap = this.btcTxIdIndex.get(event.btcTxId);
                 if (swap != null) {
                     swap.txIds.claim = event.meta?.txId;
@@ -127,7 +127,7 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 await this.Vaults.processClaimEvent(vault, swap, event);
                 await this.processClaimEvent(swap, event);
             }
-            else if (event instanceof base_1.SpvVaultDepositEvent) {
+            else if ((0, base_1.isSpvVaultDepositEvent)(event)) {
                 await this.Vaults.processDepositEvent(vault, event);
             }
         }
