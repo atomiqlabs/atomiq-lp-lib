@@ -367,11 +367,11 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
         }
 
         if(invoiceData.state===FromBtcLnTrustedSwapState.CONFIRMED) {
-            await this.lightning.settleHodlInvoice(invoiceData.secret);
+            const paymentHash = invoiceData.getIdentifierHash();
+            await this.LightningAssertions.settleInvoiceIdempotent(paymentHash, invoiceData.secret);
 
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcSettled = Date.now();
 
-            const paymentHash = invoiceData.getIdentifierHash();
             this.processedTxIds.set(paymentHash, invoiceData.txIds.init);
             await invoiceData.setState(FromBtcLnTrustedSwapState.SETTLED);
 
