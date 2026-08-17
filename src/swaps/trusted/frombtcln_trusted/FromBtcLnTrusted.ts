@@ -319,8 +319,12 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                 };
             } else {
                 //Successfully paid
-                await invoiceData.setState(FromBtcLnTrustedSwapState.CONFIRMED);
-                await this.saveSwapData(invoiceData);
+                try {
+                    await invoiceData.setState(FromBtcLnTrustedSwapState.CONFIRMED);
+                    await this.saveSwapData(invoiceData);
+                } finally {
+                    unlock();
+                }
             }
 
             unlock();
