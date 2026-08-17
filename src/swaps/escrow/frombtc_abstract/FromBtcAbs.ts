@@ -22,6 +22,7 @@ import {ServerParamEncoder} from "../../../utils/paramcoders/server/ServerParamE
 import {FromBtcBaseConfig, FromBtcBaseSwapHandler} from "../FromBtcBaseSwapHandler";
 import {IBitcoinWallet} from "../../../wallets/IBitcoinWallet";
 import {isQuoteThrow} from "../../../plugins/IPlugin";
+import {FromBtcLnSwapState} from "../frombtcln_abstract/FromBtcLnSwapAbs";
 
 export type FromBtcConfig = FromBtcBaseConfig & {
     confirmations: number,
@@ -129,6 +130,17 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             await this.removeSwapData(swap, FromBtcSwapState.CANCELED);
             return false;
         }
+
+        if(swap.state===FromBtcSwapState.REFUNDED) {
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state: FromBtcSwapState = swap.state as FromBtcSwapState;
+            if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
+                if(state===FromBtcSwapState.REFUNDED) {
+                    this.swapLogger.info(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, removing swap!");
+                    await this.removeSwapData(swap, FromBtcSwapState.REFUNDED);
+                }
+            }
+        }
     }
 
     /**
@@ -141,7 +153,8 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 key: "state",
                 values: [
                     FromBtcSwapState.CREATED,
-                    FromBtcSwapState.COMMITED
+                    FromBtcSwapState.COMMITED,
+                    FromBtcSwapState.REFUNDED
                 ]
             }
         ]);
@@ -177,6 +190,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 this.swapLogger.info(refundSwap, "refundSwaps(): swap refunded, address: "+refundSwap.address);
                 //The swap should be removed by the event handler
                 await refundSwap.setState(FromBtcSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
             } catch (e) {
                 this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
             }
