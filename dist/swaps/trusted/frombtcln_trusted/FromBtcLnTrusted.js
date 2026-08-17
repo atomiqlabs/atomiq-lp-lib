@@ -96,7 +96,7 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             return true;
         const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
         const invoice = await this.lightning.getInvoice(parsedPR.id);
-        switch (invoice.status) {
+        switch (invoice?.status) {
             case "held":
                 try {
                     await this.htlcReceived(swap, invoice);
@@ -114,7 +114,8 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
                     await swap.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CANCELED);
                     return true;
                 }
-                this.subscribeToInvoice(swap);
+                if (invoice != null)
+                    this.subscribeToInvoice(swap);
                 return false;
         }
     }
@@ -274,8 +275,13 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             }
             else {
                 //Successfully paid
-                await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED);
-                await this.saveSwapData(invoiceData);
+                try {
+                    await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED);
+                    await this.saveSwapData(invoiceData);
+                }
+                finally {
+                    unlock();
+                }
             }
             unlock();
             unlock = null;
@@ -318,10 +324,10 @@ class FromBtcLnTrusted extends SwapHandler_1.SwapHandler {
             }
         }
         if (invoiceData.state === FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.CONFIRMED) {
-            await this.lightning.settleHodlInvoice(invoiceData.secret);
+            const paymentHash = invoiceData.getIdentifierHash();
+            await this.LightningAssertions.settleInvoiceIdempotent(paymentHash, invoiceData.secret);
             if (invoiceData.metadata != null)
                 invoiceData.metadata.times.htlcSettled = Date.now();
-            const paymentHash = invoiceData.getIdentifierHash();
             this.processedTxIds.set(paymentHash, invoiceData.txIds.init);
             await invoiceData.setState(FromBtcLnTrustedSwap_1.FromBtcLnTrustedSwapState.SETTLED);
             this.unsubscribeInvoice(paymentHash);

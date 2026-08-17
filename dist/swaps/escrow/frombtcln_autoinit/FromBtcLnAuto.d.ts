@@ -39,6 +39,7 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
     readonly LightningAssertions: LightningAssertions;
     readonly minCltv: bigint;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcLnAutoSwap>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: FromBtcLnAutoConfig);
+    private markSwapSettledFromCommitStatus;
     protected processPastSwap(swap: FromBtcLnAutoSwap): Promise<"REFUND" | "SETTLE" | null>;
     protected refundSwaps(refundSwaps: FromBtcLnAutoSwap[]): Promise<void>;
     protected settleInvoices(swaps: FromBtcLnAutoSwap[]): Promise<void>;

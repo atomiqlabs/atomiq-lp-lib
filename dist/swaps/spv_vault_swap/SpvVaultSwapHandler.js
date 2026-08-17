@@ -730,8 +730,11 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
                 };
             const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTC_SPV, swap);
             if ((0, IPlugin_1.isQuoteThrow)(pluginCheckResult)) {
-                if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED)
+                if (swap.state === SpvVaultSwap_1.SpvVaultSwapState.CREATED) {
                     await this.removeSwapData(swap, SpvVaultSwap_1.SpvVaultSwapState.FAILED);
+                    if (!swap.hasStickyAddress)
+                        await this.bitcoin.addUnusedAddress(swap.btcAddress);
+                }
                 throw {
                     code: 29999,
                     msg: pluginCheckResult.message
@@ -857,9 +860,14 @@ class SpvVaultSwapHandler extends SwapHandler_1.SwapHandler {
         };
     }
     async saveSwapData(swap) {
-        if (swap.btcTxId != null)
+        if (!swap.removed && swap.btcTxId != null)
             this.btcTxIdIndex.set(swap.btcTxId, swap);
-        return super.saveSwapData(swap);
+        await super.saveSwapData(swap);
+        if (swap.removed && swap.btcTxId != null) {
+            const cmpSwap = this.btcTxIdIndex.get(swap.btcTxId);
+            if (cmpSwap === swap)
+                this.btcTxIdIndex.delete(swap.btcTxId);
+        }
     }
     async removeSwapData(swap, ultimateState) {
         if (swap.btcTxId != null)

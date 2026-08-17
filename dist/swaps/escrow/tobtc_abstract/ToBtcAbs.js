@@ -49,6 +49,8 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
      * @param tx
      * @param swap
      * @param vout
+     *
+     * @returns boolean - whether a terminal state was reached and bitcoin txs should be unsubscribed
      */
     async tryClaimSwap(tx, swap, vout) {
         const { chainInterface, swapContract, signer, btcRelay } = this.getChain(swap.chainIdentifier);
@@ -80,6 +82,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 swap.txIds ?? (swap.txIds = {});
                 swap.txIds.refund = status.getRefundTxId == null ? null : await status.getRefundTxId();
                 await this.removeSwapData(swap, ToBtcSwapAbs_1.ToBtcSwapState.REFUNDED);
+                return true;
             }
             this.swapLogger.warn(swap, "tryClaimSwap(): tried to claim but escrow doesn't exist anymore," +
                 " status: " + status +
@@ -185,6 +188,13 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 .catch(e => this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e));
         }
     }
+    /**
+     * @param swap
+     * @param tx
+     * @protected
+     *
+     * @returns boolean - whether a terminal swap was reached and transaction subscriptions should be removed
+     */
     async processBtcTx(swap, tx) {
         tx.confirmations = tx.confirmations ?? 0;
         //Check transaction has enough confirmations
@@ -206,8 +216,7 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         }
         if (swap.metadata != null)
             swap.metadata.times.payTxConfirmed = Date.now();
-        const success = await this.tryClaimSwap(_tx, swap, vout.n);
-        return success;
+        return await this.tryClaimSwap(_tx, swap, vout.n);
     }
     /**
      * Checks active sent out bitcoin transactions
@@ -346,17 +355,28 @@ class ToBtcAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
             if (swap.metadata != null)
                 swap.metadata.times.paySignPSBT = Date.now();
             try {
-                this.swapLogger.debug(swap, "sendBitcoinPayment(): signed raw transaction: " + signResult.raw);
+                const txId = signResult.tx.id;
+                this.swapLogger.debug(swap, "sendBitcoinPayment(): signed BTC transaction id: " + txId);
                 //Save previous bitcoin tx
                 if (swap.txId != null && swap.btcRawTx != null) {
                     swap.pastTxIds[swap.txId] = swap.btcRawTx;
                 }
-                swap.txId = signResult.tx.id;
+                swap.txId = txId;
                 swap.btcRawTx = signResult.raw;
                 swap.setRealNetworkFee(BigInt(signResult.networkFee));
                 swap.sending = true;
                 await swap.setState(ToBtcSwapAbs_1.ToBtcSwapState.BTC_SENDING);
                 await this.saveSwapData(swap);
+            }
+            catch (e) {
+                swap.sending = false;
+                this.swapLogger.error(swap, "sendBitcoinPayment(): Failed to persist swap state, while sending bitcoin payout!");
+                throw {
+                    code: 90005,
+                    msg: "Failed to persist swap state!"
+                };
+            }
+            try {
                 await this.bitcoin.sendRawTransaction(signResult.raw);
                 swap.sending = false;
             }

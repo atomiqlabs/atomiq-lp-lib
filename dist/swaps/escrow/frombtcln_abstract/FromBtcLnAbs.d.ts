@@ -32,6 +32,7 @@ export declare class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAb
     readonly LightningAssertions: LightningAssertions;
     readonly minCltv: bigint;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcLnSwapAbs>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: FromBtcLnConfig);
+    private markSwapSettleFromCommitStatus;
     protected processPastSwap(swap: FromBtcLnSwapAbs): Promise<"REFUND" | "SETTLE" | "CANCEL" | null>;
     protected refundSwaps(refundSwaps: FromBtcLnSwapAbs[]): Promise<void>;
     protected cancelInvoices(swaps: FromBtcLnSwapAbs[]): Promise<void>;

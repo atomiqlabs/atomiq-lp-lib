@@ -30,14 +30,37 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             / this.config.bitcoinBlocktime, //Ceil division
         (0, Utils_1.getMinSafeBlockWindowFast)(this.config.safetyFactor));
     }
+    async markSwapSettleFromCommitStatus(swap, onchainStatus) {
+        //Extract the swap secret
+        if (swap.state !== FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED && swap.state !== FromBtcLnSwapAbs_1.FromBtcLnSwapState.SETTLED) {
+            const secretHex = await onchainStatus.getClaimResult();
+            const secret = Buffer.from(secretHex, "hex");
+            const paymentHash = (0, crypto_1.createHash)("sha256").update(secret).digest();
+            const paymentHashHex = paymentHash.toString("hex");
+            if (swap.lnPaymentHash !== paymentHashHex) {
+                //TODO: Possibly fatal failure
+                this.swapLogger.error(swap, "FATAL: processPastSwap(state=RECEIVED|COMMITED): onchainStatus=PAID, Invalid swap secret specified: " + secretHex
+                    + " with hash: " + paymentHashHex
+                    + " expected paymentHash: " + swap.lnPaymentHash
+                    + " swap invoice: " + swap.pr);
+                return true;
+            }
+            swap.secret = secretHex;
+            await swap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED);
+            await this.saveSwapData(swap);
+            this.swapLogger.warn(swap, "processPastSwap(state=RECEIVED|COMMITED): swap settled (detected from processPastSwap), invoice: " + swap.pr);
+            return true;
+        }
+        return false;
+    }
     async processPastSwap(swap) {
         const { swapContract, signer } = this.getChain(swap.chainIdentifier);
         if (swap.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.CREATED) {
             //Check if already paid
             const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
             const invoice = await this.lightning.getInvoice(parsedPR.id);
-            const isBeingPaid = invoice.status === "held";
-            if (!isBeingPaid) {
+            const cancelledOrUnpaid = invoice == null || invoice.status === "canceled" || invoice.status === "unpaid";
+            if (cancelledOrUnpaid) {
                 //Not paid
                 const isInvoiceExpired = parsedPR.expiryEpochMillis < Date.now();
                 if (!isInvoiceExpired)
@@ -60,26 +83,8 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
             const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
             const state = swap.state;
             if (onchainStatus.type === base_1.SwapCommitStateType.PAID) {
-                //Extract the swap secret
-                if (state !== FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED && state !== FromBtcLnSwapAbs_1.FromBtcLnSwapState.SETTLED) {
-                    const secretHex = await onchainStatus.getClaimResult();
-                    const secret = Buffer.from(secretHex, "hex");
-                    const paymentHash = (0, crypto_1.createHash)("sha256").update(secret).digest();
-                    const paymentHashHex = paymentHash.toString("hex");
-                    if (swap.lnPaymentHash !== paymentHashHex) {
-                        //TODO: Possibly fatal failure
-                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=RECEIVED|COMMITED): onchainStatus=PAID, Invalid swap secret specified: " + secretHex
-                            + " with hash: " + paymentHashHex
-                            + " expected paymentHash: " + swap.lnPaymentHash
-                            + " swap invoice: " + swap.pr);
-                        return null;
-                    }
-                    swap.secret = secretHex;
-                    await swap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED);
-                    await this.saveSwapData(swap);
-                    this.swapLogger.warn(swap, "processPastSwap(state=RECEIVED|COMMITED): swap settled (detected from processPastSwap), invoice: " + swap.pr);
+                if (await this.markSwapSettleFromCommitStatus(swap, onchainStatus))
                     return "SETTLE";
-                }
                 return null;
             }
             if (onchainStatus.type === base_1.SwapCommitStateType.COMMITED) {
@@ -133,7 +138,13 @@ class FromBtcLnAbs extends FromBtcBaseSwapHandler_1.FromBtcBaseSwapHandler {
                         await swap.setState(FromBtcLnSwapAbs_1.FromBtcLnSwapState.CANCELED);
                         await this.saveSwapData(swap);
                     }
+                    return null;
                 }
+            }
+            else if (onchainStatus.type === base_1.SwapCommitStateType.PAID) {
+                if (await this.markSwapSettleFromCommitStatus(swap, onchainStatus))
+                    return "SETTLE";
+                return null;
             }
         }
         if (swap.state === FromBtcLnSwapAbs_1.FromBtcLnSwapState.CLAIMED)

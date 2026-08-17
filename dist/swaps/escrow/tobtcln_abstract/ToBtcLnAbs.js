@@ -34,8 +34,8 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
         if (this.config.lnSendBitcoinBlockTimeSafetyFactorPPM < 1250000n) {
             throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
-        this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.config.minSendCltv * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
-        this.cltvDeltaLowerBound = (0, Utils_1.getMinSafeBlockWindowSlow)(Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1000000);
+        this.cltvDeltaLowerBound = (0, Utils_1.bigIntMax)(this.config.minSendCltv, (0, Utils_1.getMinSafeBlockWindowSlow)(Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1000000));
+        this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.cltvDeltaLowerBound * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1000000n);
     }
     /**
      * Cleans up exactIn authorization that are already past their expiry
@@ -328,7 +328,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 else
                     throw e;
             }
-            const unlock = swap.lock(120);
+            const unlock = swap.lock(Infinity);
             if (unlock == null)
                 return;
             await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED);
@@ -342,9 +342,16 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
                 if ((0, Utils_1.isDefinedRuntimeError)(e)) {
                     if (swap.metadata != null)
                         swap.metadata.payError = e;
-                    const payment = await this.lightning.getPayment(swap.lnPaymentHash);
-                    if (!unlock())
-                        return;
+                    const payment = await (0, base_1.tryWithRetries)(async () => {
+                        const payment = await this.lightning.getPayment(swap.lnPaymentHash);
+                        if (payment == null)
+                            throw "NOT FOUND";
+                        return payment;
+                    }, undefined, err => err !== "NOT FOUND").catch(err => {
+                        if (err === "NOT FOUND")
+                            return null;
+                        throw err;
+                    });
                     if (payment == null || payment.status === "failed") {
                         if (swap.state === ToBtcLnSwapAbs_1.ToBtcLnSwapState.COMMITED)
                             await swap.setState(ToBtcLnSwapAbs_1.ToBtcLnSwapState.NON_PAYABLE);
@@ -972,7 +979,7 @@ class ToBtcLnAbs extends ToBtcBaseSwapHandler_1.ToBtcBaseSwapHandler {
     }
     getInfoData() {
         return {
-            minCltv: Number(this.config.minSendCltv),
+            minCltv: Number(this.cltvDeltaLowerBound),
             minTimestampCltv: Number(this.minTsSendCltv)
         };
     }

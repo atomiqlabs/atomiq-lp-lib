@@ -48,15 +48,63 @@ class SpvVault extends base_1.Lockable {
         map.set(withdrawalData.getTxId(), withdrawalData);
     }
     update(event) {
+        if ((0, base_1.isSpvVaultCloseEvent)(event)) {
+            this.replacedWithdrawals.clear();
+            this.pendingWithdrawals.splice(0);
+            this.data.updateState(event);
+            this.balances = this.data.getBalances();
+            return;
+        }
         //Check if the transition is valid
         //Trip the data through deserializer, so we get new instance
         const clonedData = base_1.SpvVaultData.deserialize(this.data.serialize());
         clonedData.updateState(event);
-        let removedWithdrawals;
-        if ((0, base_1.isSpvVaultClaimEvent)(event) || (0, base_1.isSpvVaultCloseEvent)(event)) {
+        let removedWithdrawalsFront;
+        const originalValueMap = new Map();
+        let removedWithdrawalsBack;
+        if ((0, base_1.isSpvVaultClaimEvent)(event)) {
+            if (event.withdrawCount <= this.data.getWithdrawalCount())
+                return;
             const processedWithdrawalIndex = this.pendingWithdrawals.findIndex(val => val.btcTx.txid === event.btcTxId);
-            if (processedWithdrawalIndex !== -1)
-                removedWithdrawals = this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
+            if (processedWithdrawalIndex !== -1) {
+                removedWithdrawalsFront = this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
+            }
+            else {
+                //Search in replaced withdrawals
+                const foundWithdrawal = this.replacedWithdrawals.get(event.withdrawCount)?.get(event.btcTxId);
+                if (foundWithdrawal != null) {
+                    const difference = event.withdrawCount - this.data.getWithdrawalCount();
+                    removedWithdrawalsFront = this.pendingWithdrawals.splice(0, difference);
+                    //Re-check subsequent withdrawals
+                    let txId = foundWithdrawal.getTxId();
+                    for (let i = 0; i < this.pendingWithdrawals.length; i++) {
+                        const pendingWithdrawal = this.pendingWithdrawals[i];
+                        if (pendingWithdrawal.getSpentVaultUtxo().split(":")[0] === txId) {
+                            txId = pendingWithdrawal.getTxId();
+                            continue;
+                        }
+                        //Check in replaced withdrawals
+                        const respectiveGroup = this.replacedWithdrawals.get(event.withdrawCount + i + 1);
+                        let found = false;
+                        if (respectiveGroup != null)
+                            for (let replacedPendingWithdrawal of respectiveGroup.values()) {
+                                if (replacedPendingWithdrawal.getSpentVaultUtxo().split(":")[0] === txId) {
+                                    txId = replacedPendingWithdrawal.getTxId();
+                                    //And re-introduce this to pending withdrawals
+                                    originalValueMap.set(i, this.pendingWithdrawals[i]);
+                                    this.pendingWithdrawals[i] = replacedPendingWithdrawal;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        if (!found) {
+                            //End of the line, remove all the subsequent pending swaps
+                            removedWithdrawalsBack = this.pendingWithdrawals.splice(i);
+                            break;
+                        }
+                    }
+                }
+            }
         }
         //This throws if there is invalid withdrawal tx chain
         try {
@@ -64,8 +112,11 @@ class SpvVault extends base_1.Lockable {
         }
         catch (e) {
             //Roll-back pending withdrawals
-            if (removedWithdrawals != null)
-                this.pendingWithdrawals.unshift(...removedWithdrawals);
+            originalValueMap.forEach((value, index) => this.pendingWithdrawals[index] = value);
+            if (removedWithdrawalsFront != null)
+                this.pendingWithdrawals.unshift(...removedWithdrawalsFront);
+            if (removedWithdrawalsBack != null)
+                this.pendingWithdrawals.push(...removedWithdrawalsBack);
             throw e;
         }
         //Everything verified now
@@ -75,9 +126,6 @@ class SpvVault extends base_1.Lockable {
                 if (key <= event.withdrawCount)
                     this.replacedWithdrawals.delete(key);
             }
-        }
-        if ((0, base_1.isSpvVaultCloseEvent)(event)) {
-            this.replacedWithdrawals.clear();
         }
         //Apply state update for real and recalculate the balance
         this.data.updateState(event);

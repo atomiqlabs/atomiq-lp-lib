@@ -56,6 +56,8 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param tx
      * @param swap
      * @param vout
+     *
+     * @returns boolean - whether a terminal state was reached and bitcoin txs should be unsubscribed
      */
     private tryClaimSwap;
     protected processPastSwap(swap: ToBtcSwapAbs): Promise<void>;
@@ -63,6 +65,13 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * Checks past swaps, deletes ones that are already expired.
      */
     protected processPastSwaps(): Promise<void>;
+    /**
+     * @param swap
+     * @param tx
+     * @protected
+     *
+     * @returns boolean - whether a terminal swap was reached and transaction subscriptions should be removed
+     */
     protected processBtcTx(swap: ToBtcSwapAbs, tx: BtcTx): Promise<boolean>;
     /**
      * Checks active sent out bitcoin transactions
