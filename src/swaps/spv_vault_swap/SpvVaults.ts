@@ -83,7 +83,11 @@ export class SpvVaults {
         if(vault.state===SpvVaultState.OPENED) {
             vault.state = SpvVaultState.CLOSED;
         }
-        vault.update(event);
+        try {
+            vault.update(event);
+        } catch (e) {
+            this.logger.error("processCloseEvent(): Failed to update vault data with the close event, marking as CLOSED anyway!", e);
+        }
         await this.saveVault(vault);
     }
 
