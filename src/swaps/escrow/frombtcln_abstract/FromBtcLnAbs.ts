@@ -196,6 +196,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                         await swap.setState(FromBtcLnSwapState.CANCELED);
                         await this.saveSwapData(swap);
                     }
+                    return null;
                 }
             }
         }
