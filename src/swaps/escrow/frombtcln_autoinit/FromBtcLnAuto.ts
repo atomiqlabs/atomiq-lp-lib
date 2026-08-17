@@ -99,8 +99,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
             const invoice = await this.lightning.getInvoice(parsedPR.id);
 
-            const isBeingPaid = invoice.status==="held";
-            if(!isBeingPaid) {
+            const cancelledOrUnpaid = invoice==null || invoice.status==="canceled" || invoice.status==="unpaid";
+            if(cancelledOrUnpaid) {
                 //Not paid
                 const isInvoiceExpired = parsedPR.expiryEpochMillis<Date.now();
                 if(isInvoiceExpired) {
