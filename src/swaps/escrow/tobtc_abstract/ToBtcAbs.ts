@@ -108,6 +108,8 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
      * @param tx
      * @param swap
      * @param vout
+     *
+     * @returns boolean - whether a terminal state was reached and bitcoin txs should be unsubscribed
      */
     private async tryClaimSwap(tx: {blockhash: string, confirmations: number, txid: string, hex: string}, swap: ToBtcSwapAbs, vout: number): Promise<boolean> {
         const {chainInterface, swapContract, signer, btcRelay} = this.getChain(swap.chainIdentifier);
@@ -141,6 +143,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
                 swap.txIds ??= {};
                 swap.txIds.refund = status.getRefundTxId==null ? null : await status.getRefundTxId();
                 await this.removeSwapData(swap, ToBtcSwapState.REFUNDED);
+                return true;
             }
             this.swapLogger.warn(swap, "tryClaimSwap(): tried to claim but escrow doesn't exist anymore,"+
                 " status: "+status+
@@ -260,6 +263,13 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         }
     }
 
+    /**
+     * @param swap
+     * @param tx
+     * @protected
+     *
+     * @returns boolean - whether a terminal swap was reached and transaction subscriptions should be removed
+     */
     protected async processBtcTx(swap: ToBtcSwapAbs, tx: BtcTx): Promise<boolean> {
         tx.confirmations = tx.confirmations ?? 0;
 
@@ -285,9 +295,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
 
         if(swap.metadata!=null) swap.metadata.times.payTxConfirmed = Date.now();
 
-        const success = await this.tryClaimSwap(_tx, swap, vout.n);
-
-        return success;
+        return await this.tryClaimSwap(_tx, swap, vout.n);
     }
 
     /**
