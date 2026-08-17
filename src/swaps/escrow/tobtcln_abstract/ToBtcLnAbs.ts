@@ -9,7 +9,7 @@ import {
     InitializeEvent,
     RefundEvent,
     SwapCommitStateType,
-    SwapData
+    SwapData, tryWithRetries
 } from "@atomiqlabs/base";
 import {
     bigIntMax,
@@ -448,7 +448,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 } else throw e;
             }
 
-            const unlock = swap.lock(120);
+            const unlock = swap.lock(Infinity);
             if(unlock==null) return;
 
             await swap.setState(ToBtcLnSwapState.COMMITED);
@@ -459,8 +459,15 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
                 this.swapLogger.error(swap, "processInitialized(): lightning payment error", e);
                 if(isDefinedRuntimeError(e)) {
                     if(swap.metadata!=null) swap.metadata.payError = e;
-                    const payment = await this.lightning.getPayment(swap.lnPaymentHash);
-                    if(!unlock()) return;
+
+                    const payment: OutgoingLightningNetworkPayment | null = await tryWithRetries(async () => {
+                        const payment = await this.lightning.getPayment(swap.lnPaymentHash);
+                        if(payment==null) throw "NOT FOUND";
+                        return payment;
+                    }, undefined, err => err!=="NOT FOUND").catch(err => {
+                        if(err==="NOT FOUND") return null;
+                        throw err;
+                    });
                     if(payment==null || payment.status==="failed") {
                         if(swap.state as ToBtcLnSwapState === ToBtcLnSwapState.COMMITED)
                             await swap.setState(ToBtcLnSwapState.NON_PAYABLE);
