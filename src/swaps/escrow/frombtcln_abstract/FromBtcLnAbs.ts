@@ -10,12 +10,14 @@ import {
     InitializeEvent,
     RefundEvent,
     SwapCommitStateType,
-    SwapData
+    SwapData,
+    SwapPaidState
 } from "@atomiqlabs/base";
 import {
     bigIntMax,
     expressHandlerWrapper,
-    getAbortController, getMinSafeBlockWindowFast,
+    getAbortController,
+    getMinSafeBlockWindowFast,
     HEX_REGEX,
     isDefinedRuntimeError
 } from "../../../utils/Utils";
@@ -34,7 +36,6 @@ import {
 } from "../../../wallets/ILightningWallet";
 import {LightningAssertions} from "../../assertions/LightningAssertions";
 import {isQuoteThrow} from "../../../plugins/IPlugin";
-import {FromBtcLnAutoSwapState} from "../frombtcln_autoinit/FromBtcLnAutoSwap";
 
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
@@ -87,6 +88,34 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         );
     }
 
+    private async markSwapSettleFromCommitStatus(swap: FromBtcLnSwapAbs, onchainStatus: SwapPaidState): Promise<boolean> {
+        //Extract the swap secret
+        if(swap.state!==FromBtcLnSwapState.CLAIMED && swap.state!==FromBtcLnSwapState.SETTLED) {
+            const secretHex = await onchainStatus.getClaimResult();
+            const secret: Buffer = Buffer.from(secretHex, "hex");
+            const paymentHash: Buffer = createHash("sha256").update(secret).digest();
+            const paymentHashHex = paymentHash.toString("hex");
+
+            if (swap.lnPaymentHash!==paymentHashHex) {
+                //TODO: Possibly fatal failure
+                this.swapLogger.error(swap, "FATAL: processPastSwap(state=RECEIVED|COMMITED): onchainStatus=PAID, Invalid swap secret specified: "+secretHex
+                    +" with hash: "+paymentHashHex
+                    +" expected paymentHash: "+swap.lnPaymentHash
+                    +" swap invoice: "+swap.pr);
+                return true;
+            }
+
+            swap.secret = secretHex;
+            await swap.setState(FromBtcLnSwapState.CLAIMED);
+            await this.saveSwapData(swap);
+
+            this.swapLogger.warn(swap, "processPastSwap(state=RECEIVED|COMMITED): swap settled (detected from processPastSwap), invoice: "+swap.pr);
+
+            return true;
+        }
+        return false;
+    }
+
     protected async processPastSwap(swap: FromBtcLnSwapAbs): Promise<"REFUND" | "SETTLE" | "CANCEL" | null> {
         const {swapContract, signer} = this.getChain(swap.chainIdentifier);
         if(swap.state===FromBtcLnSwapState.CREATED) {
@@ -120,30 +149,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
             const state: FromBtcLnSwapState = swap.state as FromBtcLnSwapState;
             if(onchainStatus.type===SwapCommitStateType.PAID) {
-                //Extract the swap secret
-                if(state!==FromBtcLnSwapState.CLAIMED && state!==FromBtcLnSwapState.SETTLED) {
-                    const secretHex = await onchainStatus.getClaimResult();
-                    const secret: Buffer = Buffer.from(secretHex, "hex");
-                    const paymentHash: Buffer = createHash("sha256").update(secret).digest();
-                    const paymentHashHex = paymentHash.toString("hex");
-
-                    if (swap.lnPaymentHash!==paymentHashHex) {
-                        //TODO: Possibly fatal failure
-                        this.swapLogger.error(swap, "FATAL: processPastSwap(state=RECEIVED|COMMITED): onchainStatus=PAID, Invalid swap secret specified: "+secretHex
-                            +" with hash: "+paymentHashHex
-                            +" expected paymentHash: "+swap.lnPaymentHash
-                            +" swap invoice: "+swap.pr);
-                        return null;
-                    }
-
-                    swap.secret = secretHex;
-                    await swap.setState(FromBtcLnSwapState.CLAIMED);
-                    await this.saveSwapData(swap);
-
-                    this.swapLogger.warn(swap, "processPastSwap(state=RECEIVED|COMMITED): swap settled (detected from processPastSwap), invoice: "+swap.pr);
-
-                    return "SETTLE";
-                }
+                if(await this.markSwapSettleFromCommitStatus(swap, onchainStatus)) return "SETTLE";
                 return null;
             }
             if(onchainStatus.type===SwapCommitStateType.COMMITED) {
@@ -198,6 +204,9 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
                     }
                     return null;
                 }
+            } else if(onchainStatus.type===SwapCommitStateType.PAID) {
+                if(await this.markSwapSettleFromCommitStatus(swap, onchainStatus)) return "SETTLE";
+                return null;
             }
         }
 
