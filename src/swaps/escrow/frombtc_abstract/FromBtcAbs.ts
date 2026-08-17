@@ -138,6 +138,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 if(state===FromBtcSwapState.REFUNDED) {
                     this.swapLogger.info(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, removing swap!");
                     await this.removeSwapData(swap, FromBtcSwapState.REFUNDED);
+                    await this.bitcoin.addUnusedAddress(swap.address);
                 }
             }
         }
