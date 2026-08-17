@@ -333,6 +333,10 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
     protected subscribeToPayment(payment: ToBtcSwapAbs) {
         this.swapLogger.info(payment, "subscribeToPayment(): subscribing to swap, txId: "+payment.txId+" address: "+payment.address);
         this.activeSubscriptions[payment.txId] = payment;
+        for(let txId in payment.pastTxIds) {
+            this.swapLogger.info(payment, "subscribeToPayment(): subscribing swap, txId: "+txId+" address: "+payment.address);
+            this.activeSubscriptions[txId] = payment;
+        }
     }
 
     protected unsubscribePayment(payment: ToBtcSwapAbs) {
