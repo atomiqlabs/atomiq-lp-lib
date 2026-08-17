@@ -137,7 +137,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
         const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
         const invoice = await this.lightning.getInvoice(parsedPR.id);
 
-        switch (invoice.status) {
+        switch (invoice?.status) {
             case "held":
                 try {
                     await this.htlcReceived(swap, invoice);
@@ -154,7 +154,7 @@ export class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, FromBtcL
                     await swap.setState(FromBtcLnTrustedSwapState.CANCELED);
                     return true;
                 }
-                this.subscribeToInvoice(swap);
+                if(invoice!=null) this.subscribeToInvoice(swap);
                 return false;
         }
     }
