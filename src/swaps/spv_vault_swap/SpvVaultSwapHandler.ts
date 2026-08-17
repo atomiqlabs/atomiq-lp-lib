@@ -917,8 +917,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 swap
             );
             if(isQuoteThrow(pluginCheckResult)) {
-                if(swap.state===SpvVaultSwapState.CREATED)
+                if(swap.state===SpvVaultSwapState.CREATED) {
                     await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                    if(!swap.hasStickyAddress) await this.bitcoin.addUnusedAddress(swap.btcAddress);
+                }
                 throw {
                     code: 29999,
                     msg: pluginCheckResult.message
