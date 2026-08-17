@@ -12,6 +12,7 @@ import {
     SwapData
 } from "@atomiqlabs/base";
 import {
+    bigIntMax,
     expressHandlerWrapper,
     getAbortController,
     getMinSafeBlockWindowSlow,
@@ -133,11 +134,14 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
         if(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM < 1_250_000n) {
             throw new Error("Lightning network send block safety factor set below 1.25, this is insecure!");
         }
-        this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.config.minSendCltv * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1_000_000n);
 
-        this.cltvDeltaLowerBound = getMinSafeBlockWindowSlow(
-            Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1_000_000
+        this.cltvDeltaLowerBound = bigIntMax(
+            this.config.minSendCltv,
+            getMinSafeBlockWindowSlow(
+                Number(this.config.lnSendBitcoinBlockTimeSafetyFactorPPM) / 1_000_000
+            )
         );
+        this.minTsSendCltv = config.gracePeriod + (this.config.bitcoinBlocktime * this.cltvDeltaLowerBound * this.config.lnSendBitcoinBlockTimeSafetyFactorPPM / 1_000_000n);
     }
 
     /**
@@ -1231,7 +1235,7 @@ export class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToBtcLnSwap
 
     getInfoData(): any {
         return {
-            minCltv: Number(this.config.minSendCltv),
+            minCltv: Number(this.cltvDeltaLowerBound),
             minTimestampCltv: Number(this.minTsSendCltv)
         };
     }
