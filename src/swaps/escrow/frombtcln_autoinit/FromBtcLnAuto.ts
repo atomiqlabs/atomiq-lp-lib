@@ -188,6 +188,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                         } else {
                             //Expired and not committed, we can remove the swap as refunded
                             await this.removeSwapData(swap, FromBtcLnAutoSwapState.REFUNDED);
+                            return null;
                         }
                     }
                 }
@@ -205,6 +206,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                 if(state===FromBtcLnAutoSwapState.REFUNDED) {
                     //Explicitly don't cancel the invoice
                     await this.removeSwapData(swap, FromBtcLnAutoSwapState.REFUNDED);
+                    return null;
                 }
             }
         }
