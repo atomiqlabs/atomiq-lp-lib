@@ -32,27 +32,102 @@ class SpvVault extends base_1.Lockable {
             this.replacedWithdrawals = new Map();
             if (chainIdOrObj.replacedWithdrawals != null) {
                 chainIdOrObj.replacedWithdrawals.forEach((val) => {
-                    this.replacedWithdrawals.set(val[0], val[1].map((base_1.SpvWithdrawalTransactionData.deserialize)));
+                    this.replacedWithdrawals.set(val[0], new Map(val[1].map((raw) => {
+                        const withdrawTxData = base_1.SpvWithdrawalTransactionData.deserialize(raw);
+                        return [withdrawTxData.getTxId(), withdrawTxData];
+                    })));
                 });
             }
         }
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
+    addToReplacedWithdrawals(withdrawalIndex, withdrawalData) {
+        let map = this.replacedWithdrawals.get(withdrawalIndex);
+        if (map == null)
+            this.replacedWithdrawals.set(withdrawalIndex, map = new Map());
+        map.set(withdrawalData.getTxId(), withdrawalData);
+    }
     update(event) {
-        if ((0, base_1.isSpvVaultClaimEvent)(event) || (0, base_1.isSpvVaultCloseEvent)(event)) {
+        if ((0, base_1.isSpvVaultCloseEvent)(event)) {
+            this.replacedWithdrawals.clear();
+            this.pendingWithdrawals.splice(0);
+            this.data.updateState(event);
+            this.balances = this.data.getBalances();
+            return;
+        }
+        //Check if the transition is valid
+        //Trip the data through deserializer, so we get new instance
+        const clonedData = base_1.SpvVaultData.deserialize(this.data.serialize());
+        clonedData.updateState(event);
+        let removedWithdrawalsFront;
+        const originalValueMap = new Map();
+        let removedWithdrawalsBack;
+        if ((0, base_1.isSpvVaultClaimEvent)(event)) {
+            if (event.withdrawCount <= this.data.getWithdrawalCount())
+                return;
             const processedWithdrawalIndex = this.pendingWithdrawals.findIndex(val => val.btcTx.txid === event.btcTxId);
-            if (processedWithdrawalIndex !== -1)
-                this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
-            if ((0, base_1.isSpvVaultClaimEvent)(event)) {
-                for (let key of this.replacedWithdrawals.keys()) {
-                    if (key <= event.withdrawCount)
-                        this.replacedWithdrawals.delete(key);
+            if (processedWithdrawalIndex !== -1) {
+                removedWithdrawalsFront = this.pendingWithdrawals.splice(0, processedWithdrawalIndex + 1);
+            }
+            else {
+                //Search in replaced withdrawals
+                const foundWithdrawal = this.replacedWithdrawals.get(event.withdrawCount)?.get(event.btcTxId);
+                if (foundWithdrawal != null) {
+                    const difference = event.withdrawCount - this.data.getWithdrawalCount();
+                    removedWithdrawalsFront = this.pendingWithdrawals.splice(0, difference);
+                    //Re-check subsequent withdrawals
+                    let txId = foundWithdrawal.getTxId();
+                    for (let i = 0; i < this.pendingWithdrawals.length; i++) {
+                        const pendingWithdrawal = this.pendingWithdrawals[i];
+                        if (pendingWithdrawal.getSpentVaultUtxo().split(":")[0] === txId) {
+                            txId = pendingWithdrawal.getTxId();
+                            continue;
+                        }
+                        //Check in replaced withdrawals
+                        const respectiveGroup = this.replacedWithdrawals.get(event.withdrawCount + i + 1);
+                        let found = false;
+                        if (respectiveGroup != null)
+                            for (let replacedPendingWithdrawal of respectiveGroup.values()) {
+                                if (replacedPendingWithdrawal.getSpentVaultUtxo().split(":")[0] === txId) {
+                                    txId = replacedPendingWithdrawal.getTxId();
+                                    //And re-introduce this to pending withdrawals
+                                    originalValueMap.set(i, this.pendingWithdrawals[i]);
+                                    this.pendingWithdrawals[i] = replacedPendingWithdrawal;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        if (!found) {
+                            //End of the line, remove all the subsequent pending swaps
+                            removedWithdrawalsBack = this.pendingWithdrawals.splice(i);
+                            break;
+                        }
+                    }
                 }
             }
-            if ((0, base_1.isSpvVaultCloseEvent)(event)) {
-                this.replacedWithdrawals.clear();
+        }
+        //This throws if there is invalid withdrawal tx chain
+        try {
+            clonedData.calculateStateAfter(this.pendingWithdrawals);
+        }
+        catch (e) {
+            //Roll-back pending withdrawals
+            originalValueMap.forEach((value, index) => this.pendingWithdrawals[index] = value);
+            if (removedWithdrawalsFront != null)
+                this.pendingWithdrawals.unshift(...removedWithdrawalsFront);
+            if (removedWithdrawalsBack != null)
+                this.pendingWithdrawals.push(...removedWithdrawalsBack);
+            throw e;
+        }
+        //Everything verified now
+        //Handle replaced withdrawals and vault close events
+        if ((0, base_1.isSpvVaultClaimEvent)(event)) {
+            for (let key of this.replacedWithdrawals.keys()) {
+                if (key <= event.withdrawCount)
+                    this.replacedWithdrawals.delete(key);
             }
         }
+        //Apply state update for real and recalculate the balance
         this.data.updateState(event);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
     }
@@ -65,29 +140,65 @@ class SpvVault extends base_1.Lockable {
         const index = this.pendingWithdrawals.indexOf(withdrawalData);
         if (index === -1)
             return false;
-        this.pendingWithdrawals.splice(index, 1);
+        //We also have to remove all the subsequent withdrawals, otherwise the state calculation throws on discontinous chain
+        this.pendingWithdrawals.splice(index);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
         return true;
     }
+    //Must only be called on the latest pending withdrawal!
     doubleSpendPendingWithdrawal(withdrawalData) {
         const index = this.pendingWithdrawals.indexOf(withdrawalData);
         if (index === -1)
             return false;
+        if (index !== this.pendingWithdrawals.length - 1)
+            throw new Error("Cannot remove not-last pending withdrawal!");
         this.pendingWithdrawals.splice(index, 1);
         this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
-        const withdrawalIndex = this.data.getWithdrawalCount() + index + 1;
-        let arr = this.replacedWithdrawals.get(withdrawalIndex);
-        if (arr == null)
-            this.replacedWithdrawals.set(withdrawalIndex, arr = []);
-        arr.push(withdrawalData);
+        this.addToReplacedWithdrawals(this.data.getWithdrawalCount() + index + 1, withdrawalData);
         return true;
+    }
+    replacePendingWithdrawals(newPendingWithdrawalData) {
+        const backup = this.pendingWithdrawals.splice(0);
+        try {
+            newPendingWithdrawalData.forEach(newWithdrawal => this.addWithdrawal(newWithdrawal));
+        }
+        catch (e) {
+            //Roll-back the original backup
+            this.pendingWithdrawals.splice(0);
+            this.pendingWithdrawals.push(...backup);
+            this.balances = this.data.calculateStateAfter(this.pendingWithdrawals).balances;
+            throw e;
+        }
+        for (let i = 0; i < newPendingWithdrawalData.length; i++) {
+            const newWithdrawal = newPendingWithdrawalData[i];
+            if (backup[i] == null)
+                continue; //Nothing needs to be done
+            if (backup[i].getTxId() == newWithdrawal.getTxId())
+                continue; //Same transaction
+            //Different transaction, add the original to the replaced txs
+            this.addToReplacedWithdrawals(this.data.getWithdrawalCount() + i + 1, backup[i]);
+        }
+        //The replacement is actually shorter than the original
+        for (let i = newPendingWithdrawalData.length; i < backup.length; i++) {
+            //Add the original to the replaced txs
+            this.addToReplacedWithdrawals(this.data.getWithdrawalCount() + i + 1, backup[i]);
+        }
+        //Also purge the current newPendingWithdrawalData from the replacedWithdrawals
+        for (let value of this.replacedWithdrawals.values()) {
+            newPendingWithdrawalData.forEach(newTx => value.delete(newTx.getTxId()));
+        }
     }
     toRawAmounts(amounts) {
         return amounts.map((amt, index) => {
+            if (amt < 0n)
+                throw new Error("Amount cannot be negative!");
             const tokenData = this.data.getTokenData()[index];
             if (tokenData == null)
                 throw new Error("Amount index out of bounds!");
-            return amt / tokenData.multiplier;
+            const result = amt / tokenData.multiplier;
+            if (result < 0n || result >= 2n ** 64n)
+                throw new Error("Amount too large to be represented as uint64 after multiplier scaling!");
+            return result;
         });
     }
     fromRawAmounts(rawAmounts) {
@@ -107,7 +218,7 @@ class SpvVault extends base_1.Lockable {
     serialize() {
         const replacedWithdrawals = [];
         this.replacedWithdrawals.forEach((value, key) => {
-            replacedWithdrawals.push([key, value.map(val => val.serialize())]);
+            replacedWithdrawals.push([key, [...value.values()].map(val => val.serialize())]);
         });
         return {
             state: this.state,
@@ -137,6 +248,9 @@ class SpvVault extends base_1.Lockable {
         if (latestWithdrawal.btcTx.confirmations >= 1)
             return latestWithdrawal.btcTx.txid + ":0";
         return null;
+    }
+    getNextWithdrawalIndex() {
+        return this.data.getWithdrawalCount() + this.pendingWithdrawals.length + 1;
     }
     /**
      * Returns whether the vault is ready for the next swap

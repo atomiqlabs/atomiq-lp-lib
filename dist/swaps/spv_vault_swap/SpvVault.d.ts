@@ -12,7 +12,7 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
     readonly initialUtxo: string;
     readonly btcAddress: string;
     readonly pendingWithdrawals: D[];
-    readonly replacedWithdrawals: Map<number, D[]>;
+    readonly replacedWithdrawals: Map<number, Map<string, D>>;
     data: T;
     state: SpvVaultState;
     balances: SpvVaultTokenBalance[];
@@ -21,10 +21,12 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
     };
     constructor(chainId: string, vault: T, btcAddress: string);
     constructor(obj: any);
+    private addToReplacedWithdrawals;
     update(event: SpvVaultOpenEvent | SpvVaultDepositEvent | SpvVaultCloseEvent | SpvVaultClaimEvent): void;
     addWithdrawal(withdrawalData: D): void;
     removeWithdrawal(withdrawalData: D): boolean;
     doubleSpendPendingWithdrawal(withdrawalData: D): boolean;
+    replacePendingWithdrawals(newPendingWithdrawalData: D[]): void;
     toRawAmounts(amounts: bigint[]): bigint[];
     fromRawAmounts(rawAmounts: bigint[]): bigint[];
     /**
@@ -38,6 +40,7 @@ export declare class SpvVault<D extends SpvWithdrawalTransactionData = SpvWithdr
      * Returns the latest vault utxo
      */
     getLatestUtxo(): string;
+    getNextWithdrawalIndex(): number;
     /**
      * Returns whether the vault is ready for the next swap
      */

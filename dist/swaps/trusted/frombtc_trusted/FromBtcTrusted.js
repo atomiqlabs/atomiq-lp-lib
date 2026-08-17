@@ -33,7 +33,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
     async refundSwap(swap) {
         if (swap.state !== FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE) {
             await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE);
-            await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+            await this.saveSwapData(swap);
         }
         if (swap.refundAddress == null)
             return;
@@ -161,19 +161,19 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                 return;
             }
             await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED);
-            await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+            await this.saveSwapData(swap);
         }
         if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED) {
             //Check if transaction still exists
             if (tx == null || foundVout == null || tx.txid !== swap.txId) {
                 await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CREATED);
-                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                await this.saveSwapData(swap);
                 return;
             }
             //Check if it is confirmed
             if (tx.confirmations > 0) {
                 await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED);
-                await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                await this.saveSwapData(swap);
             }
             else {
                 //Check if it pays high enough fee AND has confirmed ancestors
@@ -190,7 +190,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                     swap.txSize = tx.vsize;
                     swap.txFee = fee;
                     await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                 }
                 else {
                     return;
@@ -246,7 +246,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
             if (swap.state !== FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED)
                 return;
             const txns = await chainInterface.txsTransfer(signer.getAddress(), swap.token, swap.adjustedOutput, swap.dstAddress);
-            let unlock = swap.lock(30 * 1000);
+            let unlock = swap.lock(30);
             if (unlock == null)
                 return;
             const pluginCheckResult = await PluginManager_1.PluginManager.onHandlePreFromBtcExecute(SwapHandler_1.SwapHandlerType.FROM_BTC_TRUSTED, swap);
@@ -265,7 +265,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                 swap.scRawTx = rawTx;
                 if (swap.state === FromBtcTrustedSwap_1.FromBtcTrustedSwapState.BTC_CONFIRMED) {
                     await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.SENT);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                 }
                 if (unlock != null)
                     unlock();
@@ -280,7 +280,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                     swap.txIds = { init: null };
                     swap.scRawTx = null;
                     await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                     break;
                 case "reverted":
                     //Cancel invoice
@@ -289,7 +289,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                     break;
                 case "success":
                     await swap.setState(FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CONFIRMED);
-                    await this.storageManager.saveData(swap.getIdentifierHash(), swap.getSequence(), swap);
+                    await this.saveSwapData(swap);
                     break;
             }
         }
@@ -308,7 +308,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcTrustedSwap_1.FromBtcTrustedSwapState.REFUNDABLE,
                     FromBtcTrustedSwap_1.FromBtcTrustedSwapState.CREATED,
                     FromBtcTrustedSwap_1.FromBtcTrustedSwapState.RECEIVED,
@@ -341,7 +341,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
                 await this.processPastSwap(swap, txs[0]?.tx, txs[0]?.vout);
             }
             catch (e) {
-                this.swapLogger.error(swap, "processPastSwaps(): Error ocurred while processing swap: ", e);
+                this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e);
             }
         }
     }
@@ -441,7 +441,7 @@ class FromBtcTrusted extends SwapHandler_1.SwapHandler {
             metadata.times.swapCreated = Date.now();
             createdSwap.metadata = metadata;
             await PluginManager_1.PluginManager.swapCreate(createdSwap);
-            await this.storageManager.saveData(createdSwap.getIdentifierHash(), createdSwap.getSequence(), createdSwap);
+            await this.saveSwapData(createdSwap);
             this.subscriptions.set(outputScript, createdSwap);
             this.swapLogger.info(createdSwap, "REST: /getAddress: Created swap address: " + createdSwap.btcAddress + " amount: " + amountBD.toString(10));
             res.status(200).json({

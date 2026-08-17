@@ -50,6 +50,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
 
     readonly token: string;
     readonly gasToken: string;
+    readonly withdrawalIndex?: number;
 
     btcTxId: string;
 
@@ -58,7 +59,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
 
     constructor(
         chainIdentifier: string, quoteId: string, expiry: number,
-        vault: SpvVault, vaultUtxo: string,
+        vault: SpvVault, vaultUtxo: string, withdrawalIndex: number,
         btcAddress: string, btcFeeRate: number, recipient: string, amountBtc: bigint, amountToken: bigint, amountGasToken: bigint,
         swapFee: bigint, swapFeeInToken: bigint,
         gasSwapFee: bigint, gasSwapFeeInToken: bigint,
@@ -68,7 +69,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     constructor(data: any);
     constructor(
         chainIdentifierOrObj: string | any, quoteId?: string, expiry?: number,
-        vault?: SpvVault, vaultUtxo?: string,
+        vault?: SpvVault, vaultUtxo?: string, withdrawalIndex?: number,
         btcAddress?: string, btcFeeRate?: number, recipient?: string, amountBtc?: bigint, amountToken?: bigint, amountGasToken?: bigint,
         swapFee?: bigint, swapFeeInToken?: bigint,
         gasSwapFee?: bigint, gasSwapFeeInToken?: bigint,
@@ -104,6 +105,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             this.tokenMultiplier = vault.data.getTokenData()[0].multiplier;
             this.gasToken = gasToken;
             this.gasTokenMultiplier = vault.data.getTokenData()[1].multiplier;
+            this.withdrawalIndex = withdrawalIndex;
         } else {
             super(chainIdentifierOrObj);
             this.quoteId = chainIdentifierOrObj.quoteId;
@@ -134,6 +136,7 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             this.btcTxId = chainIdentifierOrObj.btcTxId;
             this.hasStickyAddress = chainIdentifierOrObj.hasStickyAddress;
             this.saveStickyAddress = chainIdentifierOrObj.saveStickyAddress;
+            this.withdrawalIndex = chainIdentifierOrObj.withdrawalIndex;
         }
         this.type = SwapHandlerType.FROM_BTC_SPV;
     }
@@ -168,7 +171,8 @@ export class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
             gasTokenMultiplier: serializeBN(this.gasTokenMultiplier),
             btcTxId: this.btcTxId,
             hasStickyAddress: this.hasStickyAddress,
-            saveStickyAddress: this.saveStickyAddress
+            saveStickyAddress: this.saveStickyAddress,
+            withdrawalIndex: this.withdrawalIndex
         };
     }
 

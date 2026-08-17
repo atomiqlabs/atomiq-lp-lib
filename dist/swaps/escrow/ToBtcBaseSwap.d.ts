@@ -4,8 +4,8 @@ export declare abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = a
     amount: bigint;
     quotedNetworkFee: bigint;
     readonly quotedNetworkFeeInToken: bigint;
-    realNetworkFee: bigint;
-    realNetworkFeeInToken: bigint;
+    realNetworkFee?: bigint;
+    realNetworkFeeInToken?: bigint;
     protected constructor(chainIdentifier: string, amount: bigint, swapFee: bigint, swapFeeInToken: bigint, quotedNetworkFee: bigint, quotedNetworkFeeInToken: bigint);
     protected constructor(obj: any);
     serialize(): any;
@@ -29,8 +29,8 @@ export declare abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = a
      *  just represented here in both denomination for ease of use)
      */
     getRealNetworkFee(): {
-        inInputToken: bigint;
-        inOutputToken: bigint;
+        inInputToken?: bigint;
+        inOutputToken?: bigint;
     };
     getOutputAmount(): bigint;
 }

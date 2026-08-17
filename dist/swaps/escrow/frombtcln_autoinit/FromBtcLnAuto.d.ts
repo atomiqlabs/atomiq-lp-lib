@@ -9,7 +9,7 @@ import { ILightningWallet } from "../../../wallets/ILightningWallet";
 import { LightningAssertions } from "../../assertions/LightningAssertions";
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number;
-    minCltv: bigint;
+    destinationHtlcTimeoutSeconds: bigint;
     gracePeriod: bigint;
     gasTokenMax: {
         [chainId: string]: bigint;
@@ -37,7 +37,9 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
     readonly config: FromBtcLnAutoConfig;
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
+    readonly minCltv: bigint;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcLnAutoSwap>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: FromBtcLnAutoConfig);
+    private markSwapSettledFromCommitStatus;
     protected processPastSwap(swap: FromBtcLnAutoSwap): Promise<"REFUND" | "SETTLE" | null>;
     protected refundSwaps(refundSwaps: FromBtcLnAutoSwap[]): Promise<void>;
     protected settleInvoices(swaps: FromBtcLnAutoSwap[]): Promise<void>;
@@ -83,21 +85,6 @@ export declare class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoS
      * @param responseStream
      */
     private sendPublicKeyAsync;
-    /**
-     * Returns the CLTV timeout (blockheight) of the received HTLC corresponding to the invoice. If multiple HTLCs are
-     *  received (MPP) it returns the lowest of the timeouts
-     *
-     * @param invoice
-     */
-    private getInvoicePaymentsTimeout;
-    /**
-     * Checks if the received HTLC's CLTV timeout is large enough to still process the swap
-     *
-     * @param invoice
-     * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     * @returns expiry timeout in seconds
-     */
-    private checkHtlcExpiry;
     /**
      * Cancels the swap (CANCELED state) & also cancels the LN invoice (including all pending HTLCs)
      *

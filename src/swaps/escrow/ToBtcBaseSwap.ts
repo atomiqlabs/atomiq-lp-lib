@@ -8,8 +8,8 @@ export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> exte
 
     quotedNetworkFee: bigint;
     readonly quotedNetworkFeeInToken: bigint;
-    realNetworkFee: bigint;
-    realNetworkFeeInToken: bigint;
+    realNetworkFee?: bigint;
+    realNetworkFeeInToken?: bigint;
 
     protected constructor(chainIdentifier: string, amount: bigint, swapFee: bigint, swapFeeInToken: bigint, quotedNetworkFee: bigint, quotedNetworkFeeInToken: bigint);
     protected constructor(obj: any);
@@ -75,7 +75,7 @@ export abstract class ToBtcBaseSwap<T extends SwapData = SwapData, S = any> exte
      * Returns real network fee paid for the swap, denominated in input & output tokens (the fee is paid only once, it is
      *  just represented here in both denomination for ease of use)
      */
-    getRealNetworkFee(): { inInputToken: bigint; inOutputToken: bigint } {
+    getRealNetworkFee(): { inInputToken?: bigint; inOutputToken?: bigint } {
         return {inInputToken: this.realNetworkFeeInToken, inOutputToken: this.realNetworkFee};
     }
 

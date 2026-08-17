@@ -28,6 +28,13 @@ export declare class FromBtcLnTrusted extends SwapHandler<FromBtcLnTrustedSwap, 
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
     readonly AmountAssertions: FromBtcAmountAssertions;
+    txReplaces: {
+        chainIdentifier: string;
+        oldTx: string;
+        oldTxId: string;
+        newTx: string;
+        newTxId: string;
+    }[];
     constructor(storageDirectory: IIntermediaryStorage<FromBtcLnTrustedSwap>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: SwapForGasServerConfig);
     /**
      * Unsubscribe from the pending lightning network invoice

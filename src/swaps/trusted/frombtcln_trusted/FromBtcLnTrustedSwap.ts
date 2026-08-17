@@ -22,7 +22,7 @@ export class FromBtcLnTrustedSwap extends SwapHandlerSwap<FromBtcLnTrustedSwapSt
     readonly secret: string;
     readonly token: string;
 
-    scRawTx: string;
+    scSendTxs: {[txId: string]: string};
 
     constructor(
         chainIdentifier: string,
@@ -57,6 +57,7 @@ export class FromBtcLnTrustedSwap extends SwapHandlerSwap<FromBtcLnTrustedSwapSt
             this.secret = secret;
             this.dstAddress = dstAddress;
             this.token = token;
+            this.scSendTxs = {};
         } else {
             super(chainIdOrObj);
             this.pr = chainIdOrObj.pr;
@@ -65,7 +66,10 @@ export class FromBtcLnTrustedSwap extends SwapHandlerSwap<FromBtcLnTrustedSwapSt
             this.secret = chainIdOrObj.secret;
             this.dstAddress = chainIdOrObj.dstAddress;
             this.token = chainIdOrObj.token;
-            this.scRawTx = chainIdOrObj.scRawTx;
+            this.scSendTxs = chainIdOrObj.scSendTxs
+                ?? (
+                    this.txIds?.init!=null && chainIdOrObj.scRawTx!=null ? {[this.txIds.init]: chainIdOrObj.scRawTx} : {}
+                );
         }
         this.type = SwapHandlerType.FROM_BTCLN_TRUSTED;
     }
@@ -98,7 +102,7 @@ export class FromBtcLnTrustedSwap extends SwapHandlerSwap<FromBtcLnTrustedSwapSt
         partialSerialized.secret = this.secret;
         partialSerialized.dstAddress = this.dstAddress;
         partialSerialized.token = this.token;
-        partialSerialized.scRawTx = this.scRawTx;
+        partialSerialized.scSendTxs = this.scSendTxs;
         return partialSerialized;
     }
 

@@ -3,8 +3,23 @@ import {createHash} from "crypto";
 import {FromBtcLnAutoSwap, FromBtcLnAutoSwapState} from "./FromBtcLnAutoSwap";
 import {MultichainData, SwapHandlerType} from "../../SwapHandler";
 import {ISwapPrice} from "../../../prices/ISwapPrice";
-import {ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
-import {expressHandlerWrapper, getAbortController, HEX_REGEX, isDefinedRuntimeError} from "../../../utils/Utils";
+import {
+    ChainSwapType,
+    ClaimEvent,
+    InitializeEvent,
+    RefundEvent,
+    SwapCommitStateType,
+    SwapData,
+    SwapPaidState
+} from "@atomiqlabs/base";
+import {
+    bigIntMax,
+    expressHandlerWrapper,
+    getAbortController,
+    getMinSafeBlockWindowFast,
+    HEX_REGEX,
+    isDefinedRuntimeError
+} from "../../../utils/Utils";
 import {PluginManager} from "../../../plugins/PluginManager";
 import {IIntermediaryStorage} from "../../../storage/IIntermediaryStorage";
 import {FieldTypeEnum, verifySchema} from "../../../utils/paramcoders/SchemaVerifier";
@@ -23,7 +38,7 @@ import {isQuoteThrow} from "../../../plugins/IPlugin";
 
 export type FromBtcLnAutoConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number,
-    minCltv: bigint,
+    destinationHtlcTimeoutSeconds: bigint,
     gracePeriod: bigint,
     gasTokenMax: {[chainId: string]: bigint}
 }
@@ -54,6 +69,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
 
+    readonly minCltv: bigint;
+
     constructor(
         storageDirectory: IIntermediaryStorage<FromBtcLnAutoSwap>,
         path: string,
@@ -73,6 +90,41 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             const {swapContract} = this.getChain(chain);
             if(!swapContract.supportsInitWithoutClaimer) this.allowedTokens[chain].clear();
         }
+
+        const numerator = (this.config.destinationHtlcTimeoutSeconds + this.config.gracePeriod) * this.config.safetyFactor;
+        this.minCltv = bigIntMax(
+            (numerator + this.config.bitcoinBlocktime - 1n)
+                / this.config.bitcoinBlocktime, //Ceil division
+            getMinSafeBlockWindowFast(this.config.safetyFactor)
+        );
+    }
+
+    private async markSwapSettledFromCommitStatus(swap: FromBtcLnAutoSwap, onchainStatus: SwapPaidState): Promise<boolean> {
+        //Extract the swap secret
+        if(swap.state!==FromBtcLnAutoSwapState.CLAIMED && swap.state!==FromBtcLnAutoSwapState.SETTLED) {
+            const secretHex = await onchainStatus.getClaimResult();
+            const secret: Buffer = Buffer.from(secretHex, "hex");
+            const paymentHash: Buffer = createHash("sha256").update(secret).digest();
+            const paymentHashHex = paymentHash.toString("hex");
+
+            if (swap.lnPaymentHash!==paymentHashHex) {
+                //TODO: Possibly fatal failure
+                this.swapLogger.error(swap, "FATAL: markSwapSettledFromCommitStatus(): onchainStatus=PAID, Invalid swap secret specified: "+secretHex
+                    +" with hash: "+paymentHashHex
+                    +" expected paymentHash: "+swap.lnPaymentHash
+                    +" swap invoice: "+swap.pr);
+                return false;
+            }
+
+            swap.secret = secretHex;
+            await swap.setState(FromBtcLnAutoSwapState.CLAIMED);
+            await this.saveSwapData(swap);
+
+            this.swapLogger.warn(swap, "markSwapSettledFromCommitStatus(): swap settled (detected from processPastSwap), invoice: "+swap.pr);
+
+            return true;
+        }
+        return false;
     }
 
     protected async processPastSwap(swap: FromBtcLnAutoSwap): Promise<"REFUND" | "SETTLE" | null> {
@@ -82,8 +134,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             const parsedPR = await this.lightning.parsePaymentRequest(swap.pr);
             const invoice = await this.lightning.getInvoice(parsedPR.id);
 
-            const isBeingPaid = invoice.status==="held";
-            if(!isBeingPaid) {
+            const cancelledOrUnpaid = invoice==null || invoice.status==="canceled" || invoice.status==="unpaid";
+            if(cancelledOrUnpaid) {
                 //Not paid
                 const isInvoiceExpired = parsedPR.expiryEpochMillis<Date.now();
                 if(isInvoiceExpired) {
@@ -120,27 +172,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
             const state: FromBtcLnAutoSwapState = swap.state as FromBtcLnAutoSwapState;
             if(onchainStatus.type===SwapCommitStateType.PAID) {
-                //Extract the swap secret
-                if(state!==FromBtcLnAutoSwapState.CLAIMED && state!==FromBtcLnAutoSwapState.SETTLED) {
-                    const secretHex = await onchainStatus.getClaimResult();
-                    const secret: Buffer = Buffer.from(secretHex, "hex");
-                    const paymentHash: Buffer = createHash("sha256").update(secret).digest();
-                    const paymentHashHex = paymentHash.toString("hex");
-
-                    if (swap.lnPaymentHash!==paymentHashHex) {
-                        //TODO: Possibly fatal failure
-                        this.swapLogger.error(swap, "processPastSwap(state=TXS_SENT|COMMITED): onchainStatus=PAID, Invalid swap secret specified: "+secretHex+" for paymentHash: "+paymentHashHex);
-                        return null;
-                    }
-
-                    swap.secret = secretHex;
-                    await swap.setState(FromBtcLnAutoSwapState.CLAIMED);
-                    await this.saveSwapData(swap);
-
-                    this.swapLogger.warn(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap settled (detected from processPastSwap), invoice: "+swap.pr);
-
-                    return "SETTLE";
-                }
+                if(await this.markSwapSettledFromCommitStatus(swap, onchainStatus)) return "SETTLE";
                 return null;
             }
             if(onchainStatus.type===SwapCommitStateType.COMMITED) {
@@ -162,14 +194,35 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                     }
                 } else {
                     if(await swapContract.isExpired(signer.getAddress(), swap.data)) {
-                        this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
-                        return "REFUND";
+                        if(await swapContract.isCommited(swap.data)) {
+                            this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
+                            return "REFUND";
+                        } else {
+                            //Expired and not committed, we can remove the swap as refunded
+                            await this.removeSwapData(swap, FromBtcLnAutoSwapState.REFUNDED);
+                            return null;
+                        }
                     }
                 }
             }
             if(onchainStatus.type===SwapCommitStateType.REFUNDABLE) {
                 this.swapLogger.info(swap, "processPastSwap(state=TXS_SENT|COMMITED): swap timed out, refunding to self, invoice: "+swap.pr);
                 return "REFUND";
+            }
+        }
+
+        if(swap.state===FromBtcLnAutoSwapState.REFUNDED) {
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state: FromBtcLnAutoSwapState = swap.state as FromBtcLnAutoSwapState;
+            if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
+                if(state===FromBtcLnAutoSwapState.REFUNDED) {
+                    //Explicitly don't cancel the invoice
+                    await this.removeSwapData(swap, FromBtcLnAutoSwapState.REFUNDED);
+                    return null;
+                }
+            } else if(onchainStatus.type===SwapCommitStateType.PAID) {
+                if(await this.markSwapSettledFromCommitStatus(swap, onchainStatus)) return "SETTLE";
+                return null;
             }
         }
 
@@ -184,10 +237,14 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             if(unlock==null) continue;
 
             this.swapLogger.debug(refundSwap, "refundSwaps(): initiate refund of swap");
-            await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
-            this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: "+refundSwap.pr);
-
-            await refundSwap.setState(FromBtcLnAutoSwapState.REFUNDED);
+            try {
+                await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
+                this.swapLogger.info(refundSwap, "refundsSwaps(): swap refunded, invoice: "+refundSwap.pr);
+                await refundSwap.setState(FromBtcLnAutoSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
+            } catch (e) {
+                this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
+            }
             unlock();
         }
     }
@@ -195,7 +252,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
     protected async settleInvoices(swaps: FromBtcLnAutoSwap[]) {
         for(let swap of swaps) {
             try {
-                await this.lightning.settleHodlInvoice(swap.secret);
+                await this.LightningAssertions.settleInvoiceIdempotent(swap.lnPaymentHash, swap.secret);
                 if(swap.metadata!=null) swap.metadata.times.htlcSettled = Date.now();
                 await this.removeSwapData(swap, FromBtcLnAutoSwapState.SETTLED);
 
@@ -217,25 +274,30 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcLnAutoSwapState.CREATED,
                     FromBtcLnAutoSwapState.RECEIVED,
                     FromBtcLnAutoSwapState.TXS_SENT,
                     FromBtcLnAutoSwapState.COMMITED,
                     FromBtcLnAutoSwapState.CLAIMED,
                     FromBtcLnAutoSwapState.CANCELED,
+                    FromBtcLnAutoSwapState.REFUNDED
                 ]
             }
         ]);
 
         for(let {obj: swap} of queriedData) {
-            switch(await this.processPastSwap(swap)) {
-                case "SETTLE":
-                    settleInvoices.push(swap);
-                    break;
-                case "REFUND":
-                    refundSwaps.push(swap);
-                    break;
+            try {
+                switch(await this.processPastSwap(swap)) {
+                    case "SETTLE":
+                        settleInvoices.push(swap);
+                        break;
+                    case "REFUND":
+                        refundSwaps.push(swap);
+                        break;
+                }
+            } catch (e) {
+                this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e);
             }
         }
 
@@ -260,21 +322,30 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
         const secretHex = secret.toString("hex");
         const paymentHashHex = paymentHash.toString("hex");
 
-        if (savedSwap.lnPaymentHash!==paymentHashHex) return;
+        if (savedSwap.lnPaymentHash!==paymentHashHex) {
+            //TODO: Possibly fatal failure
+            this.swapLogger.error(savedSwap, "FATAL: SC: ClaimEvent: invalid swap secret specified: "+secretHex
+                +" with hash: "+paymentHashHex
+                +" expected paymentHash: "+savedSwap.lnPaymentHash
+                +" swap invoice: "+savedSwap.pr);
+            return;
+        }
 
         this.swapLogger.info(savedSwap, "SC: ClaimEvent: swap HTLC successfully claimed by the client, invoice: "+savedSwap.pr);
 
-        try {
-            await this.lightning.settleHodlInvoice(secretHex);
-            this.swapLogger.info(savedSwap, "SC: ClaimEvent: invoice settled, secret: "+secretHex);
+        if(savedSwap.state <= FromBtcLnAutoSwapState.COMMITED) {
             savedSwap.secret = secretHex;
+            await savedSwap.setState(FromBtcLnAutoSwapState.CLAIMED);
+            await this.saveSwapData(savedSwap);
+        }
+
+        if(savedSwap.state === FromBtcLnAutoSwapState.CLAIMED) try {
+            await this.LightningAssertions.settleInvoiceIdempotent(savedSwap.lnPaymentHash, secretHex);
+            this.swapLogger.info(savedSwap, "SC: ClaimEvent: invoice settled, secret: "+secretHex);
             if(savedSwap.metadata!=null) savedSwap.metadata.times.htlcSettled = Date.now();
             await this.removeSwapData(savedSwap, FromBtcLnAutoSwapState.SETTLED);
         } catch (e) {
             this.swapLogger.error(savedSwap, "SC: ClaimEvent: cannot settle invoice", e);
-            savedSwap.secret = secretHex;
-            await savedSwap.setState(FromBtcLnAutoSwapState.CLAIMED);
-            await this.saveSwapData(savedSwap);
         }
 
     }
@@ -301,6 +372,10 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             if(result.status==="held")
                 this.htlcReceived(swap, result).catch(e => this.swapLogger.error(swap, "subscribeToInvoice(): HTLC received result", e));
             this.activeSubscriptions.delete(paymentHash);
+        }).catch(e => {
+            this.swapLogger.error(swap, "subscribeToInvoice(): error while waiting for invoice payment, invoice: "+swap.pr, e);
+            //Delete from active subscription, the watchdog will re-subscribe later
+            this.activeSubscriptions.delete(paymentHash);
         });
         this.swapLogger.info(swap, "subscribeToInvoice(): subscribe to invoice: "+swap.pr);
 
@@ -322,10 +397,9 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
 
         const useToken = invoiceData.token;
 
-        let expiryTimeout: bigint;
         try {
             //Check if HTLC expiry is long enough
-            expiryTimeout = await this.checkHtlcExpiry(invoice);
+            await this.LightningAssertions.checkHtlcExpiry(invoice, this.minCltv);
             if(invoiceData.metadata!=null) invoiceData.metadata.times.htlcTimeoutCalculated = Date.now();
         } catch (e) {
             if(isDefinedRuntimeError(e) && invoiceData.metadata!=null) invoiceData.metadata.htlcReceiveError = e;
@@ -344,7 +418,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             invoiceData.amountToken,
             invoiceData.claimHash,
             0n,
-            BigInt(Math.floor(Date.now() / 1000)) + expiryTimeout,
+            BigInt(Math.floor(Date.now() / 1000)) + this.config.destinationHtlcTimeoutSeconds,
             false,
             true,
             invoiceData.amountGasToken + invoiceData.claimerBounty,
@@ -506,57 +580,20 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
     }
 
     /**
-     * Returns the CLTV timeout (blockheight) of the received HTLC corresponding to the invoice. If multiple HTLCs are
-     *  received (MPP) it returns the lowest of the timeouts
-     *
-     * @param invoice
-     */
-    private getInvoicePaymentsTimeout(invoice: LightningNetworkInvoice): number | null {
-        let timeout: number = null;
-        invoice.payments.forEach((curr) => {
-            if (timeout == null || timeout > curr.timeout) timeout = curr.timeout;
-        });
-        return timeout;
-    }
-
-    /**
-     * Checks if the received HTLC's CLTV timeout is large enough to still process the swap
-     *
-     * @param invoice
-     * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     * @returns expiry timeout in seconds
-     */
-    private async checkHtlcExpiry(invoice: LightningNetworkInvoice): Promise<bigint> {
-        const timeout: number = this.getInvoicePaymentsTimeout(invoice);
-        const current_block_height = await this.lightning.getBlockheight();
-
-        const blockDelta = BigInt(timeout - current_block_height);
-
-        const htlcExpiresTooSoon = blockDelta < this.config.minCltv;
-        if(htlcExpiresTooSoon) {
-            throw {
-                code: 20002,
-                msg: "Not enough time to reliably process the swap",
-                data: {
-                    requiredDelta: this.config.minCltv.toString(10),
-                    actualDelta: blockDelta.toString(10)
-                }
-            };
-        }
-
-        return (this.config.minCltv * this.config.bitcoinBlocktime / this.config.safetyFactor) - this.config.gracePeriod;
-    }
-
-    /**
      * Cancels the swap (CANCELED state) & also cancels the LN invoice (including all pending HTLCs)
      *
      * @param invoiceData
      */
     private async cancelSwapAndInvoice(invoiceData: FromBtcLnAutoSwap): Promise<void> {
         await invoiceData.setState(FromBtcLnAutoSwapState.CANCELED);
-        await this.lightning.cancelHodlInvoice(invoiceData.lnPaymentHash);
-        await this.removeSwapData(invoiceData);
-        this.swapLogger.info(invoiceData, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", invoiceData.pr);
+        try {
+            await this.LightningAssertions.cancelInvoiceIdempotent(invoiceData.lnPaymentHash);
+            await this.removeSwapData(invoiceData);
+            this.swapLogger.info(invoiceData, "cancelSwapAndInvoice(): swap removed & invoice cancelled, invoice: ", invoiceData.pr);
+        } catch (e) {
+            await this.saveSwapData(invoiceData);
+            throw e;
+        }
     };
 
     /**
@@ -639,7 +676,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                             typeof(val)==="string" &&
                             val.length===64 &&
                             HEX_REGEX.test(val) ? val: null,
-                amount: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
@@ -648,8 +685,8 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
                 gasToken: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         chainInterface.isValidToken(val) ? val : null,
-                gasAmount: FieldTypeEnum.BigInt,
-                claimerBounty: FieldTypeEnum.BigInt
+                gasAmount: FieldTypeEnum.BigIntNotNegative,
+                claimerBounty: FieldTypeEnum.BigIntNotNegative
             });
             if(parsedBody==null) throw {
                 code: 20100,
@@ -752,7 +789,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             //Create swap
             const hodlInvoiceObj: HodlInvoiceInit = {
                 description: description ?? (chainIdentifier+"-"+parsedBody.address),
-                cltvDelta:  Number(this.config.minCltv) + 5,
+                cltvDelta:  Number(this.minCltv) + 5,
                 expiresAt: Date.now()+(this.config.invoiceTimeoutSeconds*1000),
                 id: parsedBody.paymentHash,
                 mtokens: totalBtcInput * 1000n,
@@ -882,7 +919,7 @@ export class FromBtcLnAuto extends FromBtcBaseSwapHandler<FromBtcLnAutoSwap, Fro
             };
         }
         return {
-            minCltv: Number(this.config.minCltv),
+            minCltv: Number(this.minCltv),
             invoiceTimeoutSeconds: this.config.invoiceTimeoutSeconds,
             gasTokens: mappedDict
         };

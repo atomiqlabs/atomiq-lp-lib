@@ -2,7 +2,7 @@ import { Express } from "express";
 import { ToBtcSwapAbs, ToBtcSwapState } from "./ToBtcSwapAbs";
 import { MultichainData, SwapHandlerType } from "../../SwapHandler";
 import { ISwapPrice } from "../../../prices/ISwapPrice";
-import { BtcTx, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData, BitcoinRpc, BtcBlock } from "@atomiqlabs/base";
+import { BitcoinRpc, BtcBlock, BtcTx, ChainSwapType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { IIntermediaryStorage } from "../../../storage/IIntermediaryStorage";
 import { ToBtcBaseConfig, ToBtcBaseSwapHandler } from "../ToBtcBaseSwapHandler";
 import { IBitcoinWallet } from "../../../wallets/IBitcoinWallet";
@@ -56,6 +56,8 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @param tx
      * @param swap
      * @param vout
+     *
+     * @returns boolean - whether a terminal state was reached and bitcoin txs should be unsubscribed
      */
     private tryClaimSwap;
     protected processPastSwap(swap: ToBtcSwapAbs): Promise<void>;
@@ -63,6 +65,13 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * Checks past swaps, deletes ones that are already expired.
      */
     protected processPastSwaps(): Promise<void>;
+    /**
+     * @param swap
+     * @param tx
+     * @protected
+     *
+     * @returns boolean - whether a terminal swap was reached and transaction subscriptions should be removed
+     */
     protected processBtcTx(swap: ToBtcSwapAbs, tx: BtcTx): Promise<boolean>;
     /**
      * Checks active sent out bitcoin transactions
@@ -91,12 +100,13 @@ export declare class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSw
      * @private
      * @throws DefinedRuntimeError will throw an error in case the actual fee is higher than quoted fee
      */
-    protected checkCalculatedTxFee(quotedSatsPerVbyte: bigint, actualSatsPerVbyte: bigint): void;
+    protected checkCalculatedTxFee(quotedSatsPerVbyte: number, actualSatsPerVbyte: number): void;
     /**
      * Sends a bitcoin transaction to payout BTC for a swap
      *
      * @param swap
      * @private
+     * @retuns boolean whether a broadcast was successful, or an error happened during broadcasting
      * @throws DefinedRuntimeError will throw an error in case the payment cannot be initiated
      */
     private sendBitcoinPayment;

@@ -9,7 +9,7 @@ import { ILightningWallet } from "../../../wallets/ILightningWallet";
 import { LightningAssertions } from "../../assertions/LightningAssertions";
 export type FromBtcLnConfig = FromBtcBaseConfig & {
     invoiceTimeoutSeconds?: number;
-    minCltv: bigint;
+    destinationHtlcTimeoutSeconds: bigint;
     gracePeriod: bigint;
 };
 export type FromBtcLnRequestType = {
@@ -30,7 +30,9 @@ export declare class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAb
     readonly config: FromBtcLnConfig;
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
+    readonly minCltv: bigint;
     constructor(storageDirectory: IIntermediaryStorage<FromBtcLnSwapAbs>, path: string, chains: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: FromBtcLnConfig);
+    private markSwapSettleFromCommitStatus;
     protected processPastSwap(swap: FromBtcLnSwapAbs): Promise<"REFUND" | "SETTLE" | "CANCEL" | null>;
     protected refundSwaps(refundSwaps: FromBtcLnSwapAbs[]): Promise<void>;
     protected cancelInvoices(swaps: FromBtcLnSwapAbs[]): Promise<void>;
@@ -90,7 +92,6 @@ export declare class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAb
      * @param blockheightPrefetch
      * @param signal
      * @throws {DefinedRuntimeError} Will throw if HTLC expires too soon and therefore cannot be processed
-     * @returns expiry timeout in seconds
      */
     private checkHtlcExpiry;
     /**

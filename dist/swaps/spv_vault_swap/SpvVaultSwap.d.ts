@@ -37,10 +37,11 @@ export declare class SpvVaultSwap extends SwapHandlerSwap<SpvVaultSwapState> {
     readonly executionFeeShare: bigint;
     readonly token: string;
     readonly gasToken: string;
+    readonly withdrawalIndex?: number;
     btcTxId: string;
     saveStickyAddress?: boolean;
     hasStickyAddress?: boolean;
-    constructor(chainIdentifier: string, quoteId: string, expiry: number, vault: SpvVault, vaultUtxo: string, btcAddress: string, btcFeeRate: number, recipient: string, amountBtc: bigint, amountToken: bigint, amountGasToken: bigint, swapFee: bigint, swapFeeInToken: bigint, gasSwapFee: bigint, gasSwapFeeInToken: bigint, callerFeeShare: bigint, frontingFeeShare: bigint, executionFeeShare: bigint, token: string, gasToken: string);
+    constructor(chainIdentifier: string, quoteId: string, expiry: number, vault: SpvVault, vaultUtxo: string, withdrawalIndex: number, btcAddress: string, btcFeeRate: number, recipient: string, amountBtc: bigint, amountToken: bigint, amountGasToken: bigint, swapFee: bigint, swapFeeInToken: bigint, gasSwapFee: bigint, gasSwapFeeInToken: bigint, callerFeeShare: bigint, frontingFeeShare: bigint, executionFeeShare: bigint, token: string, gasToken: string);
     constructor(data: any);
     serialize(): any;
     getIdentifierHash(): string;

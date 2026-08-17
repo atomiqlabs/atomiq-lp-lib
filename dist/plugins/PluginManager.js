@@ -102,55 +102,62 @@ class PluginManager {
         }
     }
     static async onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount) {
+        let quoteAmountTooHigh;
+        let quoteAmountTooLow;
+        let pluginQuote;
+        let quoteSetFees;
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePostFromBtcQuote != null) {
                     const result = await plugin.onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if (result != null) {
-                        if ((0, IPlugin_1.isQuoteSetFees)(result))
-                            return result;
                         if ((0, IPlugin_1.isQuoteThrow)(result))
                             return result;
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            quoteSetFees ?? (quoteSetFees = result);
                         if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                            return result;
+                            quoteAmountTooHigh ?? (quoteAmountTooHigh = result);
                         if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                            return result;
+                            quoteAmountTooLow ?? (quoteAmountTooLow = result);
                         if ((0, IPlugin_1.isPluginQuote)(result)) {
                             if (result.amount.input === requestedAmount.input)
                                 throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
-                            return result;
+                            pluginQuote ?? (pluginQuote = result);
                         }
                     }
                 }
             }
             catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePostFromBtcQuote(): plugin error", e);
             }
         }
-        return null;
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? pluginQuote ?? quoteSetFees ?? null;
     }
     static async onHandlePreFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount) {
+        let quoteAmountTooHigh;
+        let quoteAmountTooLow;
+        let quoteSetFees;
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePreFromBtcQuote != null) {
                     const result = await plugin.onHandlePreFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if (result != null) {
-                        if ((0, IPlugin_1.isQuoteSetFees)(result))
-                            return result;
                         if ((0, IPlugin_1.isQuoteThrow)(result))
                             return result;
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            quoteSetFees ?? (quoteSetFees = result);
                         if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                            return result;
+                            quoteAmountTooHigh ?? (quoteAmountTooHigh = result);
                         if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                            return result;
+                            quoteAmountTooLow ?? (quoteAmountTooLow = result);
                     }
                 }
             }
             catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePreFromBtcQuote(): plugin error", e);
             }
         }
-        return null;
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? quoteSetFees ?? null;
     }
     static async onHandlePreFromBtcExecute(swapType, swap) {
         for (let plugin of PluginManager.plugins.values()) {
@@ -168,6 +175,10 @@ class PluginManager {
         return null;
     }
     static async onHandlePostToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees) {
+        let quoteAmountTooHigh;
+        let quoteAmountTooLow;
+        let pluginQuote;
+        let quoteSetFees;
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePostToBtcQuote != null) {
@@ -181,53 +192,58 @@ class PluginManager {
                         }
                     });
                     if (result != null) {
-                        if ((0, IPlugin_1.isQuoteSetFees)(result))
-                            return result;
                         if ((0, IPlugin_1.isQuoteThrow)(result))
                             return result;
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            quoteSetFees ?? (quoteSetFees = result);
                         if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                            return result;
+                            quoteAmountTooHigh ?? (quoteAmountTooHigh = result);
                         if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                            return result;
+                            quoteAmountTooLow ?? (quoteAmountTooLow = result);
                         if ((0, IPlugin_1.isToBtcPluginQuote)(result)) {
                             if (result.amount.input === requestedAmount.input)
                                 throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
-                            return {
+                            if (networkFeeData == null)
+                                throw new Error("Network fee getter needs to be called by the quote handling plugin!");
+                            pluginQuote ?? (pluginQuote = {
                                 ...result,
                                 networkFeeData: networkFeeData
-                            };
+                            });
                         }
                     }
                 }
             }
             catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePostToBtcQuote(): plugin error", e);
             }
         }
-        return null;
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? pluginQuote ?? quoteSetFees ?? null;
     }
     static async onHandlePreToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees) {
+        let quoteAmountTooHigh;
+        let quoteAmountTooLow;
+        let quoteSetFees;
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onHandlePreToBtcQuote != null) {
                     const result = await plugin.onHandlePreToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees);
                     if (result != null) {
-                        if ((0, IPlugin_1.isQuoteSetFees)(result))
-                            return result;
                         if ((0, IPlugin_1.isQuoteThrow)(result))
                             return result;
+                        if ((0, IPlugin_1.isQuoteSetFees)(result))
+                            quoteSetFees ?? (quoteSetFees = result);
                         if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                            return result;
+                            quoteAmountTooHigh ?? (quoteAmountTooHigh = result);
                         if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                            return result;
+                            quoteAmountTooLow ?? (quoteAmountTooLow = result);
                     }
                 }
             }
             catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePreToBtcQuote(): plugin error", e);
             }
         }
-        return null;
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? quoteSetFees ?? null;
     }
     static async onHandlePreToBtcExecute(swapType, swap) {
         for (let plugin of PluginManager.plugins.values()) {
@@ -260,6 +276,9 @@ class PluginManager {
         return null;
     }
     static async onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount) {
+        let quoteAmountTooHigh;
+        let quoteAmountTooLow;
+        let quoteSpvVaultResult;
         for (let plugin of PluginManager.plugins.values()) {
             try {
                 if (plugin.onVaultSelection != null) {
@@ -268,11 +287,11 @@ class PluginManager {
                         if ((0, IPlugin_1.isQuoteThrow)(result))
                             return result;
                         if ((0, IPlugin_1.isQuoteAmountTooHigh)(result))
-                            return result;
+                            quoteAmountTooHigh ?? (quoteAmountTooHigh = result);
                         if ((0, IPlugin_1.isQuoteAmountTooLow)(result))
-                            return result;
+                            quoteAmountTooLow ?? (quoteAmountTooLow = result);
                         if (result instanceof SpvVault_1.SpvVault)
-                            return result;
+                            quoteSpvVaultResult ?? (quoteSpvVaultResult = result);
                     }
                 }
             }
@@ -280,7 +299,7 @@ class PluginManager {
                 pluginLogger.error(plugin, "onVaultSelection(): plugin error", e);
             }
         }
-        return null;
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? quoteSpvVaultResult ?? null;
     }
     static getWhitelistedTxIds() {
         const whitelist = new Set();

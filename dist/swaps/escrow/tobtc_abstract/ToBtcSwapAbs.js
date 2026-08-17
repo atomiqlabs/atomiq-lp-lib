@@ -25,16 +25,18 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
             this.nonce = nonce;
             this.requiredConfirmations = requiredConfirmations;
             this.preferedConfirmationTarget = preferedConfirmationTarget;
+            this.pastTxIds = {};
         }
         else {
             super(chainIdOrObj);
             this.address = chainIdOrObj.address;
-            this.satsPerVbyte = BigInt(chainIdOrObj.satsPerVbyte);
+            this.satsPerVbyte = Number(chainIdOrObj.satsPerVbyte);
             this.nonce = BigInt(chainIdOrObj.nonce);
             this.requiredConfirmations = chainIdOrObj.requiredConfirmations;
             this.preferedConfirmationTarget = chainIdOrObj.preferedConfirmationTarget;
             this.txId = chainIdOrObj.txId;
             this.btcRawTx = chainIdOrObj.btcRawTx;
+            this.pastTxIds = chainIdOrObj.pastTxIds ?? {};
             //Compatibility
             this.quotedNetworkFee ?? (this.quotedNetworkFee = (0, Utils_1.deserializeBN)(chainIdOrObj.networkFee));
         }
@@ -49,6 +51,7 @@ class ToBtcSwapAbs extends ToBtcBaseSwap_1.ToBtcBaseSwap {
         partialSerialized.preferedConfirmationTarget = this.preferedConfirmationTarget;
         partialSerialized.txId = this.txId;
         partialSerialized.btcRawTx = this.btcRawTx;
+        partialSerialized.pastTxIds = this.pastTxIds;
         return partialSerialized;
     }
     isInitiated() {

@@ -41,7 +41,7 @@ import {FromBtcAmountAssertions} from "../assertions/FromBtcAmountAssertions";
 import {randomBytes} from "crypto";
 import {Transaction} from "@scure/btc-signer";
 import {SpvVaults, VAULT_DUST_AMOUNT} from "./SpvVaults";
-import {isLegacyInput} from "../../utils/BitcoinUtils";
+import {checkTransactionReplaced, isLegacyInput} from "../../utils/BitcoinUtils";
 import {AmountAssertions} from "../assertions/AmountAssertions";
 import {isQuoteThrow} from "../../plugins/IPlugin";
 import {StickyAddress} from "./StickyAddress";
@@ -68,7 +68,7 @@ export type SpvVaultPostQuote = {
     psbtHex: string
 }
 
-const TX_MAX_VSIZE = 16*1024;
+const TX_MAX_VSIZE = 8*1024;
 
 type AmountAdjustUtxo = {
     value: number,
@@ -256,6 +256,25 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         await PluginManager.serviceInitialize(this);
     }
 
+    protected async isDefinitelyNotProcessable(vault: SpvVault, swap: SpvVaultSwap) {
+        if(swap.withdrawalIndex==null) return true;
+        if(!vault.data.isOpened()) return true;
+        const lookback = vault.data.getWithdrawalCount() - swap.withdrawalIndex;
+        if(lookback<0){
+            //The tx should not be considered completely dead yet
+            return false;
+        }
+        //Check if the transaction was actually maybe confirmed
+        const txIds = [vault.data.getUtxo().split(":")[0]];
+        for(let i=0;i<lookback;i++) {
+            const btcTx = await this.bitcoinRpc.getTransaction(txIds[txIds.length-1]);
+            if(btcTx==null) return false; //Unknown
+            txIds.push(btcTx.ins[0].txid);
+        }
+        const foundBtcTxId = txIds.find(txId => swap.btcTxId===txId);
+        return foundBtcTxId==null;
+    }
+
     protected async processPastSwap(swap: SpvVaultSwap): Promise<void> {
         if(swap.state===SpvVaultSwapState.CREATED) {
             if(swap.expiry < Date.now()/1000) {
@@ -269,12 +288,22 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             const vault = await this.Vaults.getVault(swap.chainIdentifier, swap.vaultOwner, swap.vaultId);
             const foundWithdrawal = vault.pendingWithdrawals.find(val => val.btcTx.txid === swap.btcTxId);
             let tx = foundWithdrawal?.btcTx;
-            if(tx==null) tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
+            if(tx==null) {
+                tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
+            } else {
+                tx = await checkTransactionReplaced(tx.txid, tx.raw, this.bitcoinRpc);
+            }
 
             if(tx==null) {
-                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                if(await this.isDefinitelyNotProcessable(vault, swap)){
+                    await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                    //The spv vault watchdog will handle the removal of the withdrawal tx from pending withdrawals
+                    // of the vault, if necessary
+                    return;
+                }
+                //The tx should not be considered completely dead yet
                 return;
-            } else if(tx.confirmations===0) {
+            } else if(tx.confirmations==null || tx.confirmations===0) {
                 await swap.setState(SpvVaultSwapState.SENT)
                 await this.saveSwapData(swap);
                 return;
@@ -293,7 +322,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             if(tx==null) tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
 
             if(tx==null) {
-                await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
+                if(await this.isDefinitelyNotProcessable(vault, swap)){
+                    //The tx should not be considered completely dead yet
+                    await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
+                    return;
+                }
                 return;
             } else if(tx.confirmations > 0) {
                 if(swap.state!==SpvVaultSwapState.BTC_CONFIRMED) {
@@ -308,16 +341,18 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         const swaps = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     SpvVaultSwapState.CREATED, //Check if expired
                     SpvVaultSwapState.SIGNED, //Check if sent
-                    SpvVaultSwapState.SENT //Check if confirmed or double-spent
+                    SpvVaultSwapState.SENT, //Check if confirmed or double-spent
+                    SpvVaultSwapState.BTC_CONFIRMED
                 ]
             }
         ]);
 
         for(let {obj: swap} of swaps) {
-            await this.processPastSwap(swap);
+            await this.processPastSwap(swap)
+                .catch(e => this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e));
         }
     }
 
@@ -432,11 +467,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
              * frontingFeeRate: string      Fronting fee (in output token) to assign to the swap
              */
             const actualParsedBody = await req.paramReader.getParams({
-                amount: FieldTypeEnum.BigInt,
-                gasAmount: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
+                gasAmount: FieldTypeEnum.BigIntNotNegative,
                 exactOut: FieldTypeEnum.BooleanOptional,
-                callerFeeRate: FieldTypeEnum.BigInt,
-                frontingFeeRate: FieldTypeEnum.BigInt,
+                callerFeeRate: FieldTypeEnum.BigIntNotNegative,
+                frontingFeeRate: FieldTypeEnum.BigIntNotNegative,
             });
             abortController.signal.throwIfAborted();
             if(actualParsedBody==null) throw {
@@ -462,10 +497,10 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
 
             const inputAmountAdjustments = req.paramReader.getExistingParamsOrNull({
                 amountUtxos: FieldTypeEnum.AnyOptional,
-                amountFeeRate: FieldTypeEnum.NumberOptional,
+                amountFeeRate: FieldTypeEnum.NumberPositiveOptional,
                 amountSkipDetrimental: FieldTypeEnum.BooleanOptional, //Default to true
-                amountChangeValue: FieldTypeEnum.BigIntOptional,
-                amountChangeVSize: FieldTypeEnum.NumberOptional
+                amountChangeValue: FieldTypeEnum.BigIntNotNegativeOptional,
+                amountChangeVSize: FieldTypeEnum.NumberNotNegativeOptional
             });
             if(inputAmountAdjustments==null) throw {
                 code: 20100,
@@ -660,19 +695,28 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             totalInGasToken = (totalInGasToken * 100_000n / (100_000n + callerFeeRate + frontingFeeRate));
 
             //Calculate raw amounts
-            const [rawTokenAmount, rawGasTokenAmount] = vault.toRawAmounts([totalInToken, totalInGasToken]);
-            [totalInToken, totalInGasToken] = vault.fromRawAmounts([rawTokenAmount, rawGasTokenAmount]);
+            try {
+                const [rawTokenAmount, rawGasTokenAmount] = vault.toRawAmounts([totalInToken, totalInGasToken]);
+                [totalInToken, totalInGasToken] = vault.fromRawAmounts([rawTokenAmount, rawGasTokenAmount]);
+            } catch (e) {
+                this.logger.error("REST: /getQuote: Error while calculating the scaled raw amounts for vaults: ", e)
+                throw {
+                    code: 20400,
+                    msg: "Swap amount too large for the vault, please try smaller amounts!"
+                }
+            }
 
             const expiry = Math.floor(Date.now() / 1000) + this.getInitAuthorizationTimeout(chainIdentifier);
 
             //Get PSBT data
             const executionFeeShare = 0n;
             const utxo = vault.getLatestUtxo();
+            const withdrawalIndex = vault.getNextWithdrawalIndex();
 
             const quoteId = randomBytes(32).toString("hex");
             const swap = new SpvVaultSwap(
                 chainIdentifier, quoteId, expiry,
-                vault, utxo,
+                vault, utxo, withdrawalIndex,
                 receiveAddress, btcFeeRate, parsedBody.address, totalBtcOutput, totalInToken, totalInGasToken,
                 swapFee, swapFeeInToken, gasSwapFee, gasSwapFeeInToken,
                 callerFeeRate, frontingFeeRate, executionFeeShare,
@@ -775,6 +819,9 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 };
             }
 
+            //Enforce sighash default on the spv vault input
+            transaction.updateInput(0, {sighashType: 0});
+
             for(let i=1;i<transaction.inputsLength;i++) { //Skip first vault input
                 const txIn = transaction.getInput(i);
                 if (isLegacyInput(txIn)) throw {
@@ -822,6 +869,7 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 data.rawAmounts[1]!==swap.rawAmountGasToken ||
                 data.getExecutionData()!=null ||
                 data.getSpentVaultUtxo()!==swap.vaultUtxo ||
+                data.btcTx.outs.length < 3 ||
                 data.btcTx.outs[0].value!==VAULT_DUST_AMOUNT ||
                 !Buffer.from(data.btcTx.outs[0].scriptPubKey.hex, "hex").equals(this.bitcoin.toOutputScript(swap.vaultAddress)) ||
                 BigInt(data.btcTx.outs[2].value)!==swap.amountBtc ||
@@ -869,13 +917,14 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 swap
             );
             if(isQuoteThrow(pluginCheckResult)) {
-                const error = {
+                if(swap.state===SpvVaultSwapState.CREATED) {
+                    await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                    if(!swap.hasStickyAddress) await this.bitcoin.addUnusedAddress(swap.btcAddress);
+                }
+                throw {
                     code: 29999,
                     msg: pluginCheckResult.message
-                }
-                if(swap.metadata!=null) swap.metadata.postQuoteError = error;
-                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
-                throw error;
+                };
             }
 
             await this.Vaults.checkVaultReplacedTransactions(vault, true);
@@ -886,31 +935,42 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                 };
             }
 
+            //Double-check the state to prevent race condition
+            if(swap.state!==SpvVaultSwapState.CREATED) throw {
+                code: 20505,
+                msg: "Invalid quote ID, not found or expired!"
+            }; //Continues here is only synchronous code until the state change to SIGNED
+
+            const unlock = swap.lock(120);
+            if(!unlock) throw {
+                code: 20517,
+                msg: "Bitcoin transaction submission already in progress, please retry later!"
+            };
+
+            const txId = signedTx.id;
+
+            let swapSendingSet = false;
+            let dataSendingSet = false;
             try {
                 const btcRawTx = Buffer.from(signedTx.toBytes(true, true)).toString("hex");
-
-                //Double-check the state to prevent race condition
-                if(swap.state!==SpvVaultSwapState.CREATED) {
-                    throw {
-                        code: 20505,
-                        msg: "Invalid quote ID, not found or expired!"
-                    };
-                }
 
                 //Double check in-flight swap count
                 this.checkTooManyInflightSwaps();
 
-                swap.btcTxId = signedTx.id;
+                swap.btcTxId = txId;
                 swap.state = SpvVaultSwapState.SIGNED;
                 swap.sending = true;
-                await this.saveSwapData(swap);
+                swapSendingSet = true;
 
                 data.btcTx.raw = btcRawTx;
                 (data as any).sending = true;
                 vault.addWithdrawal(data);
+                dataSendingSet = true;
+
+                await this.saveSwapData(swap);
                 await this.Vaults.saveVault(vault);
 
-                this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: "+swap.btcTxId);
+                this.swapLogger.info(swap, "REST: /postQuote: BTC transaction signed, txId: "+txId);
 
                 try {
                     await this.bitcoin.sendRawTransaction(btcRawTx);
@@ -925,15 +985,44 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
                     };
                 }
             } catch (e) {
-                (data as any).sending = false;
-                swap.sending = false;
-                vault.removeWithdrawal(data);
-                await this.Vaults.saveVault(vault);
+                if(swapSendingSet) swap.sending = false;
+                if(dataSendingSet) (data as any).sending = false;
 
-                if(isDefinedRuntimeError(e) && swap.metadata!=null) swap.metadata.postQuoteError = e;
-                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
-
-                throw e;
+                //We only make the swap failed if the error happened in CREATED or SIGNED states
+                if(swap.state===SpvVaultSwapState.CREATED || swap.state===SpvVaultSwapState.SIGNED) {
+                    try {
+                        const fetchedBtcTx = await this.bitcoin.getWalletTransaction(txId);
+                        if(fetchedBtcTx==null) {
+                            //The transaction wasn't sent
+                            if(dataSendingSet) {
+                                if(vault.doubleSpendPendingWithdrawal(data))
+                                    await this.Vaults.saveVault(vault);
+                            }
+                            if(isDefinedRuntimeError(e) && swap.metadata!=null) swap.metadata.postQuoteError = e;
+                            //Do not remove or transition the state of the swap here. Let the watchdog handle this
+                            throw e; //This will get caught locally and throw the post quote error
+                        } else {
+                            //Transaction not-null set state to sent and fall through without throwing
+                            await swap.setState(SpvVaultSwapState.SENT);
+                        }
+                    } catch (getTxErr) {
+                        if(getTxErr===e) throw e;
+                        //Cannot determine whether the bitcoin transaction was broadcasted or not
+                        // do nothing here and let the watchdog handle this!
+                        throw {
+                            _httpStatus: 200,
+                            code: 20001,
+                            msg: "Transaction status unknown",
+                            data: {
+                                txId: swap.btcTxId
+                            }
+                        };
+                    }
+                } else {
+                    throw e;
+                }
+            } finally {
+                unlock();
             }
 
             await responseStream.writeParamsAndEnd({
@@ -960,8 +1049,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
     }
 
     protected async saveSwapData(swap: SpvVaultSwap): Promise<void> {
-        if(swap.btcTxId!=null) this.btcTxIdIndex.set(swap.btcTxId, swap);
-        return super.saveSwapData(swap);
+        if(!swap.removed && swap.btcTxId!=null) this.btcTxIdIndex.set(swap.btcTxId, swap);
+        await super.saveSwapData(swap);
+        if(swap.removed && swap.btcTxId!=null) {
+            const cmpSwap = this.btcTxIdIndex.get(swap.btcTxId);
+            if(cmpSwap===swap) this.btcTxIdIndex.delete(swap.btcTxId);
+        }
     }
 
     protected async removeSwapData(swap: SpvVaultSwap, ultimateState?: SpvVaultSwapState): Promise<void> {

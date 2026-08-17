@@ -176,26 +176,32 @@ export class PluginManager {
         fees: {baseFeeInBtc: bigint, feePPM: bigint},
         gasTokenAmount?: {input: false, amount: bigint, token: string, pricePrefetch?: Promise<bigint>}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | PluginQuote> {
+        let quoteAmountTooHigh: QuoteAmountTooHigh;
+        let quoteAmountTooLow: QuoteAmountTooLow;
+        let pluginQuote: PluginQuote;
+        let quoteSetFees: QuoteSetFees;
+
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePostFromBtcQuote!=null) {
                     const result = await plugin.onHandlePostFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if(result!=null) {
-                        if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
-                        if(isQuoteAmountTooHigh(result)) return result;
-                        if(isQuoteAmountTooLow(result)) return result;
+                        if(isQuoteSetFees(result)) quoteSetFees ??= result;
+                        if(isQuoteAmountTooHigh(result)) quoteAmountTooHigh ??= result;
+                        if(isQuoteAmountTooLow(result)) quoteAmountTooLow ??= result;
                         if(isPluginQuote(result)) {
                             if(result.amount.input===requestedAmount.input) throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
-                            return result;
+                            pluginQuote ??= result;
                         }
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePostFromBtcQuote(): plugin error", e);
             }
         }
-        return null;
+
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? pluginQuote ?? quoteSetFees ?? null;
     }
 
     static async onHandlePreFromBtcQuote(
@@ -207,22 +213,27 @@ export class PluginManager {
         fees: {baseFeeInBtc: bigint, feePPM: bigint},
         gasTokenAmount?: {input: false, amount: bigint, token: string}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh> {
+        let quoteAmountTooHigh: QuoteAmountTooHigh;
+        let quoteAmountTooLow: QuoteAmountTooLow;
+        let quoteSetFees: QuoteSetFees;
+
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePreFromBtcQuote!=null) {
                     const result = await plugin.onHandlePreFromBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees, gasTokenAmount);
                     if(result!=null) {
-                        if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
-                        if(isQuoteAmountTooHigh(result)) return result;
-                        if(isQuoteAmountTooLow(result)) return result;
+                        if(isQuoteSetFees(result)) quoteSetFees ??= result;
+                        if(isQuoteAmountTooHigh(result)) quoteAmountTooHigh ??= result;
+                        if(isQuoteAmountTooLow(result)) quoteAmountTooLow ??= result;
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePreFromBtcQuote(): plugin error", e);
             }
         }
-        return null;
+
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? quoteSetFees ?? null;
     }
 
     static async onHandlePreFromBtcExecute(
@@ -250,6 +261,11 @@ export class PluginManager {
         constraints: {minInBtc: bigint, maxInBtc: bigint},
         fees: {baseFeeInBtc: bigint, feePPM: bigint, networkFeeGetter: (amount: bigint) => Promise<T>},
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh | (ToBtcPluginQuote & {networkFeeData: T})> {
+        let quoteAmountTooHigh: QuoteAmountTooHigh;
+        let quoteAmountTooLow: QuoteAmountTooLow;
+        let pluginQuote: ToBtcPluginQuote & {networkFeeData: T};
+        let quoteSetFees: QuoteSetFees;
+
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePostToBtcQuote!=null) {
@@ -263,13 +279,14 @@ export class PluginManager {
                         }
                     });
                     if(result!=null) {
-                        if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
-                        if(isQuoteAmountTooHigh(result)) return result;
-                        if(isQuoteAmountTooLow(result)) return result;
+                        if(isQuoteSetFees(result)) quoteSetFees ??= result;
+                        if(isQuoteAmountTooHigh(result)) quoteAmountTooHigh ??= result;
+                        if(isQuoteAmountTooLow(result)) quoteAmountTooLow ??= result;
                         if(isToBtcPluginQuote(result)) {
                             if(result.amount.input===requestedAmount.input) throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
-                            return {
+                            if(networkFeeData==null) throw new Error("Network fee getter needs to be called by the quote handling plugin!");
+                            pluginQuote ??= {
                                 ...result,
                                 networkFeeData: networkFeeData
                             };
@@ -277,10 +294,11 @@ export class PluginManager {
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePostToBtcQuote(): plugin error", e);
             }
         }
-        return null;
+
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? pluginQuote ?? quoteSetFees ?? null;
     }
 
     static async onHandlePreToBtcQuote(
@@ -291,22 +309,27 @@ export class PluginManager {
         constraints: {minInBtc: bigint, maxInBtc: bigint},
         fees: {baseFeeInBtc: bigint, feePPM: bigint}
     ): Promise<QuoteThrow | QuoteSetFees | QuoteAmountTooLow | QuoteAmountTooHigh> {
+        let quoteAmountTooHigh: QuoteAmountTooHigh;
+        let quoteAmountTooLow: QuoteAmountTooLow;
+        let quoteSetFees: QuoteSetFees;
+
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onHandlePreToBtcQuote!=null) {
                     const result = await plugin.onHandlePreToBtcQuote(swapType, request, requestedAmount, chainIdentifier, constraints, fees);
                     if(result!=null) {
-                        if(isQuoteSetFees(result)) return result;
                         if(isQuoteThrow(result)) return result;
-                        if(isQuoteAmountTooHigh(result)) return result;
-                        if(isQuoteAmountTooLow(result)) return result;
+                        if(isQuoteSetFees(result)) quoteSetFees ??= result;
+                        if(isQuoteAmountTooHigh(result)) quoteAmountTooHigh ??= result;
+                        if(isQuoteAmountTooLow(result)) quoteAmountTooLow ??= result;
                     }
                 }
             } catch (e) {
-                pluginLogger.error(plugin, "onSwapRequestToBtcLn(): plugin error", e);
+                pluginLogger.error(plugin, "onHandlePreToBtcQuote(): plugin error", e);
             }
         }
-        return null;
+
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? quoteSetFees ?? null;
     }
 
     static async onHandlePreToBtcExecute(
@@ -350,22 +373,27 @@ export class PluginManager {
         requestedAmount: {amount: bigint, token: string},
         gasAmount: {amount: bigint, token: string}
     ): Promise<SpvVault | QuoteThrow | QuoteAmountTooHigh | QuoteAmountTooLow> {
+        let quoteAmountTooHigh: QuoteAmountTooHigh;
+        let quoteAmountTooLow: QuoteAmountTooLow;
+        let quoteSpvVaultResult: SpvVault;
+
         for(let plugin of PluginManager.plugins.values()) {
             try {
                 if(plugin.onVaultSelection!=null) {
                     const result = await plugin.onVaultSelection(chainIdentifier, totalSats, requestedAmount, gasAmount);
                     if(result!=null) {
                         if(isQuoteThrow(result)) return result;
-                        if(isQuoteAmountTooHigh(result)) return result;
-                        if(isQuoteAmountTooLow(result)) return result;
-                        if(result instanceof SpvVault) return result;
+                        if(isQuoteAmountTooHigh(result)) quoteAmountTooHigh ??= result;
+                        if(isQuoteAmountTooLow(result)) quoteAmountTooLow ??= result;
+                        if(result instanceof SpvVault) quoteSpvVaultResult ??= result;
                     }
                 }
             } catch (e) {
                 pluginLogger.error(plugin, "onVaultSelection(): plugin error", e);
             }
         }
-        return null;
+
+        return quoteAmountTooHigh ?? quoteAmountTooLow ?? quoteSpvVaultResult ?? null;
     }
 
     static getWhitelistedTxIds(): Set<string> {

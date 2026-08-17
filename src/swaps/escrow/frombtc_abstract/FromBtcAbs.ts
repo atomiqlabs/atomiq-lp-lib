@@ -8,6 +8,7 @@ import {
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
+    SwapCommitStateType,
     SwapData
 } from "@atomiqlabs/base";
 import {randomBytes} from "crypto";
@@ -74,7 +75,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
     private getHash(chainIdentifier: string, address: string, amount: bigint): Buffer {
         const parsedOutputScript = this.bitcoin.toOutputScript(address);
         const {swapContract} = this.getChain(chainIdentifier);
-        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations, 0n);
+        return swapContract.getHashForOnchain(parsedOutputScript, amount, this.config.confirmations);
     }
 
     /**
@@ -91,11 +92,16 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         if(swap.state===FromBtcSwapState.CREATED) {
             if(!await swapContract.isInitAuthorizationExpired(swap.data, swap)) return false;
 
-            const isCommited = await swapContract.isCommited(swap.data);
-            if(isCommited) {
+            const commitState = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            if(commitState.type===SwapCommitStateType.COMMITED || commitState.type===SwapCommitStateType.REFUNDABLE) {
                 this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap was commited, but processed from watchdog, address: "+swap.address);
                 await swap.setState(FromBtcSwapState.COMMITED);
                 await this.saveSwapData(swap);
+                return false;
+            }
+            if(commitState.type===SwapCommitStateType.PAID) {
+                this.swapLogger.info(swap, "processPastSwap(state=CREATED): swap was claimed, but processed from watchdog, address: "+swap.address);
+                await this.removeSwapData(swap, FromBtcSwapState.CLAIMED);
                 return false;
             }
 
@@ -109,15 +115,32 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         if(swap.state===FromBtcSwapState.COMMITED) {
             if(!await swapContract.isExpired(signer.getAddress(), swap.data)) return false;
 
-            const isCommited = await swapContract.isCommited(swap.data);
-            if(isCommited) {
+            const commitState = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            if(commitState.type===SwapCommitStateType.COMMITED || commitState.type===SwapCommitStateType.REFUNDABLE) {
                 this.swapLogger.info(swap, "processPastSwap(state=COMMITED): swap expired, will refund, address: "+swap.address);
                 return true;
+            }
+            if(commitState.type===SwapCommitStateType.PAID) {
+                this.swapLogger.info(swap, "processPastSwap(state=COMMITED): swap was claimed, but processed from watchdog, address: "+swap.address);
+                await this.removeSwapData(swap, FromBtcSwapState.CLAIMED);
+                return false;
             }
 
             this.swapLogger.warn(swap, "processPastSwap(state=COMMITED): commited swap expired and not committed anymore (already refunded?), address: "+swap.address);
             await this.removeSwapData(swap, FromBtcSwapState.CANCELED);
             return false;
+        }
+
+        if(swap.state===FromBtcSwapState.REFUNDED) {
+            const onchainStatus = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
+            const state: FromBtcSwapState = swap.state as FromBtcSwapState;
+            if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
+                if(state===FromBtcSwapState.REFUNDED) {
+                    this.swapLogger.info(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, removing swap!");
+                    await this.removeSwapData(swap, FromBtcSwapState.REFUNDED);
+                    await this.bitcoin.addUnusedAddress(swap.address);
+                }
+            }
         }
     }
 
@@ -129,9 +152,10 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         const queriedData = await this.storageManager.query([
             {
                 key: "state",
-                value: [
+                values: [
                     FromBtcSwapState.CREATED,
-                    FromBtcSwapState.COMMITED
+                    FromBtcSwapState.COMMITED,
+                    FromBtcSwapState.REFUNDED
                 ]
             }
         ]);
@@ -139,7 +163,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         const refundSwaps: FromBtcSwapAbs[] = [];
 
         for(let {obj: swap} of queriedData) {
-            if(await this.processPastSwap(swap)) refundSwaps.push(swap);
+            try {
+                if (await this.processPastSwap(swap)) refundSwaps.push(swap);
+            } catch (e) {
+                this.swapLogger.error(swap, "processPastSwap(): Error executing watchdog function: ", e);
+            }
         }
 
         await this.refundSwaps(refundSwaps);
@@ -156,11 +184,17 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             const {swapContract, signer} = this.getChain(refundSwap.chainIdentifier);
             const unlock = refundSwap.lock(swapContract.refundTimeout);
             if(unlock==null) continue;
+
             this.swapLogger.debug(refundSwap, "refundSwaps(): initiate refund of swap");
-            await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
-            this.swapLogger.info(refundSwap, "refundSwaps(): swap refunded, address: "+refundSwap.address);
-            //The swap should be removed by the event handler
-            await refundSwap.setState(FromBtcSwapState.REFUNDED);
+            try {
+                await swapContract.refund(signer, refundSwap.data, true, false, {waitForConfirmation: true});
+                this.swapLogger.info(refundSwap, "refundSwaps(): swap refunded, address: "+refundSwap.address);
+                //The swap should be removed by the event handler
+                await refundSwap.setState(FromBtcSwapState.REFUNDED);
+                await this.saveSwapData(refundSwap);
+            } catch (e) {
+                this.swapLogger.error(refundSwap, "refundSwaps(): error refunding swap: ", e);
+            }
             unlock();
         }
     }
@@ -201,11 +235,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
     private async getClaimerBounty(req: Request & {paramReader: IParamReader}, expiry: bigint, signal: AbortSignal): Promise<bigint> {
         const parsedClaimerBounty = await req.paramReader.getParams({
             claimerBounty: {
-                feePerBlock: FieldTypeEnum.BigInt,
-                safetyFactor: FieldTypeEnum.BigInt,
-                startTimestamp: FieldTypeEnum.BigInt,
-                addBlock: FieldTypeEnum.BigInt,
-                addFee: FieldTypeEnum.BigInt,
+                feePerBlock: FieldTypeEnum.BigIntNotNegative,
+                safetyFactor: FieldTypeEnum.BigIntNotNegative,
+                startTimestamp: FieldTypeEnum.BigIntNotNegative,
+                addBlock: FieldTypeEnum.BigIntNotNegative,
+                addFee: FieldTypeEnum.BigIntNotNegative,
             },
         }).catch(e => null);
 
@@ -219,6 +253,12 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
         }
 
         const tsDelta: bigint = expiry - parsedClaimerBounty.claimerBounty.startTimestamp;
+        if(tsDelta < 0n) {
+            throw {
+                code: 20043,
+                msg: "Invalid claimerBounty (ts delta < 0)"
+            };
+        }
         const blocksDelta: bigint = tsDelta / this.config.bitcoinBlocktime * parsedClaimerBounty.claimerBounty.safetyFactor;
         const totalBlock: bigint = blocksDelta + parsedClaimerBounty.claimerBounty.addBlock;
         return parsedClaimerBounty.claimerBounty.addFee + (totalBlock * parsedClaimerBounty.claimerBounty.feePerBlock);
@@ -233,7 +273,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             address,
             useToken,
             dummyAmount,
-            swapContract.getHashForOnchain(randomBytes(32), dummyAmount, 3, null).toString("hex"),
+            swapContract.getHashForOnchain(randomBytes(32), dummyAmount, 3).toString("hex"),
             BigIntBufferUtils.fromBuffer(randomBytes(8)),
             BigInt(Math.floor(Date.now()/1000)) + this.config.swapTsCsvDelta,
             false,
@@ -283,11 +323,11 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 address: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         chainInterface.isValidAddress(val, true) ? val : null,
-                amount: FieldTypeEnum.BigInt,
+                amount: FieldTypeEnum.BigIntPositive,
                 token: (val: string) => val!=null &&
                         typeof(val)==="string" &&
                         this.isTokenSupported(chainIdentifier, val) ? val : null,
-                sequence: FieldTypeEnum.BigInt,
+                sequence: FieldTypeEnum.BigIntNotNegative,
                 exactOut: FieldTypeEnum.BooleanOptional
             });
             if(parsedBody==null) throw {
@@ -353,9 +393,18 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
             await this.checkBalance(totalInToken, balancePrefetch, abortController.signal);
             metadata.times.balanceChecked = Date.now();
 
+            //Listener that re-adds the returned bitcoin address to the unused address list if request fails or closes
+            let abortAddUnusedAddressListener: () => void;
+
             //Create swap receive bitcoin address
             const receiveAddress = await this.bitcoin.getAddress();
-            abortController.signal.throwIfAborted();
+            if(abortController.signal.aborted) {
+                await this.bitcoin.addUnusedAddress(receiveAddress);
+                abortController.signal.throwIfAborted();
+            }
+            abortController.signal.addEventListener("abort", abortAddUnusedAddressListener = () => {
+                this.bitcoin.addUnusedAddress(receiveAddress);
+            });
             metadata.times.addressCreated = Date.now();
 
             const paymentHash = this.getHash(chainIdentifier, receiveAddress, amountBD);
@@ -401,6 +450,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
             //Sign the swap
             const sigData = await this.getFromBtcSignatureData(chainIdentifier, data, req, abortController.signal, signDataPrefetchPromise);
+            abortController.signal.throwIfAborted();
             metadata.times.swapSigned = Date.now();
 
             const createdSwap: FromBtcSwapAbs = new FromBtcSwapAbs(chainIdentifier, receiveAddress, this.config.confirmations, amountBD, swapFee, swapFeeInToken);
@@ -419,7 +469,10 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 code: 29999,
                 msg: pluginCheckResult.message
             };
+            abortController.signal.throwIfAborted();
 
+            //We can remove the listener to add unused address now, as we are about to save the swap
+            abortController.signal.removeEventListener("abort", abortAddUnusedAddressListener);
             await PluginManager.swapCreate(createdSwap);
             await this.saveSwapData(createdSwap);
 

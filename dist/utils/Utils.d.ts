@@ -30,4 +30,37 @@ export declare function bigIntSorter(a: bigint, b: bigint): -1 | 0 | 1;
  */
 export declare function getAbortController(responseStream: ServerParamEncoder): AbortController;
 export declare function parsePsbt(btcTx: Transaction): BtcTx;
+/**
+ * Returns the minimum Bitcoin block window (in blocks) for which a "fast blocks" safety
+ * factor is genuinely usable: the probability that N consecutive blocks are produced
+ * with an average interval below (blocktime / safetyFactor) is less than `probability`.
+ *
+ * Model: block arrivals are a Poisson process (i.i.d. exponential intervals), so the
+ * production time of N blocks is Erlang/Gamma(shape=N). A Chernoff (Cramer) bound on
+ * the lower tail gives the per-block large-deviation rate I(S) = ln(S) + 1/S - 1, i.e.
+ *     P(N blocks faster than blocktime/S on average) <= exp(-N * I(S))
+ * which this function inverts for N. Conservative: the exact Erlang CDF already
+ * satisfies the bound ~25% earlier. Use for the fast-block tail (e.g. incoming LN
+ * HTLC expiry racing an escrow claim window).
+ *
+ * @param {number|bigint} safetyFactor Assumed max block-speed multiplier (must be > 1)
+ * @param {number} [probability=0.0001] Tolerated failure probability (default 0.01%)
+ * @returns {number} Minimum safe block window in blocks
+ */
+export declare function getMinSafeBlockWindowFast(safetyFactor: number | bigint, probability?: number): bigint;
+/**
+ * Slow-tail mirror of getMinSafeBlockWindowFast(): returns the minimum block window
+ * (in blocks) for which a "slow blocks" safety factor is genuinely usable: the
+ * probability that N consecutive blocks take LONGER than N * blocktime * safetyFactor
+ * is less than `probability`. Chernoff bound on the upper Erlang tail gives the rate
+ * I(S) = S - 1 - ln(S). Use when converting a wall-clock deadline into a block count
+ * (e.g. payout/claim timeouts that must expire before some real-world time even if
+ * blocks come slowly).
+ *
+ * @param {number|bigint} safetyFactor Assumed max block-slowness multiplier (must be > 1)
+ * @param {number} [probability=0.0001] Tolerated failure probability (default 0.01%)
+ * @returns {number} Minimum safe block window in blocks
+ */
+export declare function getMinSafeBlockWindowSlow(safetyFactor: bigint | number, probability?: number): bigint;
+export declare function bigIntMax(a: bigint, b: bigint): bigint;
 export declare function bigIntCeilDivision(a: bigint, b: bigint): bigint;

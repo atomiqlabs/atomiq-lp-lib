@@ -60,14 +60,14 @@ export declare class ToBtcLnAbs extends ToBtcBaseSwapHandler<ToBtcLnSwapAbs, ToB
     readonly swapType = ChainSwapType.HTLC;
     readonly inflightSwapStates: Set<ToBtcLnSwapState>;
     activeSubscriptions: Set<string>;
-    readonly config: ToBtcLnConfig & {
-        minTsSendCltv: bigint;
-    };
+    readonly config: ToBtcLnConfig;
+    readonly minTsSendCltv: bigint;
     readonly exactInAuths: {
         [reqId: string]: ExactInAuthorization;
     };
     readonly lightning: ILightningWallet;
     readonly LightningAssertions: LightningAssertions;
+    readonly cltvDeltaLowerBound: bigint;
     constructor(storageDirectory: IIntermediaryStorage<ToBtcLnSwapAbs>, path: string, chainData: MultichainData, lightning: ILightningWallet, swapPricing: ISwapPrice, config: ToBtcLnConfig);
     /**
      * Cleans up exactIn authorization that are already past their expiry
