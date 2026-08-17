@@ -1049,8 +1049,12 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
     }
 
     protected async saveSwapData(swap: SpvVaultSwap): Promise<void> {
-        if(swap.btcTxId!=null) this.btcTxIdIndex.set(swap.btcTxId, swap);
-        return super.saveSwapData(swap);
+        if(!swap.removed && swap.btcTxId!=null) this.btcTxIdIndex.set(swap.btcTxId, swap);
+        await super.saveSwapData(swap);
+        if(swap.removed && swap.btcTxId!=null) {
+            const cmpSwap = this.btcTxIdIndex.get(swap.btcTxId);
+            if(cmpSwap===swap) this.btcTxIdIndex.delete(swap.btcTxId);
+        }
     }
 
     protected async removeSwapData(swap: SpvVaultSwap, ultimateState?: SpvVaultSwapState): Promise<void> {
