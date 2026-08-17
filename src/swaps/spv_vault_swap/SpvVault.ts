@@ -174,6 +174,7 @@ export class SpvVault<
 
     toRawAmounts(amounts: bigint[]): bigint[] {
         return amounts.map((amt, index) => {
+            if(amt<0n) throw new Error("Amount cannot be negative!");
             const tokenData = this.data.getTokenData()[index];
             if(tokenData==null) throw new Error("Amount index out of bounds!");
             const result = amt / tokenData.multiplier;
