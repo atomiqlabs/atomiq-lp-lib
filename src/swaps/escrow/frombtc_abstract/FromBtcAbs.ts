@@ -435,6 +435,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
 
             //Sign the swap
             const sigData = await this.getFromBtcSignatureData(chainIdentifier, data, req, abortController.signal, signDataPrefetchPromise);
+            abortController.signal.throwIfAborted();
             metadata.times.swapSigned = Date.now();
 
             const createdSwap: FromBtcSwapAbs = new FromBtcSwapAbs(chainIdentifier, receiveAddress, this.config.confirmations, amountBD, swapFee, swapFeeInToken);
@@ -453,6 +454,7 @@ export class FromBtcAbs extends FromBtcBaseSwapHandler<FromBtcSwapAbs, FromBtcSw
                 code: 29999,
                 msg: pluginCheckResult.message
             };
+            abortController.signal.throwIfAborted();
 
             //We can remove the listener to add unused address now, as we are about to save the swap
             abortController.signal.removeEventListener("abort", abortAddUnusedAddressListener);
