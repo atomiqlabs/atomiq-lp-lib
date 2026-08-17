@@ -256,6 +256,25 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
         await PluginManager.serviceInitialize(this);
     }
 
+    protected async isDefinitelyNotProcessable(vault: SpvVault, swap: SpvVaultSwap) {
+        if(swap.withdrawalIndex==null) return true;
+        if(!vault.data.isOpened()) return true;
+        const lookback = vault.data.getWithdrawalCount() - swap.withdrawalIndex;
+        if(lookback<0){
+            //The tx should not be considered completely dead yet
+            return false;
+        }
+        //Check if the transaction was actually maybe confirmed
+        const txIds = [vault.data.getUtxo().split(":")[0]];
+        for(let i=0;i<lookback;i++) {
+            const btcTx = await this.bitcoinRpc.getTransaction(txIds[txIds.length-1]);
+            if(btcTx==null) return false; //Unknown
+            txIds.push(btcTx.ins[0].txid);
+        }
+        const foundBtcTxId = txIds.find(txId => swap.btcTxId===txId);
+        return foundBtcTxId==null;
+    }
+
     protected async processPastSwap(swap: SpvVaultSwap): Promise<void> {
         if(swap.state===SpvVaultSwapState.CREATED) {
             if(swap.expiry < Date.now()/1000) {
@@ -276,13 +295,13 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             }
 
             if(tx==null) {
-                if(swap.withdrawalIndex!=null && vault.data.isOpened() && vault.data.getWithdrawalCount()<swap.withdrawalIndex){
-                    //The tx should not be considered completely dead yet
+                if(await this.isDefinitelyNotProcessable(vault, swap)){
+                    await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
+                    //The spv vault watchdog will handle the removal of the withdrawal tx from pending withdrawals
+                    // of the vault, if necessary
                     return;
                 }
-                await this.removeSwapData(swap, SpvVaultSwapState.FAILED);
-                //The spv vault watchdog will handle the removal of the withdrawal tx from pending withdrawals
-                // of the vault, if necessary
+                //The tx should not be considered completely dead yet
                 return;
             } else if(tx.confirmations==null || tx.confirmations===0) {
                 await swap.setState(SpvVaultSwapState.SENT)
@@ -303,11 +322,11 @@ export class SpvVaultSwapHandler extends SwapHandler<SpvVaultSwap, SpvVaultSwapS
             if(tx==null) tx = await this.bitcoinRpc.getTransaction(swap.btcTxId);
 
             if(tx==null) {
-                if(swap.withdrawalIndex!=null && vault.data.isOpened() && vault.data.getWithdrawalCount()<swap.withdrawalIndex){
+                if(await this.isDefinitelyNotProcessable(vault, swap)){
                     //The tx should not be considered completely dead yet
+                    await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
                     return;
                 }
-                await this.removeSwapData(swap, SpvVaultSwapState.DOUBLE_SPENT);
                 return;
             } else if(tx.confirmations > 0) {
                 if(swap.state!==SpvVaultSwapState.BTC_CONFIRMED) {
