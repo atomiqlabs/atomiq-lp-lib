@@ -188,7 +188,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
             if(onchainStatus.type===SwapCommitStateType.NOT_COMMITED || onchainStatus.type===SwapCommitStateType.EXPIRED) {
                 if(state===FromBtcLnSwapState.REFUNDED) {
                     try {
-                        await this.cancelInvoiceIdempotent(swap.lnPaymentHash)
+                        await this.LightningAssertions.cancelInvoiceIdempotent(swap.lnPaymentHash)
                         this.swapLogger.info(swap, "processPastSwap(state=REFUNDED): swap confirmed refunded, lightning invoice cancelled!");
                         await this.removeSwapData(swap, FromBtcLnSwapState.REFUNDED);
                     } catch (e) {
@@ -344,7 +344,7 @@ export class FromBtcLnAbs extends FromBtcBaseSwapHandler<FromBtcLnSwapAbs, FromB
         this.swapLogger.info(savedSwap, "SC: RefundEvent: swap refunded to us, invoice: "+savedSwap.pr);
 
         try {
-            await this.cancelInvoiceIdempotent(savedSwap.lnPaymentHash)
+            await this.LightningAssertions.cancelInvoiceIdempotent(savedSwap.lnPaymentHash)
             this.swapLogger.info(savedSwap, "SC: RefundEvent: invoice cancelled");
             await this.removeSwapData(savedSwap, FromBtcLnSwapState.REFUNDED);
         } catch (e) {
