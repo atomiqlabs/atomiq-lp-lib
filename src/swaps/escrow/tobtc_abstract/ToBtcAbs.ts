@@ -210,7 +210,7 @@ export class ToBtcAbs extends ToBtcBaseSwapHandler<ToBtcSwapAbs, ToBtcSwapState>
         }
 
         //Sanity check for sent swaps
-        if(swap.state===ToBtcSwapState.BTC_SENT) {
+        if(swap.state===ToBtcSwapState.BTC_SENDING || swap.state===ToBtcSwapState.BTC_SENT) {
             const isCommited = await swapContract.isCommited(swap.data);
             if(!isCommited) {
                 const status = await swapContract.getCommitStatus(signer.getAddress(), swap.data);
