@@ -285,6 +285,7 @@ export class PluginManager {
                         if(isQuoteAmountTooLow(result)) quoteAmountTooLow ??= result;
                         if(isToBtcPluginQuote(result)) {
                             if(result.amount.input===requestedAmount.input) throw new Error("Invalid quoting response returned, when input is set, output must be returned, and vice-versa!");
+                            if(networkFeeData==null) throw new Error("Network fee getter needs to be called by the quote handling plugin!");
                             pluginQuote ??= {
                                 ...result,
                                 networkFeeData: networkFeeData
